@@ -34,14 +34,25 @@ src/
 │   ├── Home.tsx          # Landing page
 │   ├── Login.tsx         # Phone OTP → JWT
 │   ├── MapPage.tsx       # Short trip booking with Mapbox
-│   ├── DailyPage.tsx     # Permanent lines — draw route + match drivers
-│   ├── DriverPage.tsx    # Driver dashboard
-│   └── AdminPage.tsx     # Admin panel (stats/drivers/customers/bookings/routes)
+│   ├── DailyPage.tsx     # Permanent lines — draw route + match drivers + atomic book
+│   ├── DriverPage.tsx    # Driver dashboard (toggle online, draw route, requests, bookings)
+│   ├── AdminPage.tsx     # Complete Admin panel (map route drawing, stats, drivers, customers, bookings, routes)
+│   └── RidePage.tsx      # Real-time ride tracking + driver GPS live marker
 ├── store/
 │   ├── authStore.ts      # Zustand persist (user, token)
 │   └── rideStore.ts      # Zustand (activeRide, nearbyDrivers)
 ├── types/index.ts        # All TypeScript interfaces
-└── main.tsx              # Router + ProtectedRoute
+├── utils/
+│   └── telegram.ts       # Telegram WebApp SDK integration + deep-links (?role, ?tripType)
+├── index.css
+├── main.tsx              # Router + ProtectedRoute + Telegram WebApp init
+public/
+└── manifest.json         # PWA installable manifest
+telegram/
+├── telegramBot.js        # Telegram Bot engine with Iraqi Governorates, OTP, and atomic booking
+└── README.md             # Telegram Bot architecture, webhooks, and WebApp integration
+nginx.conf                # Production Nginx reverse proxy with SSL + API routing
+Dockerfile                # Multi-stage production container build
 ```
 
 ---
@@ -214,35 +225,43 @@ Map hook (`useMapbox.ts`) exposes:
 
 ---
 
-## 10. Pages TODO (Codex: Complete These)
+## 10. Three-Way Ecosystem Synchronization Architecture
 
-### `/login` — Registration flow
-- After OTP verification, if user is new → show role selection (Customer/Driver)
-- Customer: collect `fullName` → `POST /api/auth/complete-passenger-registration`
-- Driver: collect fullName, vehicleType, vehicleColor, vehiclePlate + upload documents → `POST /api/auth/complete-driver-registration`
-- File: `src/pages/Register.tsx`
+### A. Admin Dashboard (`src/pages/AdminPage.tsx`)
+- **Map Line Locking:** Admin can click on any approved driver, click "✏️ رسم مساره", and click waypoints directly on the Mapbox interactive canvas.
+- **Route Persistence:** Saves route waypoints to `/api/routes/permanent` with `totalSeats` and `fromName`/`toName`.
+- **Live Seat Monitoring:** As passengers book seats from either Web Client or Telegram Bot, the available seats in the Admin routes list decrement in real time.
 
-### `/ride/:id` — Active Ride Tracking
-- Poll `GET /api/ride/status/:id` every 3s
-- Show driver position on map, ETA, status updates
-- File: `src/pages/RidePage.tsx`
+### B. Telegram Bot (`telegram/telegramBot.js`)
+- **Native WebApp Integration:** Sends inline buttons with `web_app: { url: 'https://tawseelaiq.app/?role=Customer&tripType=daily' }`.
+- **Direct Telegram Commute Flow:** Supports fallback native command `/start` -> share location -> searches nearby matching routes -> sends inline keyboard with `book_<driverId>`.
+- **Synchronized Atomic Booking:** Deducts seat using the exact same atomic transaction as the web app (`db.executeAtomicBooking`).
+- **Driver Alerting:** When a booking occurs (either via Web or Telegram), the bot sends instant push notification to the driver's Telegram chat.
 
-### Driver GPS Broadcast
-- In `DriverPage.tsx` when online: `navigator.geolocation.watchPosition()` → `POST /api/driver/location`
-- Update every 5s
+### C. Web Client (`src/pages/DailyPage.tsx`)
+- **Commute Drawing Tool:** Commuter drops points on the map.
+- **Button Unlock:** "إظهار السائقين القريبين" is disabled until at least 2 waypoints are pinned.
+- **Spatial 3-Tier Match:** Sends waypoints to `/api/passenger/match-route`. Drivers are rendered in:
+  - 🟢 **Tier 1:** ≤ 500m
+  - 🟣 **Tier 2:** ≤ 1500m
+  - 🔴 **Tier 3:** > 1500m
+- **Atomic Booking:** Clicks driver -> opens Modal -> calls `/api/bookings/atomic-book` -> seats decrement immediately.
 
-### Socket.io Integration (Enhancement)
-- Install `socket.io` on backend
-- Replace polling with real-time events
-- Events: `driver:location`, `ride:status`, `booking:update`
+---
 
-### PWA Manifest
-- `public/manifest.json` with app name, icons, theme color `#f97316`
-- Register service worker for offline support
+## 11. Next Features for Codex to Implement
 
-### Notifications Page
-- `GET /api/notifications` (add to backend if missing)
-- Bell icon in Navbar with badge count
+### 1. Registration Screen (`src/pages/Register.tsx`)
+- Triggered after OTP verification for new users.
+- Role selection (Customer / Driver).
+- Customer: `fullName`, `governorate` -> `POST /api/auth/complete-passenger-registration`.
+- Driver: `fullName`, `vehicleType`, `vehicleColor`, `vehiclePlate`, document photo upload -> `POST /api/auth/complete-driver-registration`.
+
+### 2. Driver Background Geolocation Watcher
+- Inside `DriverPage.tsx`: when driver toggles `Online`, start `navigator.geolocation.watchPosition` posting coordinates to `/api/driver/location` every 5 seconds.
+
+### 3. Socket.io Real-Time Upgrade (Optional)
+- Replace 5-second polling in `useDriverPolling.ts` and 3-second polling in `RidePage.tsx` with Socket.io client events (`driver:moved`, `ride:status_changed`, `route:seat_decremented`).
 
 ---
 
