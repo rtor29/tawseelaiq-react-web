@@ -13,27 +13,33 @@ const telegramOtpStore = new Map();
 // User state machine
 const userStates = new Map();
 
-// --- Iraq Governorates for Registration Step 2 ---
+// --- Iraq Governorates for Registration Step 2 with Geographic Coordinates ---
 const IRAQ_GOVERNORATES = [
-    { key: 'baghdad', name: 'بغداد' },
-    { key: 'najaf', name: 'النجف' },
-    { key: 'karbala', name: 'كربلاء' },
-    { key: 'basra', name: 'البصرة' },
-    { key: 'babil', name: 'بابل' },
-    { key: 'erbil', name: 'أربيل' },
-    { key: 'sulaymaniyah', name: 'السليمانية' },
-    { key: 'kirkuk', name: 'كركوك' },
-    { key: 'nineveh', name: 'نينوى' },
-    { key: 'anbar', name: 'الأنبار' },
-    { key: 'diyala', name: 'ديالى' },
-    { key: 'wasit', name: 'واسط' },
-    { key: 'saladin', name: 'صلاح الدين' },
-    { key: 'dhi_qar', name: 'ذي قار' },
-    { key: 'maysan', name: 'ميسان' },
-    { key: 'muthanna', name: 'المثنى' },
-    { key: 'qadisiyyah', name: 'القادسية' },
-    { key: 'duhok', name: 'دهوك' }
+    { key: 'baghdad', name: 'بغداد', lat: 33.3152, lon: 44.3661 },
+    { key: 'basra', name: 'البصرة', lat: 30.5085, lon: 47.7804 },
+    { key: 'nineveh', name: 'نينوى', lat: 36.3350, lon: 43.1189 },
+    { key: 'erbil', name: 'أربيل', lat: 36.1911, lon: 44.0092 },
+    { key: 'najaf', name: 'النجف', lat: 31.9961, lon: 44.3168 },
+    { key: 'karbala', name: 'كربلاء', lat: 32.6160, lon: 44.0249 },
+    { key: 'kirkuk', name: 'كركوك', lat: 35.4681, lon: 44.3922 },
+    { key: 'sulaymaniyah', name: 'السليمانية', lat: 35.5669, lon: 45.4165 },
+    { key: 'babil', name: 'بابل', lat: 32.4839, lon: 44.4312 },
+    { key: 'anbar', name: 'الأنبار', lat: 33.4233, lon: 43.2974 },
+    { key: 'diyala', name: 'ديالى', lat: 33.7489, lon: 45.1436 },
+    { key: 'wasit', name: 'واسط', lat: 32.5126, lon: 45.8239 },
+    { key: 'saladin', name: 'صلاح الدين', lat: 34.6062, lon: 43.6793 },
+    { key: 'dhi_qar', name: 'ذي قار', lat: 31.0580, lon: 46.2573 },
+    { key: 'maysan', name: 'ميسان', lat: 31.8360, lon: 47.1435 },
+    { key: 'muthanna', name: 'المثنى', lat: 31.3115, lon: 45.2814 },
+    { key: 'qadisiyyah', name: 'القادسية', lat: 31.9929, lon: 44.9255 },
+    { key: 'duhok', name: 'دهوك', lat: 36.8679, lon: 42.9885 }
 ];
+
+function getGovernorateCoords(keyOrName) {
+    if (!keyOrName) return { lat: 33.3152, lon: 44.3661 };
+    const match = IRAQ_GOVERNORATES.find(g => g.key === keyOrName || g.name === keyOrName || (typeof keyOrName === 'string' && keyOrName.includes(g.name)));
+    return match ? { lat: match.lat, lon: match.lon } : { lat: 33.3152, lon: 44.3661 };
+}
 
 function getGovernoratesKeyboard(rolePrefix) {
     const rows = [];
@@ -346,9 +352,10 @@ async function completePassengerRegistration(chatId, user, locationInput) {
     const now = new Date().toISOString();
     const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
 
-    // Parse location
-    let lat = 31.9961;
-    let lon = 44.3168;
+    // Parse location based on actual GPS or governorate
+    const defaultCoords = getGovernorateCoords(state.governorate || locationInput);
+    let lat = defaultCoords.lat;
+    let lon = defaultCoords.lon;
     let locDisplay = 'الموقع الحالي';
     if (locationInput && typeof locationInput === 'object' && locationInput.latitude) {
         lat = Number(locationInput.latitude);
@@ -356,6 +363,9 @@ async function completePassengerRegistration(chatId, user, locationInput) {
         locDisplay = `موقعي الحالي (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
     } else if (typeof locationInput === 'string' && locationInput.trim() && !locationInput.includes('تخطي')) {
         locDisplay = locationInput.trim();
+        const cityMatch = getGovernorateCoords(locDisplay);
+        lat = cityMatch.lat;
+        lon = cityMatch.lon;
     }
 
     // Check duplicate
@@ -440,9 +450,10 @@ async function completeDriverRegistration(chatId, user, locationInput) {
     const now = new Date().toISOString();
     const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
 
-    // Parse location
-    let lat = 31.9961;
-    let lon = 44.3168;
+    // Parse location based on actual GPS or governorate
+    const defaultCoords = getGovernorateCoords(state.governorate || locationInput);
+    let lat = defaultCoords.lat;
+    let lon = defaultCoords.lon;
     let locDisplay = 'الموقع الحالي';
     if (locationInput && typeof locationInput === 'object' && locationInput.latitude) {
         lat = Number(locationInput.latitude);
@@ -450,6 +461,9 @@ async function completeDriverRegistration(chatId, user, locationInput) {
         locDisplay = `موقعي الحالي (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
     } else if (typeof locationInput === 'string' && locationInput.trim() && !locationInput.includes('تخطي')) {
         locDisplay = locationInput.trim();
+        const cityMatch = getGovernorateCoords(locDisplay);
+        lat = cityMatch.lat;
+        lon = cityMatch.lon;
     }
 
     const existsCust = (db.memoryState.customers || []).find(c => c.phoneNumber === cleanPhone);
@@ -843,14 +857,15 @@ async function handleMessage(chatId, text, user, location) {
                 await handleStart(chatId, user);
                 return;
             }
-            let pLat = 31.9961, pLon = 44.3168;
+            const defShort = getGovernorateCoords(state.governorate || text);
+            let pLat = defShort.lat, pLon = defShort.lon;
             if (location && location.latitude) {
                 pLat = location.latitude;
                 pLon = location.longitude;
             } else if (text) {
-                // Approximate coordinates or geocoding could be done here. 
-                // For now, we will use default Najaf center if text is provided.
-                // Or maybe the user already has saved location?
+                const matched = getGovernorateCoords(text);
+                pLat = matched.lat;
+                pLon = matched.lon;
             }
             
             let passenger = (db.memoryState.customers || []).find(c => String(c.telegramChatId) === String(chatId));
@@ -931,11 +946,16 @@ async function handleMessage(chatId, text, user, location) {
                 await handleStart(chatId, user);
                 return;
             }
-            let pLat = 31.9961, pLon = 44.3168, startName = text || 'موقعي الحالي';
+            const defDaily = getGovernorateCoords(state.governorate || text);
+            let pLat = defDaily.lat, pLon = defDaily.lon, startName = text || 'موقعي الحالي';
             if (location && location.latitude) {
                 pLat = location.latitude;
                 pLon = location.longitude;
                 startName = 'موقعي الحالي';
+            } else if (text) {
+                const matched = getGovernorateCoords(text);
+                pLat = matched.lat;
+                pLon = matched.lon;
             }
             
             userStates.set(chatId, { step: 'passenger_trip_daily_end', startLat: pLat, startLon: pLon, startName });

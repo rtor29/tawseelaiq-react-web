@@ -212,12 +212,13 @@ io.emit('driver:location', { driverId, lat, lon, heading });
 ```
 Token: YOUR_MAPBOX_PUBLIC_TOKEN_HERE
 Style: mapbox://styles/mapbox/streets-v12
-Center: [44.3168, 31.9961]  (Najaf, Iraq)
-Zoom: 12
+Default Center: [43.6793, 33.2232]  (Center of Iraq - Auto-detects user GPS dynamically)
+Governorates Registry: src/utils/governorates.ts (Covers all 18 governorates)
 ```
 
 Map hook (`useMapbox.ts`) exposes:
 - `flyTo(lng, lat, zoom)` — animate to location
+- `flyToGovernorate(keyOrName)` — smoothly fly to any of the 18 Iraqi governorates
 - `addMarker(id, lng, lat, color, label)` — pin marker
 - `removeMarker(id)` — remove by id
 - `drawRoute(id, [[lng,lat]], color)` — draw polyline
@@ -300,9 +301,9 @@ pm2 save
 ```env
 VITE_API_BASE_URL=https://tawseelaiq.app
 VITE_MAPBOX_TOKEN=YOUR_MAPBOX_PUBLIC_TOKEN_HERE
-VITE_MAP_CENTER_LNG=44.3168
-VITE_MAP_CENTER_LAT=31.9961
-VITE_MAP_ZOOM=12
+VITE_MAP_CENTER_LNG=43.6793
+VITE_MAP_CENTER_LAT=33.2232
+VITE_MAP_ZOOM=7
 ```
 
 ---
