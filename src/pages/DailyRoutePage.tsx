@@ -3,9 +3,9 @@
 // - أخضر < 500م | بنفسجي 500م-2كم | أحمر > 2كم
 // - عند الضغط على سائق تظهر ورقة تفاصيله
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Map as MapGL, Marker } from 'react-map-gl';
+import { Map as MapGL, Marker, type MapRef, type MapMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { http } from '../lib/api';
 import { config } from '../lib/config';
@@ -52,6 +52,7 @@ function CarSVG({ color }: { color: string }) {
 export default function DailyRoutePage() {
   const navigate = useNavigate();
   const { show } = useToast();
+  const mapRef = useRef<MapRef | null>(null);
   const [userLoc, setUserLoc] = useState(USER_LOC);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<DriverItem | null>(null);
@@ -61,7 +62,9 @@ export default function DailyRoutePage() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setUserLoc(loc);
+          mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14.2, duration: 800 });
         },
         () => {},
         { timeout: 8000 }
@@ -69,30 +72,40 @@ export default function DailyRoutePage() {
     }
   }, []);
 
-  // جلب السائقين الحقيقيين من الخادم
+  // جلب سائقي الخط الدائمي الحقيقيين من الخادم
   useEffect(() => {
     http
-      .get<any[]>(`/drivers/nearby?lat=${userLoc.lat}&lon=${userLoc.lng}&tripType=daily&rangeKm=30`)
+      .get<any[]>(`/drivers/nearby?lat=${userLoc.lat}&lon=${userLoc.lng}&tripType=daily&rangeKm=50`)
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : [];
-        const mapped: DriverItem[] = data.map((d: any, idx: number) => ({
-          id: d.driverId || idx + 1,
-          driverId: d.driverId || `d-${idx}`,
-          name: d.driverName || d.fullName || 'كابتن توصيله',
-          lat: Number(d.latitude || d.permanentLat || d.currentLat || userLoc.lat + 0.003 * (idx + 1)),
-          lng: Number(d.longitude || d.permanentLon || d.currentLon || userLoc.lng + 0.002 * (idx + 1)),
-          from: d.routeStartName || d.permanentLocationName || 'المركز',
-          to: d.routeEndName || d.permanentDropoffName || 'جامعة الكوفة',
-          rating: Number(d.rating || 4.8),
-          plate: d.plateNumber || 'النجف',
-          seats: 4,
-          takenSeats: 1,
-          phone: d.phoneNumber || d.phone || '',
-        }));
+        const mapped: DriverItem[] = data.map((d: any, idx: number) => {
+          const dLat = Number(d.permanentLat ?? d.latitude ?? d.currentLat ?? (userLoc.lat + 0.003 * (idx + 1)));
+          const dLng = Number(d.permanentLon ?? d.longitude ?? d.currentLon ?? (userLoc.lng + 0.002 * (idx + 1)));
+          return {
+            id: d.driverId || idx + 1,
+            driverId: d.driverId || `d-${idx}`,
+            name: d.driverName || d.fullName || 'كابتن توصيله',
+            lat: dLat,
+            lng: dLng,
+            from: d.permanentLocationName || d.routeStartName || 'المركز',
+            to: d.permanentDropoffName || d.routeEndName || 'جامعة الكوفة',
+            rating: Number(d.rating || 5.0),
+            plate: d.plateNumber || 'النجف',
+            seats: 4,
+            takenSeats: 1,
+            phone: d.phoneNumber || d.phone || '',
+          };
+        });
         setDrivers(mapped);
       })
       .catch(() => {});
   }, [userLoc]);
+
+  function handleMapClick(e: MapMouseEvent) {
+    const newLoc = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+    setUserLoc(newLoc);
+    show('تم تحديد موقعك على الخريطة لحساب القرب من السائقين 📍', 'info');
+  }
 
   function handleContact() {
     if (!selectedDriver?.phone) {
@@ -114,30 +127,35 @@ export default function DailyRoutePage() {
 
       {/* الخريطة */}
       <MapGL
+        ref={mapRef}
         mapboxAccessToken={config.mapboxToken}
         mapStyle={config.mapStyle}
-        initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 13.5 }}
+        initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
+        onClick={handleMapClick}
         style={{ width: '100%', height: '100%' }}
       >
         {/* موقع الراكب */}
         <Marker longitude={userLoc.lng} latitude={userLoc.lat} anchor="center">
           <div className="flex flex-col items-center">
-            <div className="h-5 w-5 rounded-full bg-[#f97316] border-3 border-white shadow-lg" />
+            <div className="h-5 w-5 rounded-full bg-[#f97316] border-3 border-white shadow-lg animate-pulse" />
+            <div className="mt-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-black text-white">موقعك</div>
           </div>
         </Marker>
 
-        {/* السائقون */}
+        {/* السائقون مع الألوان والمسافات الدقيقة */}
         {drivers.map(driver => {
           const dist = distanceKm({ lat: userLoc.lat, lng: userLoc.lng }, { lat: driver.lat, lng: driver.lng });
           const { bg } = getDriverColor(dist);
           const isSelected = selectedDriver?.id === driver.id;
+          const distLabel = dist < 1 ? `${Math.round(dist * 1000)}م` : `${dist.toFixed(1)}كم`;
           return (
             <Marker key={driver.id} longitude={driver.lng} latitude={driver.lat} anchor="bottom">
-              <div className="flex flex-col items-center cursor-pointer" onClick={() => setSelectedDriver(driver)}>
-                {/* اسم السائق */}
-                <div className="mb-0.5 rounded-md px-2 py-0.5 text-[11px] font-black text-white shadow-md"
+              <div className="flex flex-col items-center cursor-pointer transition-transform hover:scale-110 active:scale-95" onClick={(e) => { e.stopPropagation(); setSelectedDriver(driver); }}>
+                {/* اسم السائق + المسافة */}
+                <div className="mb-0.5 flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black text-white shadow-md"
                   style={{ backgroundColor: bg, outline: isSelected ? '2px solid white' : 'none' }}>
-                  {isSelected && '✓ '}{driver.name}
+                  <span>{isSelected && '✓ '}{driver.name}</span>
+                  <span className="text-[10px] font-sans opacity-95">({distLabel})</span>
                 </div>
                 <CarSVG color={bg} />
               </div>
@@ -176,9 +194,10 @@ export default function DailyRoutePage() {
 
       {/* ورقة تفاصيل السائق */}
       {selectedDriver && (() => {
-        const dist = distanceKm({ lat: USER_LOC.lat, lng: USER_LOC.lng }, { lat: selectedDriver.lat, lng: selectedDriver.lng });
-        const { bg } = getDriverColor(dist);
+        const dist = distanceKm({ lat: userLoc.lat, lng: userLoc.lng }, { lat: selectedDriver.lat, lng: selectedDriver.lng });
+        const { bg, label } = getDriverColor(dist);
         const remaining = selectedDriver.seats - selectedDriver.takenSeats;
+        const distLabel = dist < 1 ? `${Math.round(dist * 1000)} متر` : `${dist.toFixed(1)} كم`;
         return (
           <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[24px] bg-[#1e1e2e] text-white pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in">
             <div className="flex justify-center pt-3 mb-1 cursor-pointer" onClick={() => setSelectedDriver(null)}>
@@ -189,7 +208,12 @@ export default function DailyRoutePage() {
             <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-white/10">
               <div>
                 <p className="text-[19px] font-black">{selectedDriver.name}</p>
-                <p className="text-[12px] text-white/60">{selectedDriver.from} - خضراء</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: bg }} />
+                  <span className="text-[12px] font-bold" style={{ color: bg }}>
+                    يبعد عنك {distLabel} — {label}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 {/* أفاتار */}

@@ -9,16 +9,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Map as MapGL, Marker, type MapMouseEvent, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { endpoints, http } from '../lib/api';
+import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { distanceKm } from '../lib/geo';
 import { searchPlaces, reverseGeocode, getDirections, type PlaceResult } from '../lib/mapbox';
 import { storage } from '../lib/storage';
-import type { LngLat, RouteMatch } from '../types';
+import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
-import { DriverTagPin, RouteLines, type RouteLineData } from '../components/map/MapPins';
-import { BottomSheet, Button, Spinner } from '../components/ui';
+import { RouteLines, type RouteLineData } from '../components/map/MapPins';
+import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 
 // نقطة الانطلاق والوصول الافتراضية في النجف
@@ -267,24 +267,7 @@ export default function CustomerHomePage() {
   const [isListeningMic, setIsListeningMic] = useState(false);
   const searchTimer = useRef<number | null>(null);
 
-  // الكباتن المتوفرين
-  const [matches, setMatches] = useState<RouteMatch[]>([]);
-  const [selectedDriver, setSelectedDriver] = useState<RouteMatch | null>(null);
 
-  // جلب الكباتن
-  useEffect(() => {
-    http
-      .get<unknown>(endpoints.findMatchingRoutes)
-      .then((res) => {
-        let list: RouteMatch[] = [];
-        if (Array.isArray(res.data)) list = res.data;
-        else if (res.data && typeof res.data === 'object' && Array.isArray((res.data as any).routes)) {
-          list = (res.data as any).routes;
-        }
-        setMatches(list);
-      })
-      .catch(() => undefined);
-  }, []);
 
   // تحديث العنوان عند تحريك الخريطة في مرحلتي الانطلاق والوصول
   const handleMapMoveEnd = useCallback(
@@ -844,15 +827,7 @@ export default function CustomerHomePage() {
             </Marker>
           )}
 
-          {/* كباتن متوفرين على الخريطة */}
-          {matches.map((m) => (
-            <DriverTagPin
-              key={m.id ?? m.driverId}
-              point={{ lat: m.startLat, lng: m.startLon }}
-              name={m.driverName ?? 'كابتن'}
-              onClick={() => setSelectedDriver(m)}
-            />
-          ))}
+
 
           {/* موقع السائق الحقيقي عند القبول والوصول */}
           {liveDriverPosition ? (
@@ -2293,43 +2268,7 @@ export default function CustomerHomePage() {
         </div>
       )}
 
-      {/* تفاصيل الكابتن */}
-      {selectedDriver && (
-        <BottomSheet open onClose={() => setSelectedDriver(null)}>
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/20 text-2xl">
-              🚖
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="truncate text-lg font-black text-white">{selectedDriver.driverName ?? 'كابتن توصيله'}</span>
-              <p className="text-xs text-white/70 mt-0.5">
-                المسافة الحالية: {distanceKm(stage === 'pickup' ? pickup : dropoff, { lat: selectedDriver.startLat, lng: selectedDriver.startLon }).toFixed(1)} كم
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 flex gap-2">
-            {selectedDriver.driverPhone && (
-              <a
-                href={`tel:${selectedDriver.driverPhone}`}
-                className="flex w-12 items-center justify-center rounded-xl border border-white/30 text-white"
-                aria-label="اتصال بالكابتن"
-              >
-                📞
-              </a>
-            )}
-            <Button
-              variant="primary"
-              className="flex-1"
-              onClick={() => {
-                show(`تم إرسال طلب تكسي إلى الكابتن ${selectedDriver.driverName} 🚖`, 'success');
-                setSelectedDriver(null);
-              }}
-            >
-              طلب التكسي الآن
-            </Button>
-          </div>
-        </BottomSheet>
-      )}
+
     </div>
   );
 }
