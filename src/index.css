@@ -1,14 +1,131 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-html, body, #root {
+html,
+body {
   height: 100%;
-  font-family: 'Cairo', sans-serif;
+  font-family: 'Cairo', system-ui, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+  overscroll-behavior: none;
 }
 
-* { box-sizing: border-box; }
+#root {
+  min-height: 100dvh;
+}
 
-.mapboxgl-map { font-family: 'Cairo', sans-serif; }
-.mapboxgl-ctrl-group { background: rgba(15,23,42,0.9) !important; border: 1px solid rgba(255,255,255,0.1) !important; }
-.mapboxgl-ctrl-group button { color: white !important; }
+/* خريطة Mapbox: فرض الـ RTL على النافذة المنبثقة ومنع زحف الخريطة للاتجاه المعاكس */
+.maplibregl-map,
+.mapboxgl-map {
+  direction: ltr;
+}
+
+/* إخفاء شعار Mapbox زائد الحجم على الشاشات الصغيرة مع الحفاظ على الإسناد */
+.mapboxgl-ctrl-attrib {
+  font-size: 10px;
+}
+
+/* شرائط تمرير رقيقة */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* حركة موشن دخول الشعار من اليمين وظهور النصوص */
+@keyframes driveInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(160px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateX(-8px);
+  }
+  85% {
+    transform: translateX(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInText {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-drive-in {
+  animation: driveInRight 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-drive-in-delayed {
+  opacity: 0;
+  animation: driveInRight 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
+}
+
+.animate-drive-in-delayed2 {
+  opacity: 0;
+  animation: driveInRight 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+}
+
+.animate-fade-in-text {
+  opacity: 0;
+  animation: fadeInText 0.6s ease-out 0.75s forwards;
+}
+
+.animate-fade-in-text-delayed {
+  opacity: 0;
+  animation: fadeInText 0.6s ease-out 0.95s forwards;
+}
+
+.animate-fade-in-text-delayed2 {
+  opacity: 0;
+  animation: fadeInText 0.6s ease-out 1.15s forwards;
+}
+
+@keyframes slideInLeft {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-left {
+  animation: slideInLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pingExpand {
+  0%   { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.animate-ping-expand {
+  animation: pingExpand 2s ease-out infinite;
+}
+
+.animation-delay-600 {
+  animation-delay: 0.6s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s ease-out forwards;
+}
