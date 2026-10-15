@@ -148,12 +148,14 @@ export default function LoginPage() {
           phoneNumber: cleanPhone,
           role: checkData.role || 'Customer',
         });
+        show('تم إرسال رمز التحقق إلى واتساب 📲', 'success');
       } catch (_) {
         // بديل endpoint
         await http.post('/auth/send-otp', {
           phoneNumber: cleanPhone,
           role: checkData.role || 'Customer',
         });
+        show('تم إرسال رمز التحقق إلى واتساب 📲', 'success');
       }
 
       setStep('otp');
