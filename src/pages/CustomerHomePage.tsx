@@ -268,6 +268,7 @@ export default function CustomerHomePage() {
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const [isListeningMic, setIsListeningMic] = useState(false);
   const searchTimer = useRef<number | null>(null);
+  const hasNotifiedArrivalRef = useRef(false);
 
   // استعادة الطلب المحفوظ تلقائياً عند تحديث الصفحة أو الخروج منها والعودة
   useEffect(() => {
@@ -675,6 +676,7 @@ export default function CustomerHomePage() {
       });
 
       if (data.success && data.request) {
+        hasNotifiedArrivalRef.current = false;
         setRideRequestId(data.request.id);
         let assignedDriverData = null;
         if (data.assignedDriver) {
@@ -743,8 +745,12 @@ export default function CustomerHomePage() {
               mapRef.current?.flyTo({ center: [pickup.lng, pickup.lat], zoom: 15.5, duration: 700 });
             }
           } else if (req.status === 'Arrived') {
-            show('الكابتن وصل إلى موقعك الآن! 🚗', 'success', 8000);
+            if (!hasNotifiedArrivalRef.current) {
+              hasNotifiedArrivalRef.current = true;
+              show('الكابتن وصل إلى موقعك الآن! 🚗', 'success', 5000);
+            }
           } else if (req.status === 'Completed') {
+            hasNotifiedArrivalRef.current = false;
             localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
             show('تم إكمال الرحلة بنجاح. شكراً لاستخدامك توصيلة! ✨', 'success');
             setStage('pickup');
@@ -752,6 +758,7 @@ export default function CustomerHomePage() {
             setAssignedDriverInfo(null);
             setLiveDriverPosition(null);
           } else if (req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
+            hasNotifiedArrivalRef.current = false;
             localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
             show(req.status === 'Cancelled' ? 'تم إلغاء الرحلة' : 'لم يتم العثور على سائق متوفر حالياً', 'warning');
             setStage('ride_options');
@@ -798,6 +805,7 @@ export default function CustomerHomePage() {
   // إلغاء الرحلة حقيقياً
   async function handleConfirmCancelTrip() {
     if (!cancelReason) return;
+    hasNotifiedArrivalRef.current = false;
     localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
     if (rideRequestId) {
       try {
