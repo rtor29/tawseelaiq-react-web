@@ -168,6 +168,7 @@ export default function DriverHomePage() {
     if (!driverId) return;
 
     const checkActive = async () => {
+      if (document.hidden) return;
       try {
         const targetId = driverId || rawPhone;
         const { data: activeData } = await http.get<{ success?: boolean; activeRide?: any }>(
@@ -198,6 +199,7 @@ export default function DriverHomePage() {
 
     let isMounted = true;
     const fetchChatMessages = async () => {
+      if (document.hidden) return;
       try {
         const { data } = await http.get<{ success: boolean; messages: any[] }>(
           `/chat/messages?requestId=${encodeURIComponent(activeRide.id)}`
@@ -259,6 +261,7 @@ export default function DriverHomePage() {
     if (workStatus === 'taxi') sendLocation();
 
     const interval = setInterval(async () => {
+      if (document.hidden) return;
       try {
         const targetId = driverId || rawPhone;
         const { data: pendingData } = await http.get<{

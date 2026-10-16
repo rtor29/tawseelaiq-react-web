@@ -55,6 +55,7 @@ export default function ChatModal({
 
     let isMounted = true;
     const fetchMessages = async () => {
+      if (document.hidden) return;
       try {
         const { data } = await http.get<{ success: boolean; messages: ChatMessage[] }>(
           `/chat/messages?requestId=${encodeURIComponent(requestId)}`

@@ -723,6 +723,7 @@ export default function CustomerHomePage() {
     if (!rideRequestId || (stage !== 'searching' && stage !== 'driver_arriving')) return;
 
     const interval = setInterval(async () => {
+      if (document.hidden) return;
       try {
         const { data } = await http.get<{
           success: boolean;
@@ -788,6 +789,7 @@ export default function CustomerHomePage() {
     if (stage !== 'driver_arriving' || !assignedDriverInfo?.driverId) return;
 
     const interval = setInterval(async () => {
+      if (document.hidden) return;
       try {
         const { data } = await http.get<{
           latitude?: number;
