@@ -6,7 +6,21 @@ export const NAJAF_CENTER = { lat: 31.9961, lon: 44.3168 } as const;
 // حدود محافظة النجف الأشرف للبحث الجغرافي الصارم
 export const NAJAF_BBOX = { west: 44.05, south: 31.75, east: 44.65, north: 32.35 } as const;
 
-export const config = {
+export interface AppConfig {
+  appName: string;
+  appVersion: string;
+  apiBaseUrl: string;
+  hubUrl: string;
+  realtimeMode: 'polling' | 'signalr' | 'socketio';
+  mapboxToken: string;
+  mapStyle: string;
+  navigationStyle: string;
+  googleClientId: string;
+  fareBaseIqd: number;
+  farePerKmIqd: number;
+}
+
+export const config: AppConfig = {
   appName: 'توصيله',
   appVersion: '1.0.0',
 
@@ -24,7 +38,18 @@ export const config = {
   // تسعيرة افتراضية (دينار عراقي) — أجرة الافتتاح + للأفقي كيلومتر
   fareBaseIqd: 3000,
   farePerKmIqd: 450,
-} as const;
+};
+
+// تحميل المفاتيح والتوكنات العامة بأمان من بيئة السيرفر عند غيابها
+if (typeof window !== 'undefined' && !config.mapboxToken) {
+  fetch(`${config.apiBaseUrl}/config/public`)
+    .then((r) => r.json())
+    .then((data: { success?: boolean; mapboxToken?: string; googleClientId?: string }) => {
+      if (data.mapboxToken) config.mapboxToken = data.mapboxToken;
+      if (data.googleClientId) config.googleClientId = data.googleClientId;
+    })
+    .catch(() => {});
+}
 
 export function apiUrl(path: string): string {
   return `${config.apiBaseUrl}${path}`;
