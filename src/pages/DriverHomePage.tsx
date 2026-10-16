@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
@@ -48,6 +48,14 @@ export default function DriverHomePage() {
   const [incomingRequest, setIncomingRequest] = useState<IncomingRideRequest | null>(null);
   const [activeRide, setActiveRide] = useState<any | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [latestPassengerMsg, setLatestPassengerMsg] = useState<{
+    id: string;
+    text: string;
+    timestamp: string;
+    senderName: string;
+  } | null>(null);
+  const lastSeenMsgIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     void realtime.connect(storage.getToken());
@@ -94,14 +102,88 @@ export default function DriverHomePage() {
       .catch(() => {});
   }, [driverId]);
 
-  // في وضع التكسي: استطلاع الطلبات الواردة والمشاوير الجارية كل 2.5 ثانية
+  // 1. التحقق المستمر من وجود مشوار نشط للكابتن لاستقبال المحادثات والمشاوير فوراً
+  useEffect(() => {
+    if (!driverId) return;
+
+    const checkActive = async () => {
+      try {
+        const targetId = driverId || rawPhone;
+        const { data: activeData } = await http.get<{ success?: boolean; activeRide?: any }>(
+          `/driver/${encodeURIComponent(targetId)}/active-ride`
+        );
+        if (activeData?.success && activeData.activeRide) {
+          setActiveRide(activeData.activeRide);
+          // إذا وجد مشوار نشط، تفعيل وضع التكسي تلقائياً لمتابعة المشوار والمحادثة
+          setWorkStatus((prev) => (prev === 'idle' ? prev : 'taxi'));
+        } else {
+          setActiveRide(null);
+        }
+      } catch (_) {}
+    };
+
+    void checkActive();
+    const interval = setInterval(checkActive, 2500);
+    return () => clearInterval(interval);
+  }, [driverId, rawPhone]);
+
+  // 2. استطلاع رسائل المحادثة مع الراكب وتنبيه الكابتن فور وصول رسالة جديدة
+  useEffect(() => {
+    if (!activeRide?.id) {
+      setUnreadCount(0);
+      setLatestPassengerMsg(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchChatMessages = async () => {
+      try {
+        const { data } = await http.get<{ success: boolean; messages: any[] }>(
+          `/chat/messages?requestId=${encodeURIComponent(activeRide.id)}`
+        );
+        if (isMounted && data?.success && Array.isArray(data.messages)) {
+          const customerMsgs = data.messages.filter((m) => m.senderRole === 'Customer');
+          if (customerMsgs.length > 0) {
+            const lastMsg = customerMsgs[customerMsgs.length - 1];
+            setLatestPassengerMsg(lastMsg);
+
+            // تنبيه الكابتن فور وصول رسالة جديدة أثناء إغلاق المحادثة
+            if (!isChatOpen && lastMsg.id !== lastSeenMsgIdRef.current) {
+              lastSeenMsgIdRef.current = lastMsg.id;
+              setUnreadCount((prev) => prev + 1);
+              show(`💬 رسالة جديدة من الراكب (${activeRide.customerName || 'الراكب'}): "${lastMsg.text}"`, 'info', 7000);
+            }
+          }
+        }
+      } catch (_) {}
+    };
+
+    void fetchChatMessages();
+    const interval = setInterval(fetchChatMessages, 2000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeRide?.id, isChatOpen]);
+
+  // تصفير عداد الرسائل غير المقروءة عند فتح المحادثة
+  useEffect(() => {
+    if (isChatOpen) {
+      setUnreadCount(0);
+      if (latestPassengerMsg) {
+        lastSeenMsgIdRef.current = latestPassengerMsg.id;
+      }
+    }
+  }, [isChatOpen, latestPassengerMsg]);
+
+  // 3. في وضع التكسي: استطلاع الطلبات الواردة في الانتظار وإرسال موقع السائق
   useEffect(() => {
     if (workStatus !== 'taxi' || !driverId) {
       setIncomingRequest(null);
       return;
     }
 
-    // إرسال موقع السائق للخادم
     const sendLocation = () => {
       http
         .post('/driver/location', {
@@ -117,19 +199,6 @@ export default function DriverHomePage() {
 
     const interval = setInterval(async () => {
       try {
-        // 1. التحقق من وجود مشوار نشط
-        const { data: activeData } = await http.get<{ success?: boolean; activeRide?: any }>(
-          `/driver/${driverId}/active-ride`
-        );
-        if (activeData?.success && activeData.activeRide) {
-          setActiveRide(activeData.activeRide);
-          setIncomingRequest(null);
-          return;
-        } else {
-          setActiveRide(null);
-        }
-
-        // 2. التحقق من الطلبات الواردة في الانتظار
         const { data: pendingData } = await http.get<{
           success?: boolean;
           requests?: IncomingRideRequest[];
@@ -246,6 +315,39 @@ export default function DriverHomePage() {
 
       {/* المحتوى الرئيسي */}
       <main className="flex-1 overflow-y-auto px-5 py-4">
+        {/* تنبيه وصول رسالة من الراكب */}
+        {latestPassengerMsg && activeRide && (
+          <div
+            onClick={() => setIsChatOpen(true)}
+            className="mb-4 flex items-center justify-between rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 p-3.5 text-white shadow-lg cursor-pointer transition active:scale-[0.99] hover:shadow-xl animate-fade-in"
+          >
+            <div className="flex items-center gap-2">
+              <span className="rounded-xl bg-white px-3 py-1.5 text-[12px] font-black text-blue-700 shadow-sm flex items-center gap-1">
+                <span>فتح المحادثة</span>
+                <span className="text-[14px]">💬</span>
+              </span>
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-black text-white animate-pulse">
+                  {unreadCount} جديدة
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-right">
+              <div>
+                <p className="text-[12px] font-bold text-blue-100">
+                  محادثة مع الراكب ({activeRide.customerName || 'الراكب'}):
+                </p>
+                <p className="text-[14px] font-black text-white truncate max-w-[200px]">
+                  {latestPassengerMsg.text}
+                </p>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white text-[18px]">
+                💬
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 2. حالة العمل الحالية */}
         <section className="mb-6">
           <h2 className="text-[16px] font-black text-gray-900 mb-3 text-right">حالة العمل الحالية</h2>
@@ -449,6 +551,11 @@ export default function DriverHomePage() {
                     >
                       <svg className="h-4.5 w-4.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                       <span>مراسلة الراكب 💬</span>
+                      {unreadCount > 0 && (
+                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white animate-pulse">
+                          {unreadCount}
+                        </span>
+                      )}
                     </button>
                     {activeRide.customerPhone && (
                       <button
@@ -534,6 +641,56 @@ export default function DriverHomePage() {
         {/* 4. القائمة السفلية */}
         <section className="pt-2 border-t border-gray-100">
           <div className="space-y-1">
+            {/* تبويب محادثة مع الراكب */}
+            <button
+              type="button"
+              onClick={() => {
+                if (activeRide) {
+                  setIsChatOpen(true);
+                } else {
+                  show('لا يوجد مشوار نشط حالياً مع راكب لمحادثته', 'info');
+                }
+              }}
+              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-blue-50/70 border border-transparent hover:border-blue-100 cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 ? (
+                  <span className="flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-black text-white animate-pulse">
+                    <span>{unreadCount}</span>
+                    <span>رسالة جديدة</span>
+                  </span>
+                ) : activeRide ? (
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                    نشط 🚖
+                  </span>
+                ) : (
+                  <span className="text-[12px] text-gray-400">غير متوفر</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-[16px] font-black text-gray-900 block">محادثة مع الراكب</span>
+                  {activeRide?.customerName ? (
+                    <span className="text-[12px] font-bold text-blue-600">
+                      مع: {activeRide.customerName}
+                    </span>
+                  ) : (
+                    <span className="text-[11.5px] text-gray-500">
+                      مراسلة الركاب أثناء الرحلات
+                    </span>
+                  )}
+                </div>
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-white" />
+                  )}
+                </div>
+              </div>
+            </button>
+
             {/* الرحلات */}
             <button
               type="button"
