@@ -14,6 +14,18 @@ import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { distanceKm } from '../lib/geo';
 import { searchPlaces, reverseGeocode, getDirections, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import {
+  getFavoritePlaces,
+  addFavoritePlace,
+  removeFavoritePlace,
+  getRecentPlaces,
+  addRecentPlace,
+  getUserSettings,
+  saveUserSettings,
+  type FavoritePlace,
+  type RecentPlaceItem,
+  type UserSettings,
+} from '../lib/cache';
 import { storage } from '../lib/storage';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
@@ -32,28 +44,6 @@ const DEFAULT_DROPOFF_NAME = 'حي ميسان، الكوفة';
 const QUICK_CHIPS = [
   { name: 'كراج بغداد', address: 'النجف، كراج بغداد الموحد', lat: 32.028, lng: 44.3465 },
   { name: 'ساحة مظفر', address: 'النجف، ساحة مظفر - مركز المدينة', lat: 32.021, lng: 44.338 },
-];
-
-// الأماكن الأخيرة
-const RECENT_PLACES = [
-  {
-    name: 'كراج العلاوي',
-    address: 'بغداد، الصالحية، قرب شارع دمشق',
-    lat: 33.3289,
-    lng: 44.382,
-  },
-  {
-    name: 'سوبر ماركت وفر',
-    address: 'النجف، السلام، قرب شارع الحزام',
-    lat: 32.015,
-    lng: 44.325,
-  },
-  {
-    name: 'جسر كراج بغداد',
-    address: 'النجف، السلام، قرب شارع الخيمة',
-    lat: 32.0255,
-    lng: 44.341,
-  },
 ];
 
 // قائمة المدن العراقية
@@ -270,6 +260,11 @@ export default function CustomerHomePage() {
   const searchTimer = useRef<number | null>(null);
   const hasNotifiedArrivalRef = useRef(false);
 
+  // كاش المتصفح: الأماكن المفضلة، الأماكن الأخيرة، وإعدادات المستخدم
+  const [favoritePlaces, setFavoritePlaces] = useState<FavoritePlace[]>(() => getFavoritePlaces());
+  const [recentPlacesList, setRecentPlacesList] = useState<RecentPlaceItem[]>(() => getRecentPlaces());
+  const [userSettings, setUserSettings] = useState<UserSettings>(() => getUserSettings());
+
   // استعادة الطلب المحفوظ تلقائياً عند تحديث الصفحة أو الخروج منها والعودة
   useEffect(() => {
     const rawSaved = localStorage.getItem('TAWSEELA_ACTIVE_TAXI_RIDE');
@@ -472,7 +467,7 @@ export default function CustomerHomePage() {
     );
   }
 
-  // بحث الأماكن في نافذة البحث
+  // بحث الأماكن في نافذة البحث (مضبوط بـ 400ms Debounce لتقليل طلبات الشبكة)
   function handleSearchChange(query: string) {
     setSearchQuery(query);
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
@@ -492,11 +487,11 @@ export default function CustomerHomePage() {
       } finally {
         setIsSearchingPlaces(false);
       }
-    }, 250);
+    }, 400);
   }
 
-  // اختيار مكان من نتائج البحث
-  function handleSelectPlace(place: { name: string; lat: number; lng: number }) {
+  // اختيار مكان من نتائج البحث وتحديث كاش الأماكن الأخيرة
+  function handleSelectPlace(place: { name: string; lat: number; lng: number; address?: string }) {
     if (stage === 'pickup') {
       setPickup({ lat: place.lat, lng: place.lng });
       setPickupName(place.name);
@@ -504,6 +499,10 @@ export default function CustomerHomePage() {
       setDropoff({ lat: place.lat, lng: place.lng });
       setDropoffName(place.name);
     }
+    // حفظ الموقع في كاش الأماكن الأخيرة
+    addRecentPlace({ name: place.name, address: place.address, lat: place.lat, lng: place.lng });
+    setRecentPlacesList(getRecentPlaces());
+
     mapRef.current?.flyTo({ center: [place.lng, place.lat], zoom: 15.5, duration: 700 });
     setIsSearchOpen(false);
     setSearchQuery('');
@@ -1843,16 +1842,40 @@ export default function CustomerHomePage() {
                         <p className="text-[14px] font-bold text-gray-900">{place.name}</p>
                       </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addFavoritePlace({ name: place.name, lat: place.lat, lng: place.lon });
+                        setFavoritePlaces(getFavoritePlaces());
+                        show(`تمت إضافة ${place.name} إلى المفضلة ⭐`, 'success');
+                      }}
+                      className="p-2 text-gray-400 transition hover:text-amber-500"
+                      title="إضافة للمفضلة"
+                    >
+                      <svg
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>
             ) : (
               <div>
-                <p className="mb-3 text-[14px] font-bold text-gray-500">الأماكن الأخيرة</p>
+                <p className="mb-3 text-[14px] font-bold text-gray-500">الأماكن الأخيرة الشائعة</p>
                 <div className="space-y-1">
-                  {RECENT_PLACES.map((item) => (
+                  {recentPlacesList.map((item) => (
                     <div
-                      key={item.name}
+                      key={`${item.name}-${item.lat}-${item.lng}`}
                       onClick={() => handleSelectPlace(item)}
                       className="flex items-center justify-between border-b border-gray-100 py-3.5 cursor-pointer hover:bg-gray-50 transition"
                     >
@@ -1873,7 +1896,7 @@ export default function CustomerHomePage() {
                         </div>
                         <div>
                           <p className="text-[15px] font-black text-gray-900">{item.name}</p>
-                          <p className="text-[12px] font-semibold text-gray-400 mt-0.5">{item.address}</p>
+                          {item.address && <p className="text-[12px] font-semibold text-gray-400 mt-0.5">{item.address}</p>}
                         </div>
                       </div>
 
@@ -1881,6 +1904,8 @@ export default function CustomerHomePage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          addFavoritePlace({ name: item.name, address: item.address, lat: item.lat, lng: item.lng });
+                          setFavoritePlaces(getFavoritePlaces());
                           show(`تمت إضافة ${item.name} إلى المفضلة ⭐`, 'success');
                         }}
                         className="p-2 text-gray-400 transition hover:text-amber-500"
@@ -2336,12 +2361,44 @@ export default function CustomerHomePage() {
             {activeDrawerSubModal === 'favorites' && (
               <div>
                 <h3 className="text-lg font-black text-gray-900 mb-3">⭐ العناوين المفضلة</h3>
-                <div className="space-y-2 mb-4">
-                  <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                    <p className="text-sm font-black text-gray-800">المنزل 🏠</p>
-                    <p className="text-xs font-semibold text-gray-500">النجف، حي السلام</p>
+                {favoritePlaces.length === 0 ? (
+                  <p className="text-xs font-semibold text-gray-400 text-center py-6">
+                    لا توجد عناوين مفضلة بعد. يمكنك إضافة أي موقع إلى المفضلة بالنقر على النجمة ⭐ في البحث.
+                  </p>
+                ) : (
+                  <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto">
+                    {favoritePlaces.map((fav) => (
+                      <div
+                        key={fav.id}
+                        className="flex items-center justify-between rounded-xl border border-gray-100 p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer"
+                        onClick={() => {
+                          handleSelectPlace({ name: fav.name, lat: fav.lat, lng: fav.lng, address: fav.address });
+                          setActiveDrawerSubModal('none');
+                          setIsProfileOpen(false);
+                          show(`تم تحديد ${fav.name} بنجاح 📍`, 'success');
+                        }}
+                      >
+                        <div>
+                          <p className="text-sm font-black text-gray-800">{fav.name}</p>
+                          <p className="text-xs font-semibold text-gray-500">{fav.address || 'النجف الأشرف'}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const updated = removeFavoritePlace(fav.id);
+                            setFavoritePlaces(updated);
+                            show('تم حذف العنوان من المفضلة', 'info');
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition text-sm"
+                          title="حذف من المفضلة"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -2367,8 +2424,46 @@ export default function CustomerHomePage() {
             )}
 
             {activeDrawerSubModal === 'settings' && (
-              <div>
-                <h3 className="text-lg font-black text-gray-900 mb-3">⚙️ إعدادات الحساب</h3>
+              <div className="space-y-4">
+                <h3 className="text-lg font-black text-gray-900 mb-2">⚙️ إعدادات الحساب والتطبيق</h3>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700">التنبيهات الصوتية 🔔</span>
+                    <input
+                      type="checkbox"
+                      checked={userSettings.soundEnabled}
+                      onChange={(e) => {
+                        const upd = saveUserSettings({ soundEnabled: e.target.checked });
+                        setUserSettings(upd);
+                      }}
+                      className="h-4 w-4 accent-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700">إشعارات الرسائل والوصول 💬</span>
+                    <input
+                      type="checkbox"
+                      checked={userSettings.notificationsEnabled}
+                      onChange={(e) => {
+                        const upd = saveUserSettings({ notificationsEnabled: e.target.checked });
+                        setUserSettings(upd);
+                      }}
+                      className="h-4 w-4 accent-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700">توسيط الخريطة التلقائي 🗺️</span>
+                    <input
+                      type="checkbox"
+                      checked={userSettings.autoCenterMap}
+                      onChange={(e) => {
+                        const upd = saveUserSettings({ autoCenterMap: e.target.checked });
+                        setUserSettings(upd);
+                      }}
+                      className="h-4 w-4 accent-blue-600 rounded cursor-pointer"
+                    />
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={handleLogout}

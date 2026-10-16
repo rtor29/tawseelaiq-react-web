@@ -121,7 +121,7 @@ export default function CreateRoutePage() {
     searchTimer.current = window.setTimeout(async () => {
       const results = await searchPlaces(q);
       setSearchResults(results);
-    }, 200);
+    }, 400);
   }
 
   function selectPlace(place: PlaceResult) {

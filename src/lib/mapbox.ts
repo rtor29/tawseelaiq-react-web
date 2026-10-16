@@ -106,10 +106,23 @@ export const NAJAF_LOCAL_PLACES: PlaceResult[] = [
   { name: 'حي الحانة', lat: 31.9870, lon: 44.3600 },
 ];
 
-// بحث الأماكن داخل النجف حصراً — بديل searchPlaces + فلتر _isStrictlyNajaf
+import {
+  getCachedSearchResults,
+  setCachedSearchResults,
+  getCachedReverseGeocode,
+  setCachedReverseGeocode,
+} from './cache';
+
+// بحث الأماكن داخل النجف حصراً — بديل searchPlaces + فلتر _isStrictlyNajaf مع كاش محلي
 export async function searchPlaces(query: string, proximity?: LngLat): Promise<PlaceResult[]> {
   const q = query.trim();
   if (!q) return NAJAF_LOCAL_PLACES;
+
+  // التحقق من كاش المتصفح أولاً لتقليل استهلاك الـ API وتسريع الاستجابة
+  const cached = getCachedSearchResults(q, proximity);
+  if (cached && cached.length > 0) {
+    return cached;
+  }
 
   try {
     const proximityParam = proximity
@@ -141,16 +154,26 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
       }))
       .filter((p) => isStrictlyNajaf(p.name, p.lat, p.lon));
 
-    return results.length > 0 ? results : NAJAF_LOCAL_PLACES.filter(p =>
+    const finalResults = results.length > 0 ? results : NAJAF_LOCAL_PLACES.filter(p =>
       p.name.includes(q)
     );
+
+    if (finalResults.length > 0) {
+      setCachedSearchResults(q, finalResults, proximity);
+    }
+
+    return finalResults;
   } catch {
     return NAJAF_LOCAL_PLACES;
   }
 }
 
-// عكس الإحداثيات إلى عنوان عربي — بديل reverseGeocode
+// عكس الإحداثيات إلى عنوان عربي — بديل reverseGeocode مع كاش محلي
 export async function reverseGeocode(point: LngLat): Promise<string | null> {
+  // التحقق من كاش العناوين العكسية أولاً
+  const cached = getCachedReverseGeocode(point.lat, point.lng);
+  if (cached) return cached;
+
   try {
     const data = await externalGet<{ features?: Array<{ place_name_ar?: string; place_name?: string; text_ar?: string; text?: string }> }>(
       `${GEOCODE_URL}/${point.lng},${point.lat}.json`,
@@ -166,7 +189,11 @@ export async function reverseGeocode(point: LngLat): Promise<string | null> {
     );
     const first = data.features?.[0];
     const name = first?.place_name_ar || first?.place_name || first?.text_ar || first?.text;
-    return name && name.trim() ? name : null;
+    const finalName = name && name.trim() ? name.trim() : null;
+    if (finalName) {
+      setCachedReverseGeocode(point.lat, point.lng, finalName);
+    }
+    return finalName;
   } catch {
     return null;
   }
