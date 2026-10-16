@@ -107,6 +107,26 @@ export default function DailyRoutePage() {
     show('تم تحديد موقعك على الخريطة لحساب القرب من السائقين 📍', 'info');
   }
 
+  // زر تحديد الموقع الحالي عبر الـ GPS
+  function handleUseCurrentLocation() {
+    if (!navigator.geolocation) {
+      show('خاصية تحديد الموقع غير مدعومة في هذا المتصفح', 'warning');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLoc(loc);
+        mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 15, duration: 800 });
+        show('تم تحديد موقعك الحالي 📍', 'success');
+      },
+      () => {
+        show('تعذر تحديد الموقع الحالي، يرجى تفعيل الـ GPS', 'warning');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
   function handleContact() {
     if (!selectedDriver?.phone) {
       show('رقم هاتف السائق غير متوفر', 'info');
@@ -163,6 +183,32 @@ export default function DailyRoutePage() {
           );
         })}
       </MapGL>
+
+      {/* زر تحديد الموقع الحالي عبر الـ GPS */}
+      <button
+        type="button"
+        onClick={handleUseCurrentLocation}
+        className={`absolute ${selectedDriver ? 'bottom-28' : 'bottom-60'} right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-gray-800 shadow-[0_4px_16px_rgba(0,0,0,0.18)] transition-all active:scale-95 cursor-pointer hover:bg-gray-50`}
+        title="موقعي الحالي عبر الـ GPS"
+        aria-label="تحديد موقعي"
+      >
+        <svg
+          className="h-6 w-6 text-gray-700"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="7" />
+          <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+          <line x1="12" y1="2" x2="12" y2="5" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+          <line x1="2" y1="12" x2="5" y2="12" />
+          <line x1="19" y1="12" x2="22" y2="12" />
+        </svg>
+      </button>
 
       {/* مفتاح الألوان */}
       {!selectedDriver && (
