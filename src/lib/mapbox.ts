@@ -112,10 +112,11 @@ import {
   getCachedReverseGeocode,
   setCachedReverseGeocode,
 } from './cache';
+import { sanitizeSearchQuery } from './sanitize';
 
 // بحث الأماكن داخل النجف حصراً — بديل searchPlaces + فلتر _isStrictlyNajaf مع كاش محلي
 export async function searchPlaces(query: string, proximity?: LngLat): Promise<PlaceResult[]> {
-  const q = query.trim();
+  const q = sanitizeSearchQuery(query);
   if (!q) return NAJAF_LOCAL_PLACES;
 
   // التحقق من كاش المتصفح أولاً لتقليل استهلاك الـ API وتسريع الاستجابة

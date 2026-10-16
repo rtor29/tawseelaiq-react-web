@@ -9,6 +9,7 @@ import { endpoints, http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config, NAJAF_CENTER } from '../lib/config';
 import { getDirections, reverseGeocode, searchPlaces, type PlaceResult, type RouteResult } from '../lib/mapbox';
+import { sanitizeSearchQuery } from '../lib/sanitize';
 import type { LngLat } from '../types';
 import { TopBar } from '../components/TopBar';
 import { Button, Field, SelectField, Spinner } from '../components/ui';
@@ -112,14 +113,15 @@ export default function CreateRoutePage() {
   }
 
   function onSearchChange(q: string) {
+    const cleaned = sanitizeSearchQuery(q);
     setSearchQuery(q);
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
-    if (!q.trim()) {
+    if (!cleaned) {
       setSearchResults([]);
       return;
     }
     searchTimer.current = window.setTimeout(async () => {
-      const results = await searchPlaces(q);
+      const results = await searchPlaces(cleaned);
       setSearchResults(results);
     }, 400);
   }

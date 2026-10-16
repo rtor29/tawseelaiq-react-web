@@ -26,6 +26,7 @@ import {
   type RecentPlaceItem,
   type UserSettings,
 } from '../lib/cache';
+import { sanitizeSearchQuery } from '../lib/sanitize';
 import { storage } from '../lib/storage';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
@@ -467,13 +468,13 @@ export default function CustomerHomePage() {
     );
   }
 
-  // بحث الأماكن في نافذة البحث (مضبوط بـ 400ms Debounce لتقليل طلبات الشبكة)
+  // بحث الأماكن في نافذة البحث (مضبوط بـ 400ms Debounce وتنقية أمنية ضد الحقن)
   function handleSearchChange(query: string) {
+    const cleaned = sanitizeSearchQuery(query);
     setSearchQuery(query);
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
 
-    const q = query.trim();
-    if (!q) {
+    if (!cleaned) {
       setSearchResults(NAJAF_LOCAL_PLACES.map(p => ({ name: p.name, lat: p.lat, lng: p.lon })) as unknown as PlaceResult[]);
       return;
     }
@@ -482,7 +483,7 @@ export default function CustomerHomePage() {
     searchTimer.current = window.setTimeout(async () => {
       setIsSearchingPlaces(true);
       try {
-        const results = await searchPlaces(q, proximity);
+        const results = await searchPlaces(cleaned, proximity);
         setSearchResults(results);
       } finally {
         setIsSearchingPlaces(false);
