@@ -269,6 +269,133 @@ export default function CustomerHomePage() {
   const [isListeningMic, setIsListeningMic] = useState(false);
   const searchTimer = useRef<number | null>(null);
 
+  // استعادة الطلب المحفوظ تلقائياً عند تحديث الصفحة أو الخروج منها والعودة
+  useEffect(() => {
+    const rawSaved = localStorage.getItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+    let savedReqId: string | null = null;
+    if (rawSaved) {
+      try {
+        const saved = JSON.parse(rawSaved);
+        if (saved?.rideRequestId && (saved.stage === 'searching' || saved.stage === 'driver_arriving')) {
+          savedReqId = saved.rideRequestId;
+          setRideRequestId(saved.rideRequestId);
+          setStage(saved.stage);
+          if (saved.pickup) setPickup(saved.pickup);
+          if (saved.pickupName) setPickupName(saved.pickupName);
+          if (saved.dropoff) setDropoff(saved.dropoff);
+          if (saved.dropoffName) setDropoffName(saved.dropoffName);
+          if (saved.selectedTierId) setSelectedTierId(saved.selectedTierId);
+          if (saved.assignedDriverInfo) setAssignedDriverInfo(saved.assignedDriverInfo);
+          if (saved.routeCoordinates) setRouteCoordinates(saved.routeCoordinates);
+          if (saved.pickup?.lng && saved.pickup?.lat) {
+            setTimeout(() => {
+              mapRef.current?.flyTo({ center: [saved.pickup.lng, saved.pickup.lat], zoom: 15, duration: 600 });
+            }, 300);
+          }
+
+          // فحص حالة الطلب من الخادم
+          http
+            .get<{
+              success: boolean;
+              request?: {
+                status: string;
+                assignedDriverId?: string;
+                assignedDriverName?: string;
+                assignedDriverPhone?: string;
+                assignedDriverVehicle?: string;
+                acceptedDriverId?: string;
+              };
+            }>(`/ride/status/${saved.rideRequestId}`)
+            .then((res) => {
+              if (res.data?.success && res.data.request) {
+                const req = res.data.request;
+                if (req.status === 'Accepted' || req.status === 'Arrived') {
+                  setStage('driver_arriving');
+                } else if (req.status === 'Pending') {
+                  setStage('searching');
+                } else if (
+                  req.status === 'Completed' ||
+                  req.status === 'Cancelled' ||
+                  req.status === 'NoDriversAvailable'
+                ) {
+                  // إزالة الطلب فقط عند الانتهاء أو الإلغاء
+                  localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+                  setStage('pickup');
+                  setRideRequestId(null);
+                  setAssignedDriverInfo(null);
+                }
+
+                if (req.assignedDriverName || req.assignedDriverPhone) {
+                  setAssignedDriverInfo((prev) => ({
+                    ...prev,
+                    driverId: req.acceptedDriverId || req.assignedDriverId || prev?.driverId,
+                    driverName: req.assignedDriverName || prev?.driverName,
+                    driverPhone: req.assignedDriverPhone || prev?.driverPhone,
+                    driverVehicle: req.assignedDriverVehicle || prev?.driverVehicle,
+                  }));
+                }
+              }
+            })
+            .catch(() => {});
+        }
+      } catch (_) {}
+    }
+
+    // شبكة أمان إضافية من الخادم
+    if (!savedReqId) {
+      const custId = session?.userId || storage.getUserId();
+      const phoneId = rawPhone;
+      const targetQuery = custId || phoneId;
+      if (targetQuery) {
+        http
+          .get<{ success: boolean; activeRide?: any }>(`/customer/${encodeURIComponent(targetQuery)}/active-ride`)
+          .then((res) => {
+            if (res.data?.success && res.data.activeRide) {
+              const r = res.data.activeRide;
+              setRideRequestId(r.id);
+              const curStage = (r.status === 'Accepted' || r.status === 'Arrived') ? 'driver_arriving' : 'searching';
+              setStage(curStage);
+              if (r.pickupLat && r.pickupLon) {
+                setPickup({ lat: parseFloat(r.pickupLat), lng: parseFloat(r.pickupLon) });
+              }
+              if (r.pickupName) setPickupName(r.pickupName);
+              if (r.dropoffLat && r.dropoffLon) {
+                setDropoff({ lat: parseFloat(r.dropoffLat), lng: parseFloat(r.dropoffLon) });
+              }
+              if (r.dropoffName) setDropoffName(r.dropoffName);
+              if (r.assignedDriverName || r.assignedDriverPhone) {
+                setAssignedDriverInfo({
+                  driverId: r.acceptedDriverId || r.assignedDriverId,
+                  driverName: r.assignedDriverName,
+                  driverPhone: r.assignedDriverPhone,
+                  driverVehicle: r.assignedDriverVehicle,
+                });
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, []);
+
+  // مزامنة حالة الطلب في التخزين المحلي لحمايته من اختفاء الطلب عند التحديث أو الخروج
+  useEffect(() => {
+    if (rideRequestId && (stage === 'searching' || stage === 'driver_arriving')) {
+      const dataToSave = {
+        rideRequestId,
+        stage,
+        pickup,
+        pickupName,
+        dropoff,
+        dropoffName,
+        selectedTierId,
+        assignedDriverInfo,
+        routeCoordinates,
+      };
+      localStorage.setItem('TAWSEELA_ACTIVE_TAXI_RIDE', JSON.stringify(dataToSave));
+    }
+  }, [rideRequestId, stage, pickup, pickupName, dropoff, dropoffName, selectedTierId, assignedDriverInfo, routeCoordinates]);
+
 
 
   // تحديث العنوان عند تحريك الخريطة في مرحلتي الانطلاق والوصول
@@ -480,10 +607,9 @@ export default function CustomerHomePage() {
 
   // 3. زر الرجوع العائم في أعلى اليمين
   function handleBackNav() {
-    if (stage === 'driver_arriving') {
-      setStage('searching');
-    } else if (stage === 'searching') {
-      setStage('ride_options');
+    if (stage === 'driver_arriving' || stage === 'searching') {
+      setIsCancelTripOpen(true);
+      setCancelReason(null);
     } else if (stage === 'ride_options') {
       setStage('dropoff');
       setRouteCoordinates([]);
@@ -550,8 +676,9 @@ export default function CustomerHomePage() {
 
       if (data.success && data.request) {
         setRideRequestId(data.request.id);
+        let assignedDriverData = null;
         if (data.assignedDriver) {
-          setAssignedDriverInfo({
+          assignedDriverData = {
             driverId: data.assignedDriver.driverId,
             driverName: data.assignedDriver.fullName || data.assignedDriver.driverName,
             driverPhone: data.assignedDriver.phoneNumber || data.assignedDriver.phone,
@@ -560,9 +687,23 @@ export default function CustomerHomePage() {
             driverRating: data.assignedDriver.rating || 5.0,
             driverLat: data.assignedDriver.latitude,
             driverLon: data.assignedDriver.longitude,
-          });
+          };
+          setAssignedDriverInfo(assignedDriverData);
         }
         setStage('searching');
+        try {
+          localStorage.setItem('TAWSEELA_ACTIVE_TAXI_RIDE', JSON.stringify({
+            rideRequestId: data.request.id,
+            stage: 'searching',
+            pickup,
+            pickupName,
+            dropoff,
+            dropoffName,
+            selectedTierId,
+            assignedDriverInfo: assignedDriverData,
+            routeCoordinates,
+          }));
+        } catch (_) {}
         show('تم إرسال طلبك للبحث عن أقرب كابتن 🚖', 'info');
       } else {
         show(data.error || 'تعذر إرسال الطلب، يرجى المحاولة لاحقاً', 'error');
@@ -604,12 +745,14 @@ export default function CustomerHomePage() {
           } else if (req.status === 'Arrived') {
             show('الكابتن وصل إلى موقعك الآن! 🚗', 'success', 8000);
           } else if (req.status === 'Completed') {
+            localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
             show('تم إكمال الرحلة بنجاح. شكراً لاستخدامك توصيلة! ✨', 'success');
             setStage('pickup');
             setRideRequestId(null);
             setAssignedDriverInfo(null);
             setLiveDriverPosition(null);
           } else if (req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
+            localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
             show(req.status === 'Cancelled' ? 'تم إلغاء الرحلة' : 'لم يتم العثور على سائق متوفر حالياً', 'warning');
             setStage('ride_options');
             setRideRequestId(null);
@@ -655,6 +798,7 @@ export default function CustomerHomePage() {
   // إلغاء الرحلة حقيقياً
   async function handleConfirmCancelTrip() {
     if (!cancelReason) return;
+    localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
     if (rideRequestId) {
       try {
         await http.post('/ride/cancel', {
@@ -1213,7 +1357,7 @@ export default function CustomerHomePage() {
         )}
 
         {/* 7b. شاشة إلغاء الرحلة */}
-        {stage === 'searching' && isCancelTripOpen && (
+        {(stage === 'searching' || stage === 'driver_arriving') && isCancelTripOpen && (
           <div className="absolute inset-0 z-40 bg-white flex flex-col animate-fade-in" dir="rtl">
             <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
               <h2 className="text-[19px] font-black text-gray-900">إلغاء الرحلة</h2>
@@ -1299,11 +1443,18 @@ export default function CustomerHomePage() {
               <svg className="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             </div>
 
-            {/* زر "السائق وصل — انطلق!" يفتح Waze/Google Maps */}
-            <div className="px-5">
+            {/* زر "السائق وصل — انطلق!" يفتح Waze/Google Maps وزر إلغاء الرحلة */}
+            <div className="px-5 flex flex-col gap-2">
               <button type="button" onClick={handleOpenNavigation}
                 className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition active:scale-[0.98] hover:bg-orange-600 cursor-pointer">
                 🚗 السائق وصل — انطلاق إلى الوجهة
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsCancelTripOpen(true); setCancelReason(null); }}
+                className="w-full py-2 text-center text-[14px] font-bold text-red-500 hover:text-red-700 transition cursor-pointer"
+              >
+                إلغاء الرحلة
               </button>
             </div>
           </div>
