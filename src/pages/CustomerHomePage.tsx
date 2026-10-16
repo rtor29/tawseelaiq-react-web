@@ -182,13 +182,15 @@ export default function CustomerHomePage() {
   const mapRef = useRef<MapRef>(null);
 
   const session = authStore.getSession();
-  const customerName = session?.fullName || storage.getFullName() || 'موسى';
-  const rawPhone = storage.getPhone() || '07706204066';
-  const formattedPhone = rawPhone.startsWith('+')
-    ? rawPhone
-    : rawPhone.startsWith('0')
-    ? `+964${rawPhone.slice(1)}`
-    : `+964${rawPhone}`;
+  const customerName = session?.fullName || storage.getFullName() || 'المستخدم';
+  const rawPhone = storage.getPhone() || '';
+  const formattedPhone = rawPhone
+    ? rawPhone.startsWith('+')
+      ? rawPhone
+      : rawPhone.startsWith('0')
+      ? `+964${rawPhone.slice(1)}`
+      : `+964${rawPhone}`
+    : '—';
 
   // مرحلة الحجز
   const [stage, setStage] = useState<BookingStage>('pickup');
@@ -238,7 +240,7 @@ export default function CustomerHomePage() {
   const [activeDrawerSubModal, setActiveDrawerSubModal] = useState<
     'none' | 'wallet' | 'trips' | 'favorites' | 'coupons' | 'referral' | 'settings' | 'about' | 'support'
   >('none');
-  const [walletBalance] = useState('1,500');
+  const [walletBalance] = useState('0');
 
   // بيانات المشوار الحقيقي والاتصال بالسائق
   const [rideRequestId, setRideRequestId] = useState<string | null>(null);
@@ -2338,7 +2340,7 @@ export default function CustomerHomePage() {
                 <button
                   type="button"
                   onClick={() => {
-                    show('تم شحن الرصيد تجريبياً بنجاح ✅', 'success');
+                    show('لشحن الرصيد، يرجى التوجه إلى مركز الدعم المعتمد أو استخدام بطاقة الشحن', 'info');
                     setActiveDrawerSubModal('none');
                   }}
                   className="w-full rounded-xl bg-[#0026ff] py-2.5 text-center text-sm font-bold text-white shadow-md hover:bg-blue-700 cursor-pointer"
@@ -2351,12 +2353,10 @@ export default function CustomerHomePage() {
             {activeDrawerSubModal === 'trips' && (
               <div>
                 <h3 className="text-lg font-black text-gray-900 mb-3">🕒 سجل الرحلات السابقة</h3>
-                <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
-                  <div className="rounded-xl border border-gray-100 p-3 bg-gray-50">
-                    <p className="text-xs font-bold text-gray-500">12 أكتوبر 2026</p>
-                    <p className="text-sm font-black text-gray-800">حي السلام ➔ كراج بغداد</p>
-                    <p className="text-xs font-bold text-emerald-600 mt-1">مكتملة • 2,000 د.ع</p>
-                  </div>
+                <div className="rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-400 bg-gray-50/50">
+                  <span className="text-3xl block mb-2">🚗</span>
+                  <p className="text-sm font-bold text-gray-700">لا توجد رحلات سابقة بعد</p>
+                  <p className="text-xs text-gray-400 mt-1">عند إكمال أول مشوار ستظهر تفاصيل وسجل رحلاتك هنا تلقائياً</p>
                 </div>
               </div>
             )}

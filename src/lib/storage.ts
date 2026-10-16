@@ -68,4 +68,40 @@ export const storage = {
     localStorage.removeItem(KEYS.avatar);
     localStorage.removeItem(KEYS.phone);
   },
+
+  resetAllStorageAndTestArtifacts(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
+  },
+
+  cleanLegacyTestArtifacts(): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (
+          k.startsWith('bench_') ||
+          k.startsWith('test_') ||
+          k.startsWith('mock_') ||
+          k.startsWith('sample_') ||
+          k === 'tawseela_test_state'
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch {
+      // ignore
+    }
+  },
 };
+
+// تشغيل تنظيف المخلفات التجريبية فوراً عند بدء التطبيق
+storage.cleanLegacyTestArtifacts();

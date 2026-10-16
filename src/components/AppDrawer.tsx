@@ -17,16 +17,16 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
   const navigate = useNavigate();
   const { show } = useToast();
   const session = authStore.getSession();
-  const [fullName, setFullName] = useState('مستخدم توصيله');
-  const [phone, setPhone] = useState('07800000000');
+  const [fullName, setFullName] = useState(session?.fullName || storage.getFullName() || 'مستخدم توصيله');
+  const [phone, setPhone] = useState(storage.getPhone() || '');
   const [avatar, setAvatar] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isDriver = (session?.role ?? 'Customer').toLowerCase() === 'driver';
 
   useEffect(() => {
-    setFullName(session?.fullName || 'مستخدم توصيله');
-    setPhone(storage.getPhone() ?? '07801234567');
+    setFullName(session?.fullName || storage.getFullName() || 'مستخدم توصيله');
+    setPhone(storage.getPhone() || '');
     setAvatar(storage.getAvatar());
   }, [session, open]);
 

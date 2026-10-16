@@ -162,38 +162,20 @@ export function setCachedReverseGeocode(lat: number, lng: number, address: strin
   persistReverseCache();
 }
 
-// 3. إدارة الأماكن المفضلة (Favorite Places)
-const DEFAULT_FAVORITES: FavoritePlace[] = [
-  {
-    id: 'fav-home',
-    name: 'المنزل 🏠',
-    address: 'النجف، حي السلام',
-    lat: 31.985,
-    lng: 44.32,
-    icon: 'home',
-    createdAt: Date.now(),
-  },
-  {
-    id: 'fav-work',
-    name: 'العمل 💼',
-    address: 'النجف، شارع الكوفة',
-    lat: 32.015,
-    lng: 44.345,
-    icon: 'work',
-    createdAt: Date.now(),
-  },
-];
+// 3. إدارة الأماكن المفضلة (Favorite Places) - تبدأ فارغة بشكل نظيف
+const DEFAULT_FAVORITES: FavoritePlace[] = [];
 
 export function getFavoritePlaces(): FavoritePlace[] {
   if (typeof window === 'undefined') return DEFAULT_FAVORITES;
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
-    if (!raw) {
-      localStorage.setItem(FAVORITES_KEY, JSON.stringify(DEFAULT_FAVORITES));
-      return DEFAULT_FAVORITES;
-    }
+    if (!raw) return DEFAULT_FAVORITES;
     const items = JSON.parse(raw);
-    return Array.isArray(items) && items.length > 0 ? items : DEFAULT_FAVORITES;
+    // تنظيف أي عناصر تجريبية قديمة
+    const cleanItems = (Array.isArray(items) ? items : []).filter(
+      (item: FavoritePlace) => item.id !== 'fav-home' && item.id !== 'fav-work'
+    );
+    return cleanItems;
   } catch {
     return DEFAULT_FAVORITES;
   }
@@ -239,45 +221,57 @@ export function isFavoritePlace(name: string, lat: number, lng: number): boolean
   return current.some(f => f.name === name || (Math.abs(f.lat - lat) < 0.0005 && Math.abs(f.lng - lng) < 0.0005));
 }
 
-// 4. إدارة الأماكن الأخيرة (Recent Places)
-const DEFAULT_RECENT: RecentPlaceItem[] = [
-  {
-    name: 'كراج العلاوي',
-    address: 'بغداد، الصالحية، قرب شارع دمشق',
-    lat: 33.3289,
-    lng: 44.382,
-    timestamp: Date.now(),
-  },
-  {
-    name: 'سوبر ماركت وفر',
-    address: 'النجف، السلام، قرب شارع الحزام',
-    lat: 32.015,
-    lng: 44.325,
-    timestamp: Date.now(),
-  },
-  {
-    name: 'جسر كراج بغداد',
-    address: 'النجف، السلام، قرب شارع الخيمة',
-    lat: 32.0255,
-    lng: 44.341,
-    timestamp: Date.now(),
-  },
-];
+// 4. إدارة الأماكن الأخيرة (Recent Places) - تبدأ فارغة بشكل نظيف
+const DEFAULT_RECENT: RecentPlaceItem[] = [];
 
 export function getRecentPlaces(): RecentPlaceItem[] {
   if (typeof window === 'undefined') return DEFAULT_RECENT;
   try {
     const raw = localStorage.getItem(RECENT_PLACES_KEY);
-    if (!raw) {
-      localStorage.setItem(RECENT_PLACES_KEY, JSON.stringify(DEFAULT_RECENT));
-      return DEFAULT_RECENT;
-    }
+    if (!raw) return DEFAULT_RECENT;
     const items = JSON.parse(raw);
-    return Array.isArray(items) && items.length > 0 ? items : DEFAULT_RECENT;
+    // تصفية أي عناصر وهمية سابقة
+    const cleanItems = (Array.isArray(items) ? items : []).filter(
+      (item: RecentPlaceItem) => item.name !== 'كراج العلاوي' && item.name !== 'سوبر ماركت وفر' && item.name !== 'جسر كراج بغداد'
+    );
+    return cleanItems;
   } catch {
     return DEFAULT_RECENT;
   }
 }
+
+// دالة تنظيف مخازن المتصفح من بقايا الاختبار والتطوير
+export function purgeStaleTestStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    // إزالة بقايا رحلات الاختبار المؤقتة
+    const activeRideRaw = localStorage.getItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+    if (activeRideRaw) {
+      try {
+        const parsed = JSON.parse(activeRideRaw);
+        if (parsed?.rideRequestId?.startsWith('test_') || parsed?.rideRequestId?.startsWith('bench_') || parsed?.rideRequestId === 'active-ride') {
+          localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+        }
+      } catch {
+        localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+      }
+    }
+
+    // تنظيف المفاتيح التجريبية المؤقتة
+    const testKeys = ['bench_', 'test_', 'mock_', 'sample_'];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && testKeys.some(prefix => key.startsWith(prefix))) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// تنفيذ التنظيف لمرة واحدة عند تحميل الملف
+purgeStaleTestStorage();
 
 export function addRecentPlace(place: { name: string; address?: string; lat: number; lng: number }): void {
   if (typeof window === 'undefined') return;

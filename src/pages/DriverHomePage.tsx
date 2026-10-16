@@ -53,16 +53,21 @@ export default function DriverHomePage() {
   const session = authStore.getSession();
   const driverId = session?.userId || storage.getUserId() || '';
 
-  const driverName = session?.fullName || storage.getFullName() || 'موسى';
-  const rawPhone = storage.getPhone() || '07706204066';
-  const formattedPhone = rawPhone.startsWith('+')
-    ? rawPhone
-    : rawPhone.startsWith('0')
-    ? `+964${rawPhone.slice(1)}`
-    : `+964${rawPhone}`;
+  const driverName = session?.fullName || storage.getFullName() || 'الكابتن';
+  const rawPhone = storage.getPhone() || '';
+  const formattedPhone = rawPhone
+    ? rawPhone.startsWith('+')
+      ? rawPhone
+      : rawPhone.startsWith('0')
+      ? `+964${rawPhone.slice(1)}`
+      : `+964${rawPhone}`
+    : '—';
 
-  // حالة العمل الحالية: خمول | خط دائمي | تكسي
-  const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>('permanent');
+  // الرصيد الفعلي للسائق
+  const [driverBalance] = useState<string>('0');
+
+  // حالة العمل الحالية: خمول | خط دائمي | تكسي (تبدأ بوضع الخمول افتراضياً)
+  const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>('idle');
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [pendingSeatRequests, setPendingSeatRequests] = useState<PendingSeatBooking[]>([]);
   const lastNotifiedSeatBookingIdRef = useRef<string | null>(null);
@@ -415,7 +420,7 @@ export default function DriverHomePage() {
         <div className="text-left font-sans">
           <p className="text-[14px] font-bold text-gray-900" dir="ltr">{formattedPhone}</p>
           <p className="text-[13px] font-medium text-gray-600 mt-0.5" dir="rtl">
-            الرصيد: <span className="font-bold text-gray-800">1,500</span> دينار
+            الرصيد: <span className="font-bold text-gray-800">{driverBalance}</span> دينار
           </p>
         </div>
       </header>
