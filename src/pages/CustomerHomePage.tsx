@@ -5,7 +5,7 @@
 // 4. نافذة خيارات الرحلة المتقدمة (الصورة 2: الوجهة الثانية، التوقف في الطريق، رحلة ذهاب وإياب)
 // 5. نافذة اختيار المدينة ودرج الزبون الكامل (حول توصيلة)
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Map as MapGL, Marker, type MapMouseEvent, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -33,7 +33,9 @@ import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import ChatModal from '../components/ChatModal';
+
+// التحميل الكسول لنافذة الدردشة لتقليل الحزمة الأولية
+const ChatModal = lazy(() => import('../components/ChatModal'));
 
 // نقطة الانطلاق والوصول الافتراضية في النجف
 const DEFAULT_PICKUP: LngLat = { lat: 32.0298, lng: 44.3285 };
@@ -2523,17 +2525,19 @@ export default function CustomerHomePage() {
 
 
       {/* نافذة المحادثة المباشرة بين الراكب والسائق */}
-      <ChatModal
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        requestId={rideRequestId || 'active-ride'}
-        currentUserId={session?.userId || storage.getUserId() || 'customer'}
-        currentUserRole="Customer"
-        currentUserName={session?.fullName || 'الراكب'}
-        peerName={assignedDriverInfo?.driverName || 'كابتن توصيله'}
-        peerPhone={assignedDriverInfo?.driverPhone}
-        peerRole={assignedDriverInfo?.driverVehicle || 'كابتن توصيله'}
-      />
+      <Suspense fallback={null}>
+        <ChatModal
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          requestId={rideRequestId || 'active-ride'}
+          currentUserId={session?.userId || storage.getUserId() || 'customer'}
+          currentUserRole="Customer"
+          currentUserName={session?.fullName || 'الراكب'}
+          peerName={assignedDriverInfo?.driverName || 'كابتن توصيله'}
+          peerPhone={assignedDriverInfo?.driverPhone}
+          peerRole={assignedDriverInfo?.driverVehicle || 'كابتن توصيله'}
+        />
+      </Suspense>
 
     </div>
   );

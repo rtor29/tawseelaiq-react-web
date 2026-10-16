@@ -1,23 +1,36 @@
 // الموجّه الرئيسي — بديل main.dart (جلسة تلقائية + توجيه حسب الدور)
-// كما يدعم login_token في الرابط (جوجل/تليجرام) قبل تقرير الشاشة الابتدائية
+// تم تطبيق التحميل الكسول (Lazy Loading) لجميع الصفحات والمكونات لتقليص حجم الحزم وتحسين سرعة الفتح
 
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useSession } from './lib/auth';
 import { consumeLoginTokenFromUrl } from './lib/googleAuth';
 import { realtime } from './lib/realtime';
-import LoginPage from './pages/LoginPage';
-import CustomerHomePage from './pages/CustomerHomePage';
-import LiveTrackingPage from './pages/LiveTrackingPage';
-import DriverHomePage from './pages/DriverHomePage';
-import CreateRoutePage from './pages/CreateRoutePage';
-import DriverRequestsPage from './pages/DriverRequestsPage';
-import DocumentUploadPage from './pages/DocumentUploadPage';
-import VacancyAdsPage from './pages/VacancyAdsPage';
-import CreateVacancyAdPage from './pages/CreateVacancyAdPage';
-import SupportPage from './pages/SupportPage';
-import DailyRoutePage from './pages/DailyRoutePage';
-import type { ReactNode } from 'react';
+import { Spinner } from './components/ui';
+
+// Lazy loading all pages for optimal bundle splitting
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const CustomerHomePage = lazy(() => import('./pages/CustomerHomePage'));
+const LiveTrackingPage = lazy(() => import('./pages/LiveTrackingPage'));
+const DriverHomePage = lazy(() => import('./pages/DriverHomePage'));
+const CreateRoutePage = lazy(() => import('./pages/CreateRoutePage'));
+const DriverRequestsPage = lazy(() => import('./pages/DriverRequestsPage'));
+const DocumentUploadPage = lazy(() => import('./pages/DocumentUploadPage'));
+const VacancyAdsPage = lazy(() => import('./pages/VacancyAdsPage'));
+const CreateVacancyAdPage = lazy(() => import('./pages/CreateVacancyAdPage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
+const DailyRoutePage = lazy(() => import('./pages/DailyRoutePage'));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center gap-3">
+        <Spinner className="h-8 w-8 text-[#0026ff]" />
+        <span className="text-xs font-bold text-gray-500">جاري التحميل...</span>
+      </div>
+    </div>
+  );
+}
 
 function RequireAuth({ children, role }: { children: ReactNode; role?: 'Driver' }) {
   const session = useSession();
@@ -49,86 +62,88 @@ export default function App() {
   if (!ready) return null;
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<Navigate to="/login" replace />} />
-      <Route path="/otp" element={<Navigate to="/login" replace />} />
-      <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
+        <Route path="/otp" element={<Navigate to="/login" replace />} />
+        <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
 
-      <Route
-        path="/"
-        element={
-          <RequireAuth>
-            {session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHomePage />}
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/track/:bookingId"
-        element={
-          <RequireAuth>
-            <LiveTrackingPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/driver"
-        element={
-          <RequireAuth role="Driver">
-            <DriverHomePage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/driver/routes/new"
-        element={
-          <RequireAuth role="Driver">
-            <CreateRoutePage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/driver/requests"
-        element={
-          <RequireAuth role="Driver">
-            <DriverRequestsPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/driver/documents"
-        element={
-          <RequireAuth role="Driver">
-            <DocumentUploadPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/ads"
-        element={
-          <RequireAuth>
-            <VacancyAdsPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/ads/new"
-        element={
-          <RequireAuth role="Driver">
-            <CreateVacancyAdPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/support"
-        element={
-          <RequireAuth>
-            <SupportPage />
-          </RequireAuth>
-        }
-      />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              {session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHomePage />}
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/track/:bookingId"
+          element={
+            <RequireAuth>
+              <LiveTrackingPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/driver"
+          element={
+            <RequireAuth role="Driver">
+              <DriverHomePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/driver/routes/new"
+          element={
+            <RequireAuth role="Driver">
+              <CreateRoutePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/driver/requests"
+          element={
+            <RequireAuth role="Driver">
+              <DriverRequestsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/driver/documents"
+          element={
+            <RequireAuth role="Driver">
+              <DocumentUploadPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ads"
+          element={
+            <RequireAuth>
+              <VacancyAdsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ads/new"
+          element={
+            <RequireAuth role="Driver">
+              <CreateVacancyAdPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/support"
+          element={
+            <RequireAuth>
+              <SupportPage />
+            </RequireAuth>
+          }
+        />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

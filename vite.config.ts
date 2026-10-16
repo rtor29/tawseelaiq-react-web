@@ -6,7 +6,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const backendUrl = env.VITE_DEV_BACKEND_URL || 'http://127.0.0.1:5050';
   return {
-  plugins: [react()],
+    plugins: [react()],
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+      legalComments: 'none',
+    },
   server: {
     port: 5173,
     // في التطوير: تمرير نداءات /api و /hubs إلى الخادم الخلفي لتفادي CORS

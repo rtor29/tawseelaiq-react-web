@@ -1,11 +1,12 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
 import { useToast } from '../components/Toast';
-import ChatModal from '../components/ChatModal';
+
+const ChatModal = lazy(() => import('../components/ChatModal'));
 
 interface Subscriber {
   id: string;
@@ -993,17 +994,19 @@ export default function DriverHomePage() {
 
       {/* نافذة المحادثة المباشرة مع الراكب */}
       {activeRide && (
-        <ChatModal
-          isOpen={isChatOpen}
-          onClose={() => setIsChatOpen(false)}
-          requestId={activeRide.id}
-          currentUserId={driverId || 'driver'}
-          currentUserRole="Driver"
-          currentUserName={driverName || 'الكابتن'}
-          peerName={activeRide.customerName || 'الراكب'}
-          peerPhone={activeRide.customerPhone}
-          peerRole="الراكب"
-        />
+        <Suspense fallback={null}>
+          <ChatModal
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            requestId={activeRide.id}
+            currentUserId={driverId || 'driver'}
+            currentUserRole="Driver"
+            currentUserName={driverName || 'الكابتن'}
+            peerName={activeRide.customerName || 'الراكب'}
+            peerPhone={activeRide.customerPhone}
+            peerRole="الراكب"
+          />
+        </Suspense>
       )}
     </div>
   );
