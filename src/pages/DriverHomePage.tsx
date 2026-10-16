@@ -177,9 +177,9 @@ export default function DriverHomePage() {
     }
   }, [isChatOpen, latestPassengerMsg]);
 
-  // 3. في وضع التكسي: استطلاع الطلبات الواردة في الانتظار وإرسال موقع السائق
+  // 3. استطلاع الطلبات الواردة في الانتظار وإرسال موقع السائق
   useEffect(() => {
-    if (workStatus !== 'taxi' || !driverId) {
+    if (!driverId && !rawPhone) {
       setIncomingRequest(null);
       return;
     }
@@ -187,7 +187,7 @@ export default function DriverHomePage() {
     const sendLocation = () => {
       http
         .post('/driver/location', {
-          driverId,
+          driverId: driverId || rawPhone,
           latitude: 32.0298,
           longitude: 44.3285,
           heading: 0,
@@ -195,25 +195,28 @@ export default function DriverHomePage() {
         })
         .catch(() => {});
     };
-    sendLocation();
+    if (workStatus === 'taxi') sendLocation();
 
     const interval = setInterval(async () => {
       try {
+        const targetId = driverId || rawPhone;
         const { data: pendingData } = await http.get<{
           success?: boolean;
           requests?: IncomingRideRequest[];
-        }>(`/driver/${driverId}/pending-requests`);
+        }>(`/driver/${encodeURIComponent(targetId)}/pending-requests`);
 
         if (pendingData?.success && pendingData.requests && pendingData.requests.length > 0) {
           setIncomingRequest(pendingData.requests[0]);
+          // تحويل وضع العمل للتكسي تلقائياً لإظهار خيارات القبول والرفض فوراً
+          setWorkStatus((prev) => (prev === 'idle' ? prev : 'taxi'));
         } else {
           setIncomingRequest(null);
         }
       } catch (_) {}
-    }, 2500);
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, [workStatus, driverId]);
+  }, [driverId, rawPhone, workStatus]);
 
   // قبول الطلب حقيقياً
   async function handleAcceptRide() {
@@ -494,8 +497,8 @@ export default function DriverHomePage() {
               </button>
             </div>
 
-            {/* بطاقة المشوار النشط إن وُجد */}
-            {activeRide ? (
+            {/* بطاقة المشوار النشط إن وُجد وكان مقبولاً */}
+            {activeRide && (activeRide.status === 'Accepted' || activeRide.status === 'Arrived' || activeRide.status === 'InProgress') ? (
               <div className="rounded-2xl border-2 border-emerald-500 bg-white p-5 shadow-lg animate-fade-in">
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
                   <span className="rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-black text-emerald-800">
@@ -582,6 +585,53 @@ export default function DriverHomePage() {
                   </button>
                 </div>
               </div>
+            ) : incomingRequest ? (
+              /* طلب وارد مع خيارات القبول والرفض بشكل واضح وبارز */
+              <div className="rounded-2xl border-2 border-emerald-500 bg-white p-5 shadow-xl animate-fade-in">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-black text-emerald-800">
+                    طلب مشوار جديد وارد! 🚖
+                  </span>
+                  <span className="text-[16px] font-black text-gray-900">
+                    {incomingRequest.fare} دينار
+                  </span>
+                </div>
+
+                <div className="text-right space-y-2 mb-4">
+                  <p className="text-[16px] font-black text-gray-900">
+                    الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
+                  </p>
+                  {incomingRequest.customerPhone && (
+                    <p className="text-[13px] font-bold text-gray-500" dir="ltr">
+                      {incomingRequest.customerPhone}
+                    </p>
+                  )}
+                  <p className="text-[13.5px] font-bold text-gray-700">
+                    🟢 من: {incomingRequest.pickupName}
+                  </p>
+                  <p className="text-[13.5px] font-bold text-gray-700">
+                    🔴 إلى: {incomingRequest.dropoffName}
+                  </p>
+                </div>
+
+                {/* أزرار خيارات القبول والرفض */}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleAcceptRide}
+                    className="flex-1 rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-black text-white shadow-md transition active:scale-95 cursor-pointer hover:bg-emerald-700"
+                  >
+                    قبول الطلب ✅
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRejectRide}
+                    className="flex-1 rounded-xl bg-red-500 py-3.5 text-center text-[15px] font-black text-white shadow-md transition active:scale-95 cursor-pointer hover:bg-red-600"
+                  >
+                    رفض الطلب ✕
+                  </button>
+                </div>
+              </div>
             ) : (
               /* بانتظار الركاب */
               <div className="relative rounded-2xl border border-gray-100 bg-white p-5 min-h-[170px] flex flex-col justify-center">
@@ -597,42 +647,6 @@ export default function DriverHomePage() {
                   </div>
                   <p className="text-[14px] font-bold text-gray-600 mt-1">جاري البحث عن طلبات الركاب القريبين...</p>
                 </div>
-
-                {/* طلب وارد حقيقي */}
-                {incomingRequest && (
-                  <div className="absolute inset-x-3 bottom-3 rounded-xl border border-emerald-300 bg-white p-3.5 shadow-xl animate-fade-in">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[13px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
-                        {incomingRequest.fare} دينار
-                      </span>
-                      <p className="text-[15px] font-black text-gray-900">
-                        طلب مشوار جديد وارد! 🚖
-                      </p>
-                    </div>
-                    <p className="text-[13.5px] font-bold text-gray-800 text-right mt-1">
-                      الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
-                    </p>
-                    <p className="text-[13px] font-bold text-gray-600 mb-3 text-right">
-                      {incomingRequest.pickupName} <span className="font-sans mx-1">➔</span> {incomingRequest.dropoffName}
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleAcceptRide}
-                        className="flex-1 rounded-lg bg-emerald-600 py-2.5 text-center text-[14px] font-black text-white transition active:scale-95 cursor-pointer hover:bg-emerald-700"
-                      >
-                        قبول الطلب
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleRejectRide}
-                        className="flex-1 rounded-lg bg-red-500 py-2.5 text-center text-[14px] font-black text-white transition active:scale-95 cursor-pointer hover:bg-red-600"
-                      >
-                        رفض
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </section>
