@@ -13,7 +13,7 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { distanceKm } from '../lib/geo';
-import { searchPlaces, reverseGeocode, getDirections, type PlaceResult } from '../lib/mapbox';
+import { searchPlaces, reverseGeocode, getDirections, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import { storage } from '../lib/storage';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
@@ -479,7 +479,7 @@ export default function CustomerHomePage() {
 
     const q = query.trim();
     if (!q) {
-      setSearchResults([]);
+      setSearchResults(NAJAF_LOCAL_PLACES.map(p => ({ name: p.name, lat: p.lat, lng: p.lon })) as unknown as PlaceResult[]);
       return;
     }
 
@@ -1095,7 +1095,7 @@ export default function CustomerHomePage() {
             </div>
 
             <div
-              onClick={() => setIsSearchOpen(true)}
+              onClick={() => { setIsSearchOpen(true); setSearchResults(NAJAF_LOCAL_PLACES.map(p => ({ name: p.name, lat: p.lat, lng: p.lon })) as unknown as PlaceResult[]); }}
               className="mb-4 flex items-center justify-between rounded-2xl bg-[#f3f4f6] p-3.5 cursor-pointer transition active:scale-[0.99] hover:bg-gray-200/80"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1826,9 +1826,9 @@ export default function CustomerHomePage() {
               </div>
             )}
 
-            {searchQuery.trim().length > 0 && searchResults.length > 0 ? (
+            {searchResults.length > 0 ? (
               <div>
-                <p className="mb-2 text-[13px] font-bold text-gray-400">نتائج البحث</p>
+                <p className="mb-2 text-[13px] font-bold text-gray-400">{searchQuery.trim().length === 0 ? 'أماكن مقترحة' : 'نتائج البحث'}</p>
                 {searchResults.map((place, idx) => (
                   <div
                     key={`${place.lat}-${place.lon}-${idx}`}
