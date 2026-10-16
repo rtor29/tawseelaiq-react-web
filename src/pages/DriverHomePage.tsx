@@ -56,10 +56,13 @@ export default function DriverHomePage() {
   useEffect(() => {
     if (!driverId) return;
     const isOnline = workStatus !== 'idle';
+    const workMode = workStatus === 'idle' ? 'خمول' : workStatus === 'permanent' ? 'خط دائمي' : 'مشوار قصير';
     http
       .post('/driver/toggle-online', {
         driverId,
         isOnline,
+        workStatus,
+        workMode,
         driverName,
         driverPhone: rawPhone,
         latitude: 32.0298,
