@@ -11,6 +11,8 @@ import { http } from '../lib/api';
 import { config } from '../lib/config';
 import { useToast } from '../components/Toast';
 import { distanceKm } from '../lib/geo';
+import { authStore } from '../lib/auth';
+import { storage } from '../lib/storage';
 
 const USER_LOC = { lat: 32.0298, lng: 44.3285 };
 
@@ -56,6 +58,7 @@ export default function DailyRoutePage() {
   const [userLoc, setUserLoc] = useState(USER_LOC);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<DriverItem | null>(null);
+  const [isBooking, setIsBooking] = useState(false);
 
   // جلب موقع المستخدم الحقيقي عبر GPS
   useEffect(() => {
@@ -127,13 +130,43 @@ export default function DailyRoutePage() {
     );
   }
 
-  function handleContact() {
-    if (!selectedDriver?.phone) {
-      show('رقم هاتف السائق غير متوفر', 'info');
-      return;
+  // إرسال طلب حجز مقعد في الخط الدائمي للكابتن
+  async function handleBookSeat() {
+    if (!selectedDriver) return;
+    setIsBooking(true);
+    try {
+      const session = authStore.getSession();
+      const customerId = session?.userId || storage.getUserId() || 'cust-' + Date.now();
+      const customerName = session?.fullName || storage.getFullName() || 'راكب توصيلة';
+      const customerPhone = storage.getPhone() || '';
+
+      const { data } = await http.post<{ success: boolean; message?: string; error?: string }>('/bookings', {
+        driverId: String(selectedDriver.driverId || selectedDriver.id),
+        driverName: selectedDriver.name,
+        driverPhone: selectedDriver.phone,
+        customerId,
+        customerName,
+        customerPhone,
+        pickupLocation: selectedDriver.from || 'موقع الراكب',
+        dropoffLocation: selectedDriver.to || 'الوجهة',
+        pickupLat: userLoc.lat,
+        pickupLon: userLoc.lng,
+        seats: 1,
+        seatsBooked: 1,
+      });
+
+      if (data?.success) {
+        show('تم إرسال طلب حجز المقعد للكابتن بنجاح! 🚖 بانتظار موافقة الكابتن لتأكيد الحجز.', 'success', 6000);
+        setSelectedDriver(null);
+      } else {
+        show(data?.error || 'تعذر إرسال طلب الحجز', 'error');
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'حدث خطأ في الاتصال أثناء إرسال طلب الحجز';
+      show(msg, 'error');
+    } finally {
+      setIsBooking(false);
     }
-    const text = encodeURIComponent(`مرحباً كابتن ${selectedDriver.name}، أود الاستفسار عن الخط الدائمي.`);
-    window.open(`https://wa.me/${selectedDriver.phone}?text=${text}`, '_blank');
   }
 
   return (
@@ -305,39 +338,52 @@ export default function DailyRoutePage() {
               </div>
             </div>
 
-            {/* أزرار التواصل */}
-            <div className="flex items-center gap-3 px-5 pt-4">
+            {/* أزرار حجز المقعد والتواصل */}
+            <div className="flex flex-col gap-2.5 px-5 pt-4">
               <button
                 type="button"
-                onClick={() => {
-                  if (selectedDriver.phone) window.open(`tel:${selectedDriver.phone}`);
-                  else show('رقم هاتف السائق غير متوفر', 'info');
-                }}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 text-white cursor-pointer hover:bg-white/10"
+                disabled={isBooking}
+                onClick={handleBookSeat}
+                className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(16,185,129,0.35)] cursor-pointer hover:bg-emerald-700 active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-70"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                {isBooking ? (
+                  <span className="animate-pulse">جاري إرسال طلب الحجز للكابتن...</span>
+                ) : (
+                  <>
+                    <span>حجز مقعد</span>
+                    <span className="text-[18px]">💺</span>
+                  </>
+                )}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedDriver.phone) {
-                    const text = encodeURIComponent(`مرحباً كابتن ${selectedDriver.name}، أود الاستفسار عن الخط الدائمي.`);
-                    window.open(`https://wa.me/${selectedDriver.phone}?text=${text}`, '_blank');
-                  } else {
-                    show('رقم هاتف السائق غير متوفر', 'info');
-                  }
-                }}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 text-white cursor-pointer hover:bg-white/10"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              </button>
-              <button
-                type="button"
-                onClick={handleContact}
-                className="flex-1 rounded-xl bg-[#0026ff] py-3.5 text-center text-[15px] font-black text-white cursor-pointer hover:bg-blue-700 active:scale-[0.98]"
-              >
-                تواصل مع السائق
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedDriver.phone) window.open(`tel:${selectedDriver.phone}`);
+                    else show('رقم هاتف السائق غير متوفر', 'info');
+                  }}
+                  className="flex-1 flex h-11 items-center justify-center gap-1.5 rounded-xl border border-white/30 text-white text-[13px] font-bold cursor-pointer hover:bg-white/10 active:scale-95 transition"
+                >
+                  <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  <span>اتصال</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedDriver.phone) {
+                      const text = encodeURIComponent(`مرحباً كابتن ${selectedDriver.name}، أود الاستفسار عن الخط الدائمي.`);
+                      window.open(`https://wa.me/${selectedDriver.phone}?text=${text}`, '_blank');
+                    } else {
+                      show('رقم هاتف السائق غير متوفر', 'info');
+                    }
+                  }}
+                  className="flex-1 flex h-11 items-center justify-center gap-1.5 rounded-xl border border-white/30 text-white text-[13px] font-bold cursor-pointer hover:bg-white/10 active:scale-95 transition"
+                >
+                  <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  <span>واتساب</span>
+                </button>
+              </div>
             </div>
           </div>
         );

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
@@ -13,6 +13,24 @@ interface Subscriber {
   from: string;
   to: string;
   phone: string;
+}
+
+interface PendingSeatBooking {
+  id: string;
+  bookingId?: string;
+  driverId?: string;
+  driverName?: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  pickupLocation?: string;
+  dropoffLocation?: string;
+  pickupLat?: number;
+  pickupLon?: number;
+  seatsBooked?: number;
+  status: string;
+  totalFare?: number;
+  createdAt?: string;
 }
 
 interface IncomingRideRequest {
@@ -45,6 +63,8 @@ export default function DriverHomePage() {
   // حالة العمل الحالية: خمول | خط دائمي | تكسي
   const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>('permanent');
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [pendingSeatRequests, setPendingSeatRequests] = useState<PendingSeatBooking[]>([]);
+  const lastNotifiedSeatBookingIdRef = useRef<string | null>(null);
   const [incomingRequest, setIncomingRequest] = useState<IncomingRideRequest | null>(null);
   const [activeRide, setActiveRide] = useState<any | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -80,27 +100,68 @@ export default function DriverHomePage() {
       .catch(() => {});
   }, [workStatus, driverId, driverName, rawPhone]);
 
-  // جلب ركاب الخط الدائمي الحقيقيين للسائق
+  // دالة تحديث قائمة المشتركين المؤكدين في الخط الدائمي
+  const fetchSubscribers = useCallback(async () => {
+    if (!driverId && !rawPhone) return;
+    const targetId = driverId || rawPhone;
+    try {
+      const res = await http.get<{ success?: boolean; bookings?: any[] }>(
+        `/driver/${encodeURIComponent(targetId)}/bookings`
+      );
+      const list = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
+      // فقط الحجوزات المؤكدة تظهر في ركاب الخط الدائمي المشتركين
+      const confirmed = list.filter(
+        (b: any) => b.status === 'Confirmed' || (!b.status && b.bookingConfirmed !== false)
+      );
+      setSubscribers(
+        confirmed.map((b: any, idx: number) => ({
+          id: b.id || b.bookingId || String(idx),
+          name: b.customerName || b.passengerName || 'مشترك خط دائمي',
+          from: b.pickupLocation || b.pickupAddress || b.from || 'نقطة الانطلاق',
+          to: b.dropoffLocation || b.dropoffAddress || b.to || 'الوجهة',
+          phone: b.customerPhone || b.phone || '',
+        }))
+      );
+    } catch (_) {}
+  }, [driverId, rawPhone]);
+
   useEffect(() => {
-    if (!driverId) return;
-    http
-      .get<{ success?: boolean; bookings?: any[] }>(`/driver/${driverId}/bookings`)
-      .then((res) => {
-        const list = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
-        if (list.length > 0) {
-          setSubscribers(
-            list.map((b: any, idx: number) => ({
-              id: b.id || b.bookingId || String(idx),
-              name: b.customerName || b.passengerName || 'مشترك خط دائمي',
-              from: b.pickupLocation || b.pickupAddress || b.from || 'نقطة الانطلاق',
-              to: b.dropoffLocation || b.dropoffAddress || b.to || 'الوجهة',
-              phone: b.customerPhone || b.phone || '',
-            }))
-          );
+    void fetchSubscribers();
+  }, [fetchSubscribers]);
+
+  // استطلاع طلبات حجز المقاعد الواردة في الخط الدائمي وتنبيه السائق فوراً
+  useEffect(() => {
+    if (!driverId && !rawPhone) return;
+    const targetId = driverId || rawPhone;
+
+    const fetchPendingSeatBookings = async () => {
+      try {
+        const { data } = await http.get<{
+          success?: boolean;
+          requests?: any[];
+          bookings?: any[];
+        }>(`/driver/${encodeURIComponent(targetId)}/requests`);
+
+        const list = data?.requests || data?.bookings || [];
+        const pending = list.filter((b: any) => b.status === 'Pending');
+        setPendingSeatRequests(pending);
+
+        // تنبيه السائق عند وصول طلب جديد لم يسبق تنبيهه عليه
+        if (pending.length > 0) {
+          const newest = pending[0];
+          const reqId = newest.id || newest.bookingId;
+          if (reqId && reqId !== lastNotifiedSeatBookingIdRef.current) {
+            lastNotifiedSeatBookingIdRef.current = reqId;
+            show(`🔔 طلب حجز مقعد جديد في الخط الدائمي من الراكب (${newest.customerName || 'راكب'})!`, 'info', 7000);
+          }
         }
-      })
-      .catch(() => {});
-  }, [driverId]);
+      } catch (_) {}
+    };
+
+    void fetchPendingSeatBookings();
+    const interval = setInterval(fetchPendingSeatBookings, 2500);
+    return () => clearInterval(interval);
+  }, [driverId, rawPhone]);
 
   // 1. التحقق المستمر من وجود مشوار نشط للكابتن لاستقبال المحادثات والمشاوير فوراً
   useEffect(() => {
@@ -255,6 +316,45 @@ export default function DriverHomePage() {
     }
   }
 
+  // قبول حجز مقعد في الخط الدائمي
+  async function handleAcceptSeatBooking(bookingId: string) {
+    if (!bookingId) return;
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string }>(
+        `/bookings/${bookingId}/accept`,
+        { driverId: driverId || rawPhone }
+      );
+      if (data?.success) {
+        show('تم قبول حجز المقعد بنجاح! ✅ أصبح الراكب ضمن ركاب خطك الدائمي', 'success');
+        setPendingSeatRequests((prev) => prev.filter((b) => b.id !== bookingId && b.bookingId !== bookingId));
+        void fetchSubscribers();
+      } else {
+        show('تعذر قبول الحجز', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ في قبول الحجز', 'error');
+    }
+  }
+
+  // رفض حجز مقعد في الخط الدائمي
+  async function handleRejectSeatBooking(bookingId: string) {
+    if (!bookingId) return;
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string }>(
+        `/bookings/${bookingId}/decline`,
+        { driverId: driverId || rawPhone, reason: 'اعتذار الكابتن عن قبول الحجز' }
+      );
+      if (data?.success) {
+        show('تم رفض طلب الحجز', 'info');
+        setPendingSeatRequests((prev) => prev.filter((b) => b.id !== bookingId && b.bookingId !== bookingId));
+      } else {
+        show('تعذر رفض الحجز', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ في رفض الحجز', 'error');
+    }
+  }
+
   // السائق وصل لنقطة انطلاق الراكب
   async function handleDriverArrived() {
     if (!activeRide || !driverId) return;
@@ -351,6 +451,27 @@ export default function DriverHomePage() {
           </div>
         )}
 
+        {/* تنبيه وجود طلبات حجز مقاعد جديدة في الخط الدائمي */}
+        {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && (
+          <div
+            onClick={() => setWorkStatus('permanent')}
+            className="mb-4 flex items-center justify-between rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-700 p-3.5 text-white shadow-lg cursor-pointer transition active:scale-[0.99] hover:shadow-xl animate-fade-in"
+          >
+            <span className="rounded-xl bg-white px-3 py-1.5 text-[12px] font-black text-purple-800 shadow-sm flex items-center gap-1">
+              <span>معاينة وقبول/رفض</span>
+              <span className="text-[13px]">➔</span>
+            </span>
+            <div className="text-right">
+              <p className="text-[14px] font-black text-white">
+                لديك {pendingSeatRequests.length} طلب حجز مقعد جديد في الخط الدائمي!
+              </p>
+              <p className="text-[12px] text-purple-200 mt-0.5">
+                اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار فوراً
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* 2. حالة العمل الحالية */}
         <section className="mb-6">
           <h2 className="text-[16px] font-black text-gray-900 mb-3 text-right">حالة العمل الحالية</h2>
@@ -380,7 +501,7 @@ export default function DriverHomePage() {
                 setWorkStatus('permanent');
                 show('تم تفعيل الخط الدائمي', 'success');
               }}
-              className={`flex items-center justify-center gap-1.5 rounded-xl py-3 text-center text-[15px] font-black transition cursor-pointer active:scale-95 ${
+              className={`relative flex items-center justify-center gap-1.5 rounded-xl py-3 text-center text-[15px] font-black transition cursor-pointer active:scale-95 ${
                 workStatus === 'permanent'
                   ? 'bg-[#7c3aed] text-white shadow-md'
                   : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
@@ -388,6 +509,11 @@ export default function DriverHomePage() {
             >
               {workStatus === 'permanent' && <span>✓</span>}
               <span>خط دائمي</span>
+              {pendingSeatRequests.length > 0 && (
+                <span className="absolute -top-1.5 -left-1.5 flex h-5.5 w-5.5 items-center justify-center rounded-full bg-red-500 text-[11px] font-black text-white shadow-md animate-bounce">
+                  {pendingSeatRequests.length}
+                </span>
+              )}
             </button>
 
             {/* تكسي */}
@@ -416,19 +542,115 @@ export default function DriverHomePage() {
           </p>
         </section>
 
-        {/* 3. ركاب الخط الدائمي المشتركين */}
+        {/* 3. ركاب الخط الدائمي المشتركين وطلبات الحجز الواردة */}
         {workStatus === 'permanent' && (
-          <section className="mb-6">
-            <h3 className="text-center text-[16px] font-black text-gray-900 mb-3">
-              ركاب الخط الدائمي المشتركين - {subscribers.length} ركاب
-            </h3>
+          <section className="mb-6 space-y-5">
+            {/* بطاقات طلبات حجز المقاعد الواردة (تنتظر موافقة الكابتن) */}
+            {pendingSeatRequests.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-amber-500 text-white px-3 py-0.5 text-[12px] font-black animate-pulse">
+                    {pendingSeatRequests.length} طلب ينتظر قرارك
+                  </span>
+                  <h3 className="text-[16px] font-black text-gray-900">
+                    طلبات حجز المقاعد الواردة 💺
+                  </h3>
+                </div>
 
-            {subscribers.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-gray-500 bg-gray-50/50">
-                <p className="text-[14px] font-bold text-gray-700">لا يوجد ركاب مشتركين حالياً في خطك الدائمي</p>
-                <p className="text-[12px] text-gray-400 mt-1">ستظهر اشتراكات الركاب المؤكدة هنا تلقائياً عند حجز خط معك</p>
+                {pendingSeatRequests.map((req) => (
+                  <div
+                    key={req.id || req.bookingId}
+                    className="rounded-2xl border-2 border-amber-400 bg-amber-50/50 p-4 shadow-md transition hover:shadow-lg animate-fade-in text-right"
+                  >
+                    <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-amber-200/80">
+                      <span className="rounded-md bg-amber-600 text-white px-2.5 py-0.5 text-[11.5px] font-black">
+                        طلب حجز مقعد وارد 🚖
+                      </span>
+                      <span className="text-[13px] font-bold text-gray-700">
+                        {req.seatsBooked || 1} مقعد مطلوب
+                      </span>
+                    </div>
+
+                    {/* معاينة معلومات الراكب أمام السائق */}
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          {req.customerPhone && (
+                            <button
+                              type="button"
+                              onClick={() => window.open(`tel:${req.customerPhone}`)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition active:scale-95 cursor-pointer"
+                              title="اتصال بالراكب"
+                            >
+                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            </button>
+                          )}
+                          {req.customerPhone && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenWhatsApp(req.customerPhone || '', req.customerName || '')}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#22c55e]/20 text-[#16a34a] hover:bg-[#22c55e]/30 transition active:scale-95 cursor-pointer"
+                              title="واتساب مع الراكب"
+                            >
+                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[16px] font-black text-gray-900">
+                          الراكب: {req.customerName || 'راكب توصيلة'}
+                        </p>
+                      </div>
+
+                      {req.customerPhone && (
+                        <p className="text-[13px] font-bold text-gray-600" dir="ltr">
+                          📞 {req.customerPhone}
+                        </p>
+                      )}
+
+                      <div className="rounded-xl bg-white p-3 space-y-1.5 border border-amber-200/90 shadow-xs">
+                        <p className="text-[13.5px] font-bold text-gray-800">
+                          🟢 من (موقع الصعود): <span className="text-gray-900 font-black">{req.pickupLocation || 'النجف الأشرف'}</span>
+                        </p>
+                        <p className="text-[13.5px] font-bold text-gray-800">
+                          🔴 إلى (الوجهة): <span className="text-gray-900 font-black">{req.dropoffLocation || 'جامعة الكوفة'}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* خيارات القبول والرفض */}
+                    <div className="flex gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptSeatBooking(req.id || req.bookingId || '')}
+                        className="flex-1 rounded-xl bg-emerald-600 py-3 text-center text-[15px] font-black text-white shadow-sm transition active:scale-95 cursor-pointer hover:bg-emerald-700"
+                      >
+                        قبول الحجز ✅
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRejectSeatBooking(req.id || req.bookingId || '')}
+                        className="flex-1 rounded-xl bg-red-500 py-3 text-center text-[15px] font-black text-white shadow-sm transition active:scale-95 cursor-pointer hover:bg-red-600"
+                      >
+                        رفض الحجز ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : (
+            )}
+
+            {/* ركاب الخط الدائمي المشتركون */}
+            <div>
+              <h3 className="text-center text-[16px] font-black text-gray-900 mb-3">
+                ركاب الخط الدائمي المشتركين - {subscribers.length} ركاب
+              </h3>
+
+              {subscribers.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-gray-500 bg-gray-50/50">
+                  <p className="text-[14px] font-bold text-gray-700">لا يوجد ركاب مشتركين حالياً في خطك الدائمي</p>
+                  <p className="text-[12px] text-gray-400 mt-1">ستظهر اشتراكات الركاب المؤكدة هنا تلقائياً بعد قبول الحجز</p>
+                </div>
+              ) : (
               <div className="space-y-2.5">
                 {subscribers.map((sub) => (
                   <div
@@ -460,6 +682,7 @@ export default function DriverHomePage() {
                 ))}
               </div>
             )}
+            </div>
           </section>
         )}
 
