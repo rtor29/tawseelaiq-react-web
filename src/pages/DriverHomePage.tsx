@@ -1,4 +1,3 @@
-// بوابة الكابتن — واجهة السائق عند تفعيل الخط الدائمي ووضع التكسي المباشر
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
@@ -6,6 +5,7 @@ import { authStore } from '../lib/auth';
 import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
 import { useToast } from '../components/Toast';
+import ChatModal from '../components/ChatModal';
 
 interface Subscriber {
   id: string;
@@ -47,6 +47,7 @@ export default function DriverHomePage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [incomingRequest, setIncomingRequest] = useState<IncomingRideRequest | null>(null);
   const [activeRide, setActiveRide] = useState<any | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     void realtime.connect(storage.getToken());
@@ -439,6 +440,28 @@ export default function DriverHomePage() {
                     </button>
                   )}
 
+                  {/* أزرار التواصل المباشر مع الراكب */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsChatOpen(true)}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-50 border border-blue-200/80 py-2.5 text-center text-[14px] font-black text-blue-700 shadow-xs transition hover:bg-blue-100 active:scale-95 cursor-pointer"
+                    >
+                      <svg className="h-4.5 w-4.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <span>مراسلة الراكب 💬</span>
+                    </button>
+                    {activeRide.customerPhone && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(`tel:${activeRide.customerPhone}`)}
+                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition active:scale-95 cursor-pointer shrink-0"
+                        title="اتصال هاتفي"
+                      >
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      </button>
+                    )}
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -570,6 +593,21 @@ export default function DriverHomePage() {
           </div>
         </section>
       </main>
+
+      {/* نافذة المحادثة المباشرة مع الراكب */}
+      {activeRide && (
+        <ChatModal
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          requestId={activeRide.id}
+          currentUserId={driverId || 'driver'}
+          currentUserRole="Driver"
+          currentUserName={driverName || 'الكابتن'}
+          peerName={activeRide.customerName || 'الراكب'}
+          peerPhone={activeRide.customerPhone}
+          peerRole="الراكب"
+        />
+      )}
     </div>
   );
 }

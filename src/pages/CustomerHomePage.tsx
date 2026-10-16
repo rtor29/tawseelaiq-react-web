@@ -20,6 +20,7 @@ import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import ChatModal from '../components/ChatModal';
 
 // نقطة الانطلاق والوصول الافتراضية في النجف
 const DEFAULT_PICKUP: LngLat = { lat: 32.0298, lng: 44.3285 };
@@ -234,6 +235,7 @@ export default function CustomerHomePage() {
   const [isDriverSheetExpanded, setIsDriverSheetExpanded] = useState(false);
   const [isCancelTripOpen, setIsCancelTripOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // المدينة المحددة
   const [selectedCity, setSelectedCity] = useState('المدينة الحالية');
@@ -1156,14 +1158,11 @@ export default function CustomerHomePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (assignedDriverInfo?.driverPhone) window.open(`https://wa.me/${assignedDriverInfo.driverPhone}`, '_blank');
-                      else show('فتح المحادثة...', 'info');
-                    }}
-                    className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-gray-100 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-gray-200 cursor-pointer"
+                    onClick={() => setIsChatOpen(true)}
+                    className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-blue-50 border border-blue-200/60 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
                   >
                     <span>مراسلة السائق...</span>
-                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   </button>
                 </div>
                 <div className="flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3 mb-3">
@@ -1282,14 +1281,11 @@ export default function CustomerHomePage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (assignedDriverInfo?.driverPhone) window.open(`https://wa.me/${assignedDriverInfo.driverPhone}`, '_blank');
-                  else show('فتح المحادثة...', 'info');
-                }}
-                className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-gray-100 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-gray-200 cursor-pointer"
+                onClick={() => setIsChatOpen(true)}
+                className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-blue-50 border border-blue-200/60 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
               >
                 <span>مراسلة السائق...</span>
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               </button>
             </div>
 
@@ -2268,6 +2264,19 @@ export default function CustomerHomePage() {
         </div>
       )}
 
+
+      {/* نافذة المحادثة المباشرة بين الراكب والسائق */}
+      <ChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        requestId={rideRequestId || 'active-ride'}
+        currentUserId={session?.userId || storage.getUserId() || 'customer'}
+        currentUserRole="Customer"
+        currentUserName={session?.fullName || 'الراكب'}
+        peerName={assignedDriverInfo?.driverName || 'كابتن توصيله'}
+        peerPhone={assignedDriverInfo?.driverPhone}
+        peerRole={assignedDriverInfo?.driverVehicle || 'كابتن توصيله'}
+      />
 
     </div>
   );
