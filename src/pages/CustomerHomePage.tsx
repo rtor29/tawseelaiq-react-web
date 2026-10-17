@@ -296,6 +296,70 @@ export default function CustomerHomePage() {
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const hasTriggeredRatingRef = useRef(false);
 
+  // حالة الورقة السفلية لتفاصيل الرحلة (Interactive Draggable / Collapsible Sheet)
+  const [rideSheetState, setRideSheetState] = useState<'expanded' | 'collapsed'>('expanded');
+  const sheetTouchStartYRef = useRef<number | null>(null);
+  const sheetTouchCurrentYRef = useRef<number | null>(null);
+  const isSheetDraggingRef = useRef<boolean>(false);
+
+  const handleSheetTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    sheetTouchStartYRef.current = touch.clientY;
+    sheetTouchCurrentYRef.current = touch.clientY;
+    isSheetDraggingRef.current = true;
+  }, []);
+
+  const handleSheetTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isSheetDraggingRef.current || sheetTouchStartYRef.current === null) return;
+    const touch = e.touches[0];
+    sheetTouchCurrentYRef.current = touch.clientY;
+  }, []);
+
+  const handleSheetTouchEnd = useCallback(() => {
+    if (!isSheetDraggingRef.current || sheetTouchStartYRef.current === null || sheetTouchCurrentYRef.current === null) {
+      isSheetDraggingRef.current = false;
+      sheetTouchStartYRef.current = null;
+      sheetTouchCurrentYRef.current = null;
+      return;
+    }
+    const deltaY = sheetTouchCurrentYRef.current - sheetTouchStartYRef.current;
+    // سحب لأسفل مسافة > 40px -> التحول فوراً إلى 'collapsed'
+    if (deltaY > 40) {
+      setRideSheetState('collapsed');
+    }
+    // سحب لأعلى مسافة > 40px -> التحول فوراً إلى 'expanded'
+    else if (deltaY < -40) {
+      setRideSheetState('expanded');
+    }
+    isSheetDraggingRef.current = false;
+    sheetTouchStartYRef.current = null;
+    sheetTouchCurrentYRef.current = null;
+  }, []);
+
+  // دعم السحب بالفأرة على أجهزة الكمبيوتر (Mouse Drag Support)
+  const handleSheetMouseDown = useCallback((e: React.MouseEvent) => {
+    const startY = e.clientY;
+    let currentY = e.clientY;
+
+    const onMouseMove = (moveEvt: MouseEvent) => {
+      currentY = moveEvt.clientY;
+    };
+
+    const onMouseUp = () => {
+      const deltaY = currentY - startY;
+      if (deltaY > 40) {
+        setRideSheetState('collapsed');
+      } else if (deltaY < -40) {
+        setRideSheetState('expanded');
+      }
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, []);
+
   // حالة الـ GPS والتنبيهات المخصصة لـ iOS Safari
   const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -489,7 +553,13 @@ export default function CustomerHomePage() {
 
   // النقر المباشر على الخريطة
   function handleMapClick(e: MapMouseEvent) {
-    if (stage === 'ride_options' || stage === 'searching' || stage === 'driver_arriving') return;
+    if (stage === 'driver_arriving') {
+      if (rideSheetState === 'expanded') {
+        setRideSheetState('collapsed');
+      }
+      return;
+    }
+    if (stage === 'ride_options' || stage === 'searching') return;
 
     const point: LngLat = { lat: e.lngLat.lat, lng: e.lngLat.lng };
     if (stage === 'pickup') {
@@ -906,6 +976,7 @@ export default function CustomerHomePage() {
 
     // 5. تصفير حالة الرحلة والرجوع لمرحلة الانطلاق
     setStage('pickup');
+    setRideSheetState('expanded');
     setRideRequestId(null);
     setRideStatus(null);
     setAssignedDriverInfo(null);
@@ -1016,6 +1087,7 @@ export default function CustomerHomePage() {
             setRideStatus('Accepted');
             if (stage !== 'driver_arriving') {
               setStage('driver_arriving');
+              setRideSheetState('expanded');
               show('تم قبول رحلتك من قبل الكابتن! 🚖 الكابتن في طريقه إليك', 'success');
               mapRef.current?.flyTo({ center: [pickup.lng, pickup.lat], zoom: 15.5, duration: 700 });
             }
@@ -1072,6 +1144,7 @@ export default function CustomerHomePage() {
           setRideStatus('Accepted');
           if (stage !== 'driver_arriving') {
             setStage('driver_arriving');
+            setRideSheetState('expanded');
             show('تم قبول رحلتك من قبل الكابتن! 🚖', 'success');
           }
         } else if (e.status === 'Arrived') {
@@ -1245,7 +1318,14 @@ export default function CustomerHomePage() {
       )}
 
       {/* 3. الخريطة الرئيسية Mapbox */}
-      <div className="relative h-full w-full">
+      <div
+        className="relative h-full w-full"
+        onClick={() => {
+          if (stage === 'driver_arriving' && rideSheetState === 'expanded') {
+            setRideSheetState('collapsed');
+          }
+        }}
+      >
         <MapGL
           ref={mapRef}
           mapboxAccessToken={config.mapboxToken}
@@ -1754,110 +1834,209 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* 8. بطاقة "السائق قادم" */}
+        {/* 8. بطاقة تفاصيل الرحلة التفاعلية متعددة الارتفاعات (Interactive Draggable / Collapsible Sheet) */}
         {stage === 'driver_arriving' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.18)] animate-fade-in">
-            <div className="flex justify-center py-3"><div className="h-1 w-10 rounded-full bg-gray-300" /></div>
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              if (rideSheetState === 'collapsed') {
+                setRideSheetState('expanded');
+              }
+            }}
+            style={{
+              transform: rideSheetState === 'expanded' ? 'translateY(0)' : 'translateY(calc(100% - 130px))',
+              transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            }}
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white pb-6 shadow-[0_-8px_30px_rgba(0,0,0,0.18)] will-change-transform animate-fade-in"
+          >
+            {/* مقبض السحب وترويسة الورقة (Drag Handle & Header with touch-action: none) */}
+            <div
+              onTouchStart={handleSheetTouchStart}
+              onTouchMove={handleSheetTouchMove}
+              onTouchEnd={handleSheetTouchEnd}
+              onMouseDown={handleSheetMouseDown}
+              style={{ touchAction: 'none' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setRideSheetState((prev) => (prev === 'expanded' ? 'collapsed' : 'expanded'));
+              }}
+              className="cursor-pointer select-none touch-none pt-2.5 pb-2 px-5 flex flex-col items-center border-b border-slate-100/60"
+            >
+              {/* الركزة الرمادية مع مساحة لمس موسعة ومريحة (Hitbox Padding) */}
+              <div className="py-2 px-8 flex justify-center items-center">
+                <div className="h-1.5 w-12 rounded-full bg-slate-300 transition-colors hover:bg-slate-400 active:bg-slate-500" />
+              </div>
 
-            {/* اسم السيارة */}
-            <p className="text-center text-[18px] font-black text-gray-900 mb-4">
-              {assignedDriverInfo?.driverVehicle || 'سيارة خصوصي'}
-            </p>
-
-            {/* لوحة + اسم السائق + صورة */}
-            <div className="flex items-center justify-between px-5 mb-4">
-              <div className="rounded-xl border-2 border-gray-800 px-3 py-2 text-center min-w-[100px]">
-                <p className="text-[18px] font-black text-gray-900 tracking-widest">
-                  {assignedDriverInfo?.driverPlate || '١١٣٤٠ ة'}
+              {/* اسم ونوع السيارة مع سهم المؤشر */}
+              <div className="w-full flex items-center justify-between mt-0.5 mb-2 px-1">
+                <p className="text-[17px] font-black text-gray-900 truncate">
+                  {assignedDriverInfo?.driverVehicle || 'سيارة خصوصي'}
                 </p>
-                <div className="flex justify-between text-[10px] text-gray-500 font-bold mt-0.5"><span>النجف</span><span>خصوصي</span></div>
+                <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
+                  <span>{rideSheetState === 'expanded' ? 'اسحب للأسفل' : 'اسحب للأعلى'}</span>
+                  <svg
+                    className={`h-4 w-4 transition-transform duration-300 ${rideSheetState === 'expanded' ? 'rotate-180' : 'rotate-0'}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-[16px] font-bold text-gray-800">
-                  {assignedDriverInfo?.driverName || 'كابتن توصيله'}
-                </span>
-                <div className="h-14 w-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-[26px] border-2 border-blue-300">🧑‍✈️</div>
-              </div>
-            </div>
 
-            {/* مراسلة + اتصال */}
-            <div className="flex items-center gap-3 px-5 mb-4">
-              <button
-                type="button"
-                onClick={() => {
-                  if (assignedDriverInfo?.driverPhone) window.open(`tel:${assignedDriverInfo.driverPhone}`);
-                  else show('رقم الكابتن غير متوفر حالياً', 'info');
-                }}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-500 text-blue-600 shrink-0 hover:bg-blue-50 cursor-pointer"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsChatOpen(true)}
-                className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-blue-50 border border-blue-200/60 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
-              >
-                <span>مراسلة السائق...</span>
-                <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              </button>
-            </div>
-
-            {/* الدفع */}
-            <div className="flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3 mx-5 mb-4">
-              <button type="button" className="rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-bold text-white cursor-pointer hover:bg-blue-700">الدفع</button>
-              <div className="text-right">
-                <p className="text-[13px] font-bold text-red-500">الرصيد غير كاف</p>
-                <p className="text-[12px] text-gray-500">مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار</p>
-              </div>
-              <svg className="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            </div>
-
-            {/* حالة الرحلة للراكب أو زر انطلاق للكابتن */}
-            <div className="px-5 flex flex-col gap-2">
-              {isCaptain ? (
-                <button type="button" onClick={handleOpenNavigation}
-                  className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition active:scale-[0.98] hover:bg-orange-600 cursor-pointer">
-                  🚗 السائق وصل — انطلاق إلى الوجهة
-                </button>
-              ) : isPassenger ? (
-                /* شريط حالة نصي غير تفاعلي للراكب */
-                <div className={`w-full rounded-2xl py-3 px-4 text-center select-none border transition-all ${
-                  rideStatus === 'InProgress' || rideStatus === 'in_progress'
-                    ? 'bg-emerald-50 border-emerald-200/80 text-emerald-800'
-                    : rideStatus === 'Arrived'
-                    ? 'bg-amber-50 border-amber-200/80 text-amber-900'
-                    : 'bg-slate-100 border-slate-200 text-[#1B4965]'
-                }`}>
-                  <div className="flex items-center justify-center gap-2">
-                    {rideStatus === 'InProgress' || rideStatus === 'in_progress' ? (
-                      <span className="text-[15px] font-black">في الطريق إلى الوجهة 🚗💨</span>
-                    ) : rideStatus === 'Arrived' ? (
-                      <>
-                        <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-ping mr-1" />
-                        <span className="text-[14.5px] font-bold">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="inline-block h-2 w-2 rounded-full bg-[#1B4965] animate-pulse mr-1" />
-                        <span className="text-[14.5px] font-bold">الكابتن في طريقه إليك 🚗</span>
-                      </>
-                    )}
+              {/* شريط الحالة الحالي الدائم (يظهر دائماً في الأعلى ليبقى ظاهراً في حالتي expanded و collapsed) */}
+              <div className="w-full">
+                {isCaptain ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenNavigation();
+                    }}
+                    className="w-full rounded-xl bg-[#f97316] py-2.5 text-center text-[15px] font-black text-white shadow-sm transition active:scale-[0.98] hover:bg-orange-600 cursor-pointer"
+                  >
+                    🚗 السائق وصل — انطلاق إلى الوجهة
+                  </button>
+                ) : isPassenger ? (
+                  <div
+                    className={`w-full rounded-xl py-2 px-3.5 text-center select-none border transition-colors ${
+                      rideStatus === 'InProgress' || rideStatus === 'in_progress'
+                        ? 'bg-emerald-50 border-emerald-200/80 text-emerald-800'
+                        : rideStatus === 'Arrived'
+                        ? 'bg-amber-50 border-amber-200/80 text-amber-900'
+                        : 'bg-slate-100 border-slate-200 text-[#1B4965]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      {rideStatus === 'InProgress' || rideStatus === 'in_progress' ? (
+                        <span className="text-[14px] font-black">في الطريق إلى الوجهة 🚗💨</span>
+                      ) : rideStatus === 'Arrived' ? (
+                        <>
+                          <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-ping mr-1" />
+                          <span className="text-[13.5px] font-bold">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-block h-2 w-2 rounded-full bg-[#1B4965] animate-pulse mr-1" />
+                          <span className="text-[13.5px] font-bold">الكابتن في طريقه إليك 🚗</span>
+                        </>
+                      )}
+                    </div>
                   </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* محتوى تفاصيل الكابتن والدفع (يختفي بتأثير fade ناعم عند تصغير الورقة) */}
+            <div
+              className={`flex flex-col transition-all duration-300 px-5 pt-3.5 space-y-3.5 ${
+                rideSheetState === 'expanded'
+                  ? 'opacity-100 pointer-events-auto max-h-[500px]'
+                  : 'opacity-0 pointer-events-none max-h-0 overflow-hidden'
+              }`}
+            >
+              {/* لوحة + اسم السائق + صورة */}
+              <div className="flex items-center justify-between">
+                <div className="rounded-xl border-2 border-gray-800 px-3 py-2 text-center min-w-[100px]">
+                  <p className="text-[18px] font-black text-gray-900 tracking-widest font-mono">
+                    {assignedDriverInfo?.driverPlate || '١١٣٤٠ ة'}
+                  </p>
+                  <div className="flex justify-between text-[10px] text-gray-500 font-bold mt-0.5">
+                    <span>النجف</span>
+                    <span>خصوصي</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[16px] font-bold text-gray-800">
+                    {assignedDriverInfo?.driverName || 'كابتن توصيله'}
+                  </span>
+                  <div className="h-14 w-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-[26px] border-2 border-blue-300">
+                    🧑‍✈️
+                  </div>
+                </div>
+              </div>
+
+              {/* مراسلة + اتصال */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (assignedDriverInfo?.driverPhone) window.open(`tel:${assignedDriverInfo.driverPhone}`);
+                    else show('رقم الكابتن غير متوفر حالياً', 'info');
+                  }}
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-500 text-blue-600 shrink-0 hover:bg-blue-50 cursor-pointer"
+                  title="اتصال بالكابتن"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsChatOpen(true);
+                  }}
+                  className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-blue-50 border border-blue-200/60 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
+                >
+                  <span>مراسلة السائق...</span>
+                  <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </button>
+              </div>
+
+              {/* الدفع */}
+              <div className="flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    show('الدفع نقداً عند الوصول 💵', 'info');
+                  }}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-bold text-white cursor-pointer hover:bg-blue-700"
+                >
+                  الدفع
+                </button>
+                <div className="text-right">
+                  <p className="text-[13px] font-bold text-emerald-700">الدفع نقداً</p>
+                  <p className="text-[12px] text-gray-500">
+                    مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار
+                  </p>
+                </div>
+                <svg className="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="1" y="4" width="22" height="16" rx="2"/>
+                  <line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+              </div>
+
+              {/* تفاصيل حالة الرحلة الفرعية */}
+              {isPassenger && (rideStatus === 'Arrived' || rideStatus === 'InProgress' || rideStatus === 'in_progress') && (
+                <div className="text-center">
                   {rideStatus === 'Arrived' && (
-                    <p className="text-[12px] text-amber-700/90 mt-1 font-medium">بانتظار تأكيد السائق لبدء الرحلة ⏳</p>
+                    <p className="text-[12px] text-amber-700/90 font-medium">بانتظار تأكيد السائق لبدء الرحلة ⏳</p>
                   )}
                   {(rideStatus === 'InProgress' || rideStatus === 'in_progress') && (
-                    <p className="text-[12px] text-emerald-700/90 mt-1 font-medium">الرحلة جارية الآن نحو وجهتك المحددة ✨</p>
+                    <p className="text-[12px] text-emerald-700/90 font-medium">الرحلة جارية الآن نحو وجهتك المحددة ✨</p>
                   )}
                 </div>
-              ) : null}
+              )}
 
               {/* زر إلغاء الرحلة متاح للراكب لحين بدء الرحلة فعلياً */}
               {(!rideStatus || (rideStatus !== 'InProgress' && rideStatus !== 'in_progress' && rideStatus !== 'Completed')) && (
                 <button
                   type="button"
-                  onClick={() => { setIsCancelTripOpen(true); setCancelReason(null); }}
-                  className="w-full py-2.5 text-center text-[14px] font-bold text-red-500 hover:text-red-700 transition cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsCancelTripOpen(true);
+                    setCancelReason(null);
+                  }}
+                  className="w-full py-2 text-center text-[14px] font-bold text-red-500 hover:text-red-700 transition cursor-pointer"
                 >
                   إلغاء الرحلة
                 </button>
