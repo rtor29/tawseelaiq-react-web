@@ -72,7 +72,7 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
   function handleLogout() {
     localStorage.clear();
     if (onClose) onClose();
-    navigate('/login', { replace: true });
+    window.location.replace('/login');
   }
 
   if (!open) return null;
