@@ -79,8 +79,11 @@ export default function DriverHomePage() {
   });
 
 
-  // حالة العمل الحالية: خمول | خط دائمي | تكسي (تبدأ بوضع الخمول افتراضياً)
-  const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>('idle');
+  // حالة العمل الحالية: خمول | خط دائمي | تكسي (تُقرأ من التخزين المحلي أولاً)
+  const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('driver_work_status') : null;
+    return (saved === 'taxi' || saved === 'permanent' || saved === 'idle') ? saved : 'idle';
+  });
 
   // إرسال تحديث حالة ونمط عمل السائق إلى الخادم مع إحداثيات GPS الحية فوراً
   const sendDriverStatusUpdate = useCallback((statusToSync: 'idle' | 'permanent' | 'taxi') => {
@@ -121,6 +124,7 @@ export default function DriverHomePage() {
   // تبديل حالة العمل مع مسح الإشعارات السابقة وعرض الإشعار الدقيق لمدة ثانيتين وإرسال التحديث فوراً
   function handleSwitchWorkStatus(newStatus: 'idle' | 'permanent' | 'taxi') {
     dismissAll();
+    localStorage.setItem('driver_work_status', newStatus);
     setWorkStatus(newStatus);
     sendDriverStatusUpdate(newStatus);
     if (newStatus === 'taxi') {
