@@ -6,10 +6,10 @@ export default {
     extend: {
       colors: {
         brand: {
-          primary: '#1B4965',       // أزرق نفطي راقٍ للأزرار الرئيسية والتفاعل
-          primaryHover: '#14364A',  // كحلي بترولي داكن عند التمرير
+          primary: 'var(--primary-color, #1B4965)',       // أزرق نفطي راقٍ للأزرار الرئيسية والتفاعل
+          primaryHover: 'var(--primary-hover, #14364A)',  // كحلي بترولي داكن عند التمرير
           dark: '#0D1B2A',          // كحلي منتصف الليل للعناوين البارزة
-          accent: '#62B6CB',        // سماوي رمادي هادئ للشارات والتركيز
+          accent: 'var(--accent-color, #D97706)',        // لمسة التمييز الكهرمانية / السماوية
           amber: '#D97706',         // عنبري دافئ هادئ لنقطة الانطلاق
           emerald: '#059669',       // أخضر زمردي هادئ للحالات النشطة
           rose: '#E11D48',          // أحمر وردي راقٍ للإلغاء والحذف
@@ -20,7 +20,8 @@ export default {
         },
       },
       fontFamily: {
-        cairo: ['Cairo', 'Tajawal', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-family)', 'IBM Plex Sans Arabic', 'Tajawal', 'Cairo', 'system-ui', 'sans-serif'],
+        cairo: ['var(--font-family)', 'IBM Plex Sans Arabic', 'Tajawal', 'Cairo', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         xl2: '1rem',

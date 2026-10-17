@@ -6,6 +6,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useSession } from './lib/auth';
 import { consumeLoginTokenFromUrl } from './lib/googleAuth';
 import { realtime } from './lib/realtime';
+import { fetchAndApplyTheme } from './lib/theme';
 import { Spinner } from './components/ui';
 
 // Lazy loading all pages for optimal bundle splitting
@@ -42,6 +43,11 @@ function RequireAuth({ children, role }: { children: ReactNode; role?: 'Driver' 
 export default function App() {
   const session = useSession();
   const [ready, setReady] = useState(false);
+
+  // جلب وتطبيق المظهر المعتمد من لوحة التحكم والخادم
+  useEffect(() => {
+    void fetchAndApplyTheme();
+  }, []);
 
   // معالجة login_token من رابط العودة (OAuth/تليجرام) عند أول تحميل — بديل main.dart
   useEffect(() => {

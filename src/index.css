@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --primary-color: #1B4965;
+  --primary-hover: #14364A;
+  --accent-color: #D97706;
+  --bg-color: #F8FAFC;
+  --card-bg: #FFFFFF;
+  --text-color: #0F172A;
+  --font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Cairo', system-ui, -apple-system, sans-serif;
+  --app-font-size: 14px;
+}
+
 html,
 body {
   width: 100%;
@@ -10,7 +21,8 @@ body {
   min-height: 100dvh;
   overflow-x: hidden;
   position: relative;
-  font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-family);
+  font-size: var(--app-font-size);
   line-height: 1.6;
   background-color: #f8f9fa;
   color: #1a1a1a;
@@ -21,6 +33,49 @@ body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Dynamic Theme Variable Mapping for Tailwind Arbitrary Hex Classes */
+[class*="bg-[#1B4965]"],
+[class*="bg-[#1b4965]"] {
+  background-color: var(--primary-color) !important;
+}
+
+[class*="text-[#1B4965]"],
+[class*="text-[#1b4965]"] {
+  color: var(--primary-color) !important;
+}
+
+[class*="border-[#1B4965]"],
+[class*="border-[#1b4965]"] {
+  border-color: var(--primary-color) !important;
+}
+
+[class*="hover:bg-[#14364A]"]:hover,
+[class*="hover:bg-[#14364a]"]:hover {
+  background-color: var(--primary-hover) !important;
+}
+
+[class*="hover:border-[#1B4965]"]:hover,
+[class*="hover:border-[#1b4965]"]:hover {
+  border-color: var(--primary-color) !important;
+}
+
+[class*="hover:text-[#1B4965]"]:hover,
+[class*="hover:text-[#1b4965]"]:hover {
+  color: var(--primary-color) !important;
+}
+
+[class*="from-[#1B4965]"],
+[class*="from-[#1b4965]"] {
+  --tw-gradient-from: var(--primary-color) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: var(--primary-hover) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-from), var(--tw-gradient-to)) !important;
+}
+
+[class*="to-[#14364A]"],
+[class*="to-[#14364a]"] {
+  --tw-gradient-to: var(--primary-hover) var(--tw-gradient-to-position) !important;
 }
 
 #root {
