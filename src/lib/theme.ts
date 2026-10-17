@@ -5,6 +5,7 @@ export interface ThemeConfig {
   primaryColor: string;
   primaryHover: string;
   accentColor: string;
+  brandLogoColor?: string;
   fontFamily: string;
   fontSize: string;
   bgColor?: string;
@@ -20,6 +21,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   primaryColor: '#1B4965',
   primaryHover: '#14364A',
   accentColor: '#D97706',
+  brandLogoColor: '#EBB812',
   fontFamily: 'IBM Plex Sans Arabic',
   fontSize: '14px',
   bgColor: '#F8FAFC',
@@ -59,6 +61,7 @@ export function applyTheme(theme: Partial<ThemeConfig>): ThemeConfig {
     root.style.setProperty('--primary-color', merged.primaryColor);
     root.style.setProperty('--primary-hover', merged.primaryHover);
     root.style.setProperty('--accent-color', merged.accentColor);
+    root.style.setProperty('--brand-logo-color', merged.brandLogoColor || '#EBB812');
     root.style.setProperty('--bg-color', merged.bgColor || '#F8FAFC');
     root.style.setProperty('--card-bg', merged.cardBg || '#FFFFFF');
     root.style.setProperty('--text-color', merged.textColor || '#0F172A');

@@ -216,3 +216,24 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.35s ease-out forwards;
 }
+
+/* ==========================================================================
+   Dynamic Tawseela Logo Color Mask
+   ========================================================================== */
+:root {
+  --brand-logo-color: #EBB812;
+}
+
+.tawseela-dynamic-logo {
+  display: inline-block;
+  background-color: var(--brand-logo-color, #EBB812);
+  -webkit-mask-image: url('/assets/tawseela-logo-transparent.png');
+  mask-image: url('/assets/tawseela-logo-transparent.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  transition: background-color 0.25s ease-out;
+}

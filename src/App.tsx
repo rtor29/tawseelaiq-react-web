@@ -21,6 +21,7 @@ const VacancyAdsPage = lazy(() => import('./pages/VacancyAdsPage'));
 const CreateVacancyAdPage = lazy(() => import('./pages/CreateVacancyAdPage'));
 const SupportPage = lazy(() => import('./pages/SupportPage'));
 const DailyRoutePage = lazy(() => import('./pages/DailyRoutePage'));
+const CustomerHub = lazy(() => import('./components/CustomerHub').then((m) => ({ default: m.CustomerHub })));
 
 function PageLoader() {
   return (
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/register" element={<Navigate to="/login" replace />} />
         <Route path="/otp" element={<Navigate to="/login" replace />} />
         <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
+        <Route path="/hub" element={<RequireAuth>{session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHub />}</RequireAuth>} />
 
         <Route
           path="/"

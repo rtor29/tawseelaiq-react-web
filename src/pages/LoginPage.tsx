@@ -7,6 +7,7 @@ import { consumeLoginTokenFromUrl } from '../lib/googleAuth';
 import type { Session } from '../types';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { CustomerHub } from '../components/CustomerHub';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -349,6 +350,11 @@ export default function LoginPage() {
     }
   }
 
+  // في حال الوصول لخطوة اختيار الخدمة، عرض هب خدمات الزبون الحديث (Baly Style)
+  if (step === 'service_select') {
+    return <CustomerHub onSelectService={handleSelectService} />;
+  }
+
   return (
     <div className="min-h-dvh bg-white flex flex-col justify-between max-w-[480px] mx-auto px-6 py-6 relative">
       {/* 1. الخطوة الأولى: واجهة ياهلا ورقم الهاتف (مع موشن دخول الشعار من اليمين) */}
@@ -593,62 +599,6 @@ export default function LoginPage() {
               </svg>
             )}
           </button>
-        </div>
-      )}
-
-      {/* 4. الخطوة الرابعة: واجهة اختيار نوع الخدمة للزبون (تكسي / حجز خط دائمي) */}
-      {step === 'service_select' && (
-        <div className="flex-1 flex flex-col justify-start items-center pt-8 md:pt-14 px-2 overflow-hidden">
-          {/* الشعار العلوي مع حركة الموشن من اليمين */}
-          <div className="text-center flex justify-center mb-4">
-            <img
-              src="/logo.png"
-              alt="توصيلة"
-              className="w-[200px] md:w-[220px] max-w-[75%] h-auto object-contain animate-drive-in"
-            />
-          </div>
-
-          {/* نص الترحيب وسؤال الوجهة مع حركة الظهور */}
-          <h2 className="text-[20px] md:text-[22px] font-bold text-[#1A1A1A] font-cairo text-center mt-1 mb-10 md:mb-14 animate-fade-in-text">
-            ياهلا بيكم، وين حابين نوصلكم اليوم؟
-          </h2>
-
-          {/* بطاقتا الخيارات: تكسي و حجز خط دائمي */}
-          <div className="w-full flex items-center justify-center gap-5 md:gap-8">
-            {/* خيار تكسي */}
-            <div
-              onClick={() => handleSelectService('taxi')}
-              className="flex-1 max-w-[180px] flex flex-col items-center p-5 rounded-2xl border border-slate-200/80 bg-white shadow-card hover:border-[#1B4965] hover:shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 group select-none"
-            >
-              <div className="w-full flex items-center justify-center py-2">
-                <img
-                  src="/logo.png"
-                  alt="تكسي"
-                  className="w-full max-w-[130px] h-auto object-contain animate-drive-in-delayed"
-                />
-              </div>
-              <span className="mt-3 text-[17px] md:text-[18px] font-bold text-[#1A1A1A] font-cairo text-center group-hover:text-[#1B4965] transition-colors">
-                تكسي
-              </span>
-            </div>
-
-            {/* خيار حجز خط دائمي */}
-            <div
-              onClick={() => handleSelectService('permanent')}
-              className="flex-1 max-w-[180px] flex flex-col items-center p-5 rounded-2xl border border-slate-200/80 bg-white shadow-card hover:border-[#1B4965] hover:shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 group select-none"
-            >
-              <div className="w-full flex items-center justify-center py-2">
-                <img
-                  src="/logo.png"
-                  alt="حجز خط دائمي"
-                  className="w-full max-w-[130px] h-auto object-contain animate-drive-in-delayed2"
-                />
-              </div>
-              <span className="mt-3 text-[17px] md:text-[18px] font-bold text-[#1A1A1A] font-cairo text-center group-hover:text-[#1B4965] transition-colors">
-                حجز خط دائمي
-              </span>
-            </div>
-          </div>
         </div>
       )}
     </div>
