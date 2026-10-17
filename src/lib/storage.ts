@@ -52,12 +52,21 @@ export const storage = {
     localStorage.setItem(KEYS.avatar, base64);
   },
 
+  getPoints(): number {
+    const p = localStorage.getItem('user_points');
+    return p ? parseInt(p, 10) || 0 : 0;
+  },
+  setPoints(points: number): void {
+    localStorage.setItem('user_points', String(points));
+  },
+
   clearSession(): void {
     localStorage.removeItem(KEYS.token);
     localStorage.removeItem(KEYS.userId);
     localStorage.removeItem(KEYS.userRole);
     localStorage.removeItem(KEYS.fullName);
     localStorage.removeItem(KEYS.phone);
+    localStorage.removeItem('user_points');
   },
 
   clearAll(): void {
