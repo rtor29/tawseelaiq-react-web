@@ -402,58 +402,58 @@ export default function DriverHomePage() {
   return (
     <div className="flex min-h-dvh flex-col bg-white font-cairo select-none" dir="rtl">
       {/* 1. الترويسة العلوية */}
-      <header className="flex items-center justify-between border-b border-gray-100 px-6 pt-5 pb-4">
+      <header className="flex items-center justify-between border-b border-slate-100 px-6 pt-5 pb-4 bg-white">
         {/* اليمين: معلومات السائق والصورة */}
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-300 text-slate-500 shadow-sm">
-            <svg className="h-7 w-7" viewBox="0 0 24 24" fill="currentColor">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/80 shadow-subtle">
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
             </svg>
           </div>
           <div className="text-right">
-            <p className="text-[17px] font-black text-gray-900 leading-tight">{driverName}</p>
-            <p className="text-[13px] font-bold text-emerald-600 mt-0.5">سائق مفعل</p>
+            <p className="text-[16px] font-bold text-[#1A1A1A] leading-tight">{driverName}</p>
+            <p className="text-[12px] font-medium text-emerald-600 mt-0.5">سائق مفعل</p>
           </div>
         </div>
 
         {/* اليسار: رقم الهاتف والرصيد */}
         <div className="text-left font-sans">
-          <p className="text-[14px] font-bold text-gray-900" dir="ltr">{formattedPhone}</p>
-          <p className="text-[13px] font-medium text-gray-600 mt-0.5" dir="rtl">
-            الرصيد: <span className="font-bold text-gray-800">{driverBalance}</span> دينار
+          <p className="text-[13.5px] font-bold text-[#1A1A1A]" dir="ltr">{formattedPhone}</p>
+          <p className="text-[12.5px] font-medium text-[#6C757D] mt-0.5" dir="rtl">
+            الرصيد: <span className="font-bold text-[#1A1A1A]">{driverBalance}</span> د.ع
           </p>
         </div>
       </header>
 
       {/* المحتوى الرئيسي */}
-      <main className="flex-1 overflow-y-auto px-5 py-4">
+      <main className="flex-1 overflow-y-auto px-5 py-4 bg-[#F8F9FA]/40">
         {/* تنبيه وصول رسالة من الراكب */}
         {latestPassengerMsg && activeRide && (
           <div
             onClick={() => setIsChatOpen(true)}
-            className="mb-4 flex items-center justify-between rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 p-3.5 text-white shadow-lg cursor-pointer transition active:scale-[0.99] hover:shadow-xl animate-fade-in"
+            className="mb-4 flex items-center justify-between rounded-xl bg-[#1B4965] p-3.5 text-white shadow-subtle cursor-pointer transition active:scale-[0.99] hover:bg-[#14364A] animate-fade-in"
           >
             <div className="flex items-center gap-2">
-              <span className="rounded-xl bg-white px-3 py-1.5 text-[12px] font-black text-blue-700 shadow-sm flex items-center gap-1">
+              <span className="rounded-lg bg-white/15 px-3 py-1.5 text-[12px] font-bold text-white flex items-center gap-1.5">
                 <span>فتح المحادثة</span>
                 <span className="text-[14px]">💬</span>
               </span>
               {unreadCount > 0 && (
-                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-black text-white animate-pulse">
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white animate-pulse">
                   {unreadCount} جديدة
                 </span>
               )}
             </div>
             <div className="flex items-center gap-3 text-right">
               <div>
-                <p className="text-[12px] font-bold text-blue-100">
+                <p className="text-[12px] font-medium text-white/80">
                   محادثة مع الراكب ({activeRide.customerName || 'الراكب'}):
                 </p>
-                <p className="text-[14px] font-black text-white truncate max-w-[200px]">
+                <p className="text-[14px] font-bold text-white truncate max-w-[200px]">
                   {latestPassengerMsg.text}
                 </p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white text-[18px]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 text-white text-[16px]">
                 💬
               </div>
             </div>
@@ -464,17 +464,17 @@ export default function DriverHomePage() {
         {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && (
           <div
             onClick={() => setWorkStatus('permanent')}
-            className="mb-4 flex items-center justify-between rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-700 p-3.5 text-white shadow-lg cursor-pointer transition active:scale-[0.99] hover:shadow-xl animate-fade-in"
+            className="mb-4 flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-[#1A1A1A] shadow-card cursor-pointer transition active:scale-[0.99] hover:bg-amber-100/60 animate-fade-in"
           >
-            <span className="rounded-xl bg-white px-3 py-1.5 text-[12px] font-black text-purple-800 shadow-sm flex items-center gap-1">
+            <span className="rounded-lg bg-[#D97706] px-3 py-1.5 text-[12px] font-bold text-white shadow-xs flex items-center gap-1">
               <span>معاينة وقبول/رفض</span>
               <span className="text-[13px]">➔</span>
             </span>
             <div className="text-right">
-              <p className="text-[14px] font-black text-white">
+              <p className="text-[14px] font-bold text-[#1A1A1A]">
                 لديك {pendingSeatRequests.length} طلب حجز مقعد جديد في الخط الدائمي!
               </p>
-              <p className="text-[12px] text-purple-200 mt-0.5">
+              <p className="text-[12px] font-medium text-[#6C757D] mt-0.5">
                 اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار فوراً
               </p>
             </div>
@@ -483,10 +483,10 @@ export default function DriverHomePage() {
 
         {/* 2. حالة العمل الحالية */}
         <section className="mb-6">
-          <h2 className="text-[16px] font-black text-gray-900 mb-3 text-right">حالة العمل الحالية</h2>
+          <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-2.5 text-right">حالة العمل الحالية</h2>
           
-          {/* أزرار التبديل الثلاثية */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* أزرار التبديل الثلاثية (Segmented Control احترافي) */}
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/60">
             {/* خمول */}
             <button
               type="button"
@@ -494,32 +494,32 @@ export default function DriverHomePage() {
                 setWorkStatus('idle');
                 show('تم تحويل الحالة إلى خمول', 'info');
               }}
-              className={`rounded-xl py-3 text-center text-[15px] font-black transition cursor-pointer active:scale-95 ${
+              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
                 workStatus === 'idle'
-                  ? 'bg-slate-700 text-white shadow-sm'
-                  : 'bg-gray-200/90 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-white text-[#1A1A1A] font-bold shadow-card'
+                  : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
               }`}
             >
               خمول
             </button>
 
-            {/* خط دائمي (المفعل في الصورة) */}
+            {/* خط دائمي */}
             <button
               type="button"
               onClick={() => {
                 setWorkStatus('permanent');
                 show('تم تفعيل الخط الدائمي', 'success');
               }}
-              className={`relative flex items-center justify-center gap-1.5 rounded-xl py-3 text-center text-[15px] font-black transition cursor-pointer active:scale-95 ${
+              className={`relative flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
                 workStatus === 'permanent'
-                  ? 'bg-[#7c3aed] text-white shadow-md'
-                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  ? 'bg-[#1B4965] text-white font-bold shadow-card'
+                  : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
               }`}
             >
               {workStatus === 'permanent' && <span>✓</span>}
               <span>خط دائمي</span>
               {pendingSeatRequests.length > 0 && (
-                <span className="absolute -top-1.5 -left-1.5 flex h-5.5 w-5.5 items-center justify-center rounded-full bg-red-500 text-[11px] font-black text-white shadow-md animate-bounce">
+                <span className="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10.5px] font-bold text-white shadow-card animate-bounce">
                   {pendingSeatRequests.length}
                 </span>
               )}
@@ -532,17 +532,17 @@ export default function DriverHomePage() {
                 setWorkStatus('taxi');
                 show('تم تفعيل وضع التكسي', 'success');
               }}
-              className={`rounded-xl py-3 text-center text-[15px] font-black transition cursor-pointer active:scale-95 ${
+              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
                 workStatus === 'taxi'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-[#bbf7d0] text-emerald-900 hover:bg-emerald-200'
+                  ? 'bg-emerald-600 text-white font-bold shadow-card'
+                  : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
               }`}
             >
               تكسي
             </button>
           </div>
 
-          <p className="mt-3 text-center text-[13.5px] font-bold text-gray-800">
+          <p className="mt-2.5 text-center text-[12.5px] font-medium text-[#6C757D]">
             {workStatus === 'permanent'
               ? 'أنت الآن متاح للخطوط الدائمة والمشاوير الفورية'
               : workStatus === 'taxi'
@@ -697,24 +697,26 @@ export default function DriverHomePage() {
 
         {/* ===== وضع التكسي ===== */}
         {workStatus === 'taxi' && (
-          <section className="mb-6 space-y-5">
+          <section className="mb-6 space-y-4">
             {/* عنوان القسم */}
-            <h3 className="text-[16px] font-black text-gray-900 text-right">جديد - تفعيل الخريطة واستقبال الطلبات</h3>
+            <h3 className="text-[15px] font-bold text-[#1A1A1A] text-right">تفعيل الموقع وتلقي طلبات الركاب</h3>
 
             {/* كارت تفعيل الموقع */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
-              <div className="flex items-start gap-3 mb-3" dir="rtl">
+            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-card">
+              <div className="flex items-start gap-3 mb-3.5" dir="rtl">
                 {/* أيقونة الخريطة */}
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                  <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965]">
+                  <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                 </div>
                 <div className="text-right">
-                  <p className="text-[16px] font-black text-gray-900">تفعيل الموقع على الخريطة</p>
-                  <p className="text-[13px] font-bold text-gray-600 mt-0.5">الذهاب للخريطة لتلقي الطلبات</p>
-                  <p className="text-[12.5px] text-gray-500 mt-1">شغّل تتبع الحركة لتصلك طلبات الركاب القريبين منك فوراً</p>
+                  <p className="text-[15px] font-bold text-[#1A1A1A]">تفعيل الموقع على الخريطة</p>
+                  <p className="text-[12.5px] font-semibold text-[#1B4965] mt-0.5">جاهز لتلقي طلبات المشاوير</p>
+                  <p className="text-[12px] font-medium text-[#6C757D] mt-1 leading-relaxed">
+                    شغّل تتبع الحركة لتصلك إشعارات وطلبات الركاب القريبين منك فوراً
+                  </p>
                 </div>
               </div>
 
@@ -722,39 +724,39 @@ export default function DriverHomePage() {
               <button
                 type="button"
                 onClick={() => show('تم تفعيل تتبع الموقع على الخريطة', 'success')}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-white font-black text-[15px] shadow-md transition active:scale-95 cursor-pointer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1B4965] hover:bg-[#14364A] py-3 text-white font-bold text-[14.5px] shadow-subtle transition-all duration-200 active:scale-95 cursor-pointer"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" /></svg>
+                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" /></svg>
                 <span>الذهاب للخريطة وتشغيل التتبع</span>
               </button>
             </div>
 
             {/* بطاقة المشوار النشط إن وُجد وكان مقبولاً */}
             {activeRide && (activeRide.status === 'Accepted' || activeRide.status === 'Arrived' || activeRide.status === 'InProgress') ? (
-              <div className="rounded-2xl border-2 border-emerald-500 bg-white p-5 shadow-lg animate-fade-in">
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-black text-emerald-800">
+              <div className="rounded-xl border border-emerald-500/80 bg-white p-4 shadow-subtle animate-fade-in">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                  <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 border border-emerald-200/60">
                     {activeRide.status === 'Arrived' ? 'وصلت إلى الراكب 📍' : 'مشوار نشط 🚖'}
                   </span>
-                  <span className="text-[15px] font-black text-gray-900">
-                    {activeRide.fare} دينار
+                  <span className="text-[15px] font-bold text-[#1A1A1A]">
+                    {activeRide.fare} د.ع
                   </span>
                 </div>
 
                 <div className="text-right space-y-1.5 mb-4">
-                  <p className="text-[16px] font-black text-gray-900">
+                  <p className="text-[15px] font-bold text-[#1A1A1A]">
                     الراكب: {activeRide.customerName || 'راكب توصيلة'}
                   </p>
                   {activeRide.customerPhone && (
-                    <p className="text-[13px] font-bold text-gray-500" dir="ltr">
+                    <p className="text-[12.5px] font-medium text-[#6C757D]" dir="ltr">
                       {activeRide.customerPhone}
                     </p>
                   )}
-                  <p className="text-[13.5px] font-bold text-gray-700">
-                    من: {activeRide.pickupName}
+                  <p className="text-[13px] font-medium text-[#1A1A1A]">
+                    من: <span className="text-[#6C757D]">{activeRide.pickupName}</span>
                   </p>
-                  <p className="text-[13.5px] font-bold text-gray-700">
-                    إلى: {activeRide.dropoffName}
+                  <p className="text-[13px] font-medium text-[#1A1A1A]">
+                    إلى: <span className="text-[#6C757D]">{activeRide.dropoffName}</span>
                   </p>
                 </div>
 
@@ -763,7 +765,7 @@ export default function DriverHomePage() {
                     <button
                       type="button"
                       onClick={handleDriverArrived}
-                      className="w-full rounded-xl bg-emerald-600 py-3 text-center text-[15px] font-black text-white shadow-md transition active:scale-95 cursor-pointer hover:bg-emerald-700"
+                      className="w-full rounded-xl bg-emerald-600 py-3 text-center text-[14.5px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
                     >
                       وصلت إلى موقع الانطلاق 📍
                     </button>
@@ -771,7 +773,7 @@ export default function DriverHomePage() {
                     <button
                       type="button"
                       onClick={handleDriverComplete}
-                      className="w-full rounded-xl bg-[#f97316] py-3 text-center text-[15px] font-black text-white shadow-md transition active:scale-95 cursor-pointer hover:bg-orange-600"
+                      className="w-full rounded-xl bg-[#1B4965] py-3 text-center text-[14.5px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-[#14364A]"
                     >
                       إنهاء المشوار واستلام الأجرة 🏁
                     </button>
@@ -782,12 +784,12 @@ export default function DriverHomePage() {
                     <button
                       type="button"
                       onClick={() => setIsChatOpen(true)}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-blue-50 border border-blue-200/80 py-2.5 text-center text-[14px] font-black text-blue-700 shadow-xs transition hover:bg-blue-100 active:scale-95 cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 py-2.5 text-center text-[13.5px] font-bold text-[#1B4965] transition hover:bg-slate-200/80 active:scale-95 cursor-pointer"
                     >
-                      <svg className="h-4.5 w-4.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                       <span>مراسلة الراكب 💬</span>
                       {unreadCount > 0 && (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white animate-pulse">
+                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
                           {unreadCount}
                         </span>
                       )}
@@ -796,7 +798,7 @@ export default function DriverHomePage() {
                       <button
                         type="button"
                         onClick={() => window.open(`tel:${activeRide.customerPhone}`)}
-                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition active:scale-95 cursor-pointer shrink-0"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100 transition active:scale-95 cursor-pointer shrink-0"
                         title="اتصال هاتفي"
                       >
                         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
@@ -811,54 +813,54 @@ export default function DriverHomePage() {
                       const destLon = activeRide.status === 'Arrived' ? activeRide.dropoffLon : activeRide.pickupLon;
                       window.open(`https://maps.google.com/?daddr=${destLat},${destLon}`, '_blank');
                     }}
-                    className="w-full rounded-xl border border-gray-300 bg-white py-2.5 text-center text-[14px] font-bold text-gray-700 transition hover:bg-gray-50 cursor-pointer"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-center text-[13.5px] font-bold text-[#1A1A1A] transition hover:bg-slate-50 cursor-pointer"
                   >
                     فتح الملاحة (خرائط جوجل) 🗺️
                   </button>
                 </div>
               </div>
             ) : incomingRequest ? (
-              /* طلب وارد مع خيارات القبول والرفض بشكل واضح وبارز */
-              <div className="rounded-2xl border-2 border-emerald-500 bg-white p-5 shadow-xl animate-fade-in">
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-black text-emerald-800">
+              /* طلب وارد مع خيارات القبول والرفض */
+              <div className="rounded-xl border border-emerald-500 bg-white p-4 shadow-subtle animate-fade-in">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                  <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[12px] font-bold text-emerald-700">
                     طلب مشوار جديد وارد! 🚖
                   </span>
-                  <span className="text-[16px] font-black text-gray-900">
-                    {incomingRequest.fare} دينار
+                  <span className="text-[16px] font-bold text-[#1A1A1A]">
+                    {incomingRequest.fare} د.ع
                   </span>
                 </div>
 
-                <div className="text-right space-y-2 mb-4">
-                  <p className="text-[16px] font-black text-gray-900">
+                <div className="text-right space-y-1.5 mb-4">
+                  <p className="text-[15px] font-bold text-[#1A1A1A]">
                     الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
                   </p>
                   {incomingRequest.customerPhone && (
-                    <p className="text-[13px] font-bold text-gray-500" dir="ltr">
+                    <p className="text-[12.5px] font-medium text-[#6C757D]" dir="ltr">
                       {incomingRequest.customerPhone}
                     </p>
                   )}
-                  <p className="text-[13.5px] font-bold text-gray-700">
-                    🟢 من: {incomingRequest.pickupName}
+                  <p className="text-[13px] font-medium text-[#1A1A1A]">
+                    🟢 من: <span className="text-[#6C757D]">{incomingRequest.pickupName}</span>
                   </p>
-                  <p className="text-[13.5px] font-bold text-gray-700">
-                    🔴 إلى: {incomingRequest.dropoffName}
+                  <p className="text-[13px] font-medium text-[#1A1A1A]">
+                    🔴 إلى: <span className="text-[#6C757D]">{incomingRequest.dropoffName}</span>
                   </p>
                 </div>
 
                 {/* أزرار خيارات القبول والرفض */}
-                <div className="flex gap-3">
+                <div className="flex gap-2.5">
                   <button
                     type="button"
                     onClick={handleAcceptRide}
-                    className="flex-1 rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-black text-white shadow-md transition active:scale-95 cursor-pointer hover:bg-emerald-700"
+                    className="flex-1 rounded-xl bg-emerald-600 py-3 text-center text-[14.5px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
                   >
                     قبول الطلب ✅
                   </button>
                   <button
                     type="button"
                     onClick={handleRejectRide}
-                    className="flex-1 rounded-xl bg-red-500 py-3.5 text-center text-[15px] font-black text-white shadow-md transition active:scale-95 cursor-pointer hover:bg-red-600"
+                    className="flex-1 rounded-xl bg-slate-100 border border-slate-200 py-3 text-center text-[14.5px] font-bold text-[#1A1A1A] shadow-xs transition-all duration-200 active:scale-95 cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200"
                   >
                     رفض الطلب ✕
                   </button>
@@ -866,18 +868,16 @@ export default function DriverHomePage() {
               </div>
             ) : (
               /* بانتظار الركاب */
-              <div className="relative rounded-2xl border border-gray-100 bg-white p-5 min-h-[170px] flex flex-col justify-center">
-                <h4 className="text-center text-[16px] font-black text-gray-900 mb-4">بانتظار الركاب</h4>
+              <div className="relative rounded-xl border border-slate-200/80 bg-white p-5 min-h-[160px] flex flex-col justify-center shadow-card">
+                <h4 className="text-center text-[15px] font-bold text-[#1A1A1A] mb-3">بانتظار الركاب</h4>
                 <div className="flex flex-col items-center gap-2">
-                  {/* دوائر نبض متحركة */}
-                  <div className="relative flex items-center justify-center h-20 w-20">
-                    <span className="absolute h-20 w-20 rounded-full bg-emerald-100 animate-ping opacity-40" />
-                    <span className="absolute h-14 w-14 rounded-full bg-emerald-200 animate-ping opacity-30" style={{ animationDelay: '0.4s' }} />
-                    <span className="relative h-10 w-10 rounded-full bg-emerald-500 flex items-center justify-center">
-                      <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 12l2 2 4-4" /></svg>
+                  <div className="relative flex items-center justify-center h-16 w-16">
+                    <span className="absolute h-16 w-16 rounded-full bg-[#1B4965]/10 animate-ping opacity-40" />
+                    <span className="relative h-10 w-10 rounded-full bg-[#1B4965] flex items-center justify-center shadow-card">
+                      <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 12l2 2 4-4" /></svg>
                     </span>
                   </div>
-                  <p className="text-[14px] font-bold text-gray-600 mt-1">جاري البحث عن طلبات الركاب القريبين...</p>
+                  <p className="text-[13px] font-medium text-[#6C757D] mt-1">جاري البحث عن طلبات الركاب القريبين...</p>
                 </div>
               </div>
             )}
@@ -885,7 +885,7 @@ export default function DriverHomePage() {
         )}
 
         {/* 4. القائمة السفلية */}
-        <section className="pt-2 border-t border-gray-100">
+        <section className="pt-2 border-t border-slate-100">
           <div className="space-y-1">
             {/* تبويب محادثة مع الراكب */}
             <button
@@ -897,36 +897,36 @@ export default function DriverHomePage() {
                   show('لا يوجد مشوار نشط حالياً مع راكب لمحادثته', 'info');
                 }
               }}
-              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-blue-50/70 border border-transparent hover:border-blue-100 cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 border border-transparent hover:border-slate-200/80 cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 {unreadCount > 0 ? (
-                  <span className="flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-black text-white animate-pulse">
+                  <span className="flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-bold text-white animate-pulse">
                     <span>{unreadCount}</span>
                     <span>رسالة جديدة</span>
                   </span>
                 ) : activeRide ? (
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                  <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
                     نشط 🚖
                   </span>
                 ) : (
-                  <span className="text-[12px] text-gray-400">غير متوفر</span>
+                  <span className="text-[12px] font-medium text-[#6C757D]">غير متوفر</span>
                 )}
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <span className="text-[16px] font-black text-gray-900 block">محادثة مع الراكب</span>
+                  <span className="text-[15px] font-bold text-[#1A1A1A] block">محادثة مع الراكب</span>
                   {activeRide?.customerName ? (
-                    <span className="text-[12px] font-bold text-blue-600">
+                    <span className="text-[12px] font-medium text-[#1B4965]">
                       مع: {activeRide.customerName}
                     </span>
                   ) : (
-                    <span className="text-[11.5px] text-gray-500">
+                    <span className="text-[11.5px] font-medium text-[#6C757D]">
                       مراسلة الركاب أثناء الرحلات
                     </span>
                   )}
                 </div>
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/60">
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
@@ -941,10 +941,10 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => show('سجل رحلات الخط الدائمي', 'info')}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-gray-50 cursor-pointer"
+              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-slate-50 cursor-pointer"
             >
-              <span className="text-[16px] font-black text-gray-900">الرحلات</span>
-              <svg className="h-6 w-6 text-gray-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="text-[15px] font-bold text-[#1A1A1A]">الرحلات</span>
+              <svg className="h-5 w-5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
                 <circle cx="7" cy="17" r="2" />
                 <path d="M9 17h6" />
@@ -956,10 +956,10 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => show('العناوين المفضلة للكابتن', 'info')}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-gray-50 cursor-pointer"
+              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-slate-50 cursor-pointer"
             >
-              <span className="text-[16px] font-black text-gray-900">العناوين المفضلة</span>
-              <svg className="h-6 w-6 text-gray-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="text-[15px] font-bold text-[#1A1A1A]">العناوين المفضلة</span>
+              <svg className="h-5 w-5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 21s-6-5.33-6-10a6 6 0 0 1 12 0c0 4.67-6 10-6 10z" />
                 <circle cx="12" cy="11" r="2.5" />
               </svg>
@@ -969,10 +969,10 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => show('قسائم الخصومات والجوائز للكابتن', 'info')}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-gray-50 cursor-pointer"
+              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-slate-50 cursor-pointer"
             >
-              <span className="text-[16px] font-black text-gray-900">قسائم الخصومات والجوائز</span>
-              <svg className="h-6 w-6 text-gray-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="text-[15px] font-bold text-[#1A1A1A]">قسائم الخصومات والجوائز</span>
+              <svg className="h-5 w-5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <line x1="9" y1="9" x2="15" y2="15" />
                 <circle cx="9.5" cy="14.5" r="1.5" fill="currentColor" />
@@ -984,10 +984,10 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => { authStore.clear(); navigate('/login', { replace: true }); }}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-red-50 cursor-pointer"
+              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-red-50 text-red-600 cursor-pointer"
             >
-              <span className="text-[16px] font-black text-red-600">تسجيل الخروج</span>
-              <svg className="h-6 w-6 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <span className="text-[15px] font-bold">تسجيل الخروج</span>
+              <svg className="h-5 w-5 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />

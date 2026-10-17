@@ -262,10 +262,10 @@ export default function DailyRoutePage() {
 
       {/* الزر السفلي الافتراضي */}
       {!selectedDriver && (
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-white px-5 pt-3 pb-8 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] rounded-t-[24px]">
-          <div className="flex justify-center mb-3"><div className="h-1 w-10 rounded-full bg-gray-200" /></div>
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-white px-5 pt-3 pb-8 shadow-sheet rounded-t-2xl border-t border-slate-100">
+          <div className="flex justify-center mb-3"><div className="h-1 w-10 rounded-full bg-slate-200" /></div>
           <button type="button" onClick={() => show('اختر سائقاً من الخريطة أولاً', 'info')}
-            className="w-full rounded-xl bg-[#0026ff] py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(0,38,255,0.35)] cursor-pointer hover:bg-blue-700 active:scale-[0.98]">
+            className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle cursor-pointer hover:bg-[#14364A] transition-all duration-200 ease-in-out active:scale-[0.98]">
             تأكيد نقطة الانطلاق
           </button>
         </div>

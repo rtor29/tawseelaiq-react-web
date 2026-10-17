@@ -5,13 +5,13 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAt
 type ButtonVariant = 'primary' | 'dark' | 'emerald' | 'danger' | 'blue' | 'outline' | 'ghost';
 
 const BTN_VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-amber text-brand-slate hover:bg-amber-400',
-  dark: 'bg-brand-slate text-white hover:bg-brand-slate2',
-  emerald: 'bg-brand-emerald text-white hover:bg-emerald-500',
-  danger: 'bg-red-500 text-white hover:bg-red-600',
-  blue: 'bg-blue-600 text-white hover:bg-blue-700',
-  outline: 'border-2 border-slate-300 bg-white text-brand-slate hover:border-brand-amber',
-  ghost: 'text-brand-slate hover:bg-slate-100',
+  primary: 'bg-[#1B4965] text-white hover:bg-[#14364A] shadow-sm active:scale-[0.98]',
+  dark: 'bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.98]',
+  emerald: 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]',
+  danger: 'bg-red-600 text-white hover:bg-red-700 active:scale-[0.98]',
+  blue: 'bg-[#1B4965] text-white hover:bg-[#14364A] active:scale-[0.98]',
+  outline: 'border border-slate-300 bg-white text-slate-800 hover:border-[#1B4965] hover:text-[#1B4965]',
+  ghost: 'text-slate-700 hover:bg-slate-100',
 };
 
 export function Button({
@@ -22,7 +22,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${BTN_VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${BTN_VARIANTS[variant]} ${className}`}
       {...rest}
     >
       {children}
@@ -46,15 +46,15 @@ type FieldProps = InputHTMLAttributes<HTMLInputElement> & { label?: string; icon
 export function Field({ label, icon, error, className = '', ...rest }: FieldProps) {
   return (
     <label className="block">
-      {label && <span className="mb-1.5 block text-sm font-bold text-brand-slate">{label}</span>}
+      {label && <span className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</span>}
       <span className="relative block">
         {icon && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">{icon}</span>}
         <input
-          className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-brand-slate outline-none transition placeholder:text-slate-400 focus:border-brand-amber focus:ring-2 focus:ring-amber-200 ${icon ? 'pr-10' : ''} ${className}`}
+          className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${icon ? 'pr-10' : ''} ${className}`}
           {...rest}
         />
       </span>
-      {error && <span className="mt-1 block text-xs font-bold text-red-600">{error}</span>}
+      {error && <span className="mt-1 block text-xs font-semibold text-red-600">{error}</span>}
     </label>
   );
 }
@@ -67,9 +67,9 @@ export function SelectField({
 }: SelectHTMLAttributes<HTMLSelectElement> & { label?: string }) {
   return (
     <label className="block">
-      {label && <span className="mb-1.5 block text-sm font-bold text-brand-slate">{label}</span>}
+      {label && <span className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</span>}
       <select
-        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-brand-slate outline-none focus:border-brand-amber focus:ring-2 focus:ring-amber-200 ${className}`}
+        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${className}`}
         {...rest}
       >
         {children}

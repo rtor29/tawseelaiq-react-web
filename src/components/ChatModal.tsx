@@ -136,18 +136,18 @@ export default function ChatModal({
       dir="rtl"
     >
       <div
-        className="flex h-[92dvh] sm:h-[82vh] w-full max-w-lg flex-col rounded-t-[28px] sm:rounded-[28px] bg-white shadow-2xl overflow-hidden border border-gray-100"
+        className="flex h-[92dvh] sm:h-[82vh] w-full max-w-lg flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-sheet overflow-hidden border border-slate-200/80"
         onClick={(e) => e.stopPropagation()}
       >
         {/* شريط السحب على شاشات الموبايل */}
         <div className="flex sm:hidden justify-center pt-2.5 pb-1">
-          <div className="h-1 w-10 rounded-full bg-gray-300" />
+          <div className="h-1 w-10 rounded-full bg-slate-300" />
         </div>
 
         {/* 1. الترويسة العلوية */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-white shrink-0">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 bg-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600 font-black text-[18px] border border-blue-100">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] font-black text-[18px] border border-slate-200/60">
               {currentUserRole === 'Customer' ? '🚖' : '👤'}
             </div>
             <div>
@@ -223,15 +223,15 @@ export default function ChatModal({
                   className={`flex flex-col ${isMe ? 'items-start' : 'items-end'}`}
                 >
                   <div
-                    className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed shadow-xs ${
+                    className={`max-w-[78%] rounded-xl px-4 py-2.5 text-[14px] leading-relaxed shadow-card ${
                       isMe
-                        ? 'bg-[#0026ff] text-white rounded-br-xs'
-                        : 'bg-white text-gray-800 border border-gray-200/70 rounded-bl-xs'
+                        ? 'bg-[#1B4965] text-white rounded-br-xs'
+                        : 'bg-white text-[#1A1A1A] border border-slate-200 rounded-bl-xs'
                     }`}
                   >
                     <p className="font-semibold">{msg.text}</p>
                   </div>
-                  <span className="mt-1 px-1 text-[10px] font-medium text-gray-400">
+                  <span className="mt-1 px-1 text-[10px] font-medium text-[#6C757D]">
                     {formatTime(msg.timestamp)}
                   </span>
                 </div>
@@ -242,13 +242,13 @@ export default function ChatModal({
         </div>
 
         {/* 3. الردود السريعة */}
-        <div className="flex gap-2 overflow-x-auto px-4 py-2 bg-white border-t border-gray-100 no-scrollbar shrink-0">
+        <div className="flex gap-2 overflow-x-auto px-4 py-2 bg-white border-t border-slate-100 no-scrollbar shrink-0">
           {quickChips.map((chip, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => handleSend(chip)}
-              className="whitespace-nowrap rounded-full bg-gray-100 hover:bg-blue-50 hover:text-blue-600 px-3 py-1.5 text-[12px] font-bold text-gray-700 transition active:scale-95 cursor-pointer shrink-0"
+              className="whitespace-nowrap rounded-lg bg-slate-100 hover:bg-slate-200/80 hover:text-[#1B4965] px-3 py-1.5 text-[12px] font-bold text-[#1A1A1A] transition active:scale-95 cursor-pointer shrink-0"
             >
               {chip}
             </button>
@@ -261,7 +261,7 @@ export default function ChatModal({
             e.preventDefault();
             void handleSend();
           }}
-          className="flex items-center gap-2 border-t border-gray-100 bg-white p-3.5 pb-safe shrink-0"
+          className="flex items-center gap-2 border-t border-slate-100 bg-white p-3.5 pb-safe shrink-0"
         >
           <input
             type="text"
@@ -272,13 +272,13 @@ export default function ChatModal({
                 ? 'اكتب رسالة للكابتن...'
                 : 'اكتب رسالة للراكب...'
             }
-            className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-[14px] font-semibold text-gray-900 focus:bg-white focus:border-[#0026ff] focus:outline-none transition"
+            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[14px] font-semibold text-[#1A1A1A] focus:bg-white focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/10 focus:outline-none transition"
           />
 
           <button
             type="submit"
             disabled={!inputText.trim() || sending}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0026ff] text-white shadow-md transition hover:bg-[#0020d9] active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1B4965] text-white shadow-subtle transition hover:bg-[#14364A] active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0"
             title="إرسال"
           >
             <svg

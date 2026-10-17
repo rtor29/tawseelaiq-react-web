@@ -365,11 +365,11 @@ export default function LoginPage() {
 
           {/* نصوص الترحيب والحقول تظهر بعد استقرار الشعار في مكانه */}
           <div className="text-right animate-fade-in-text">
-            <h1 className="text-[36px] font-black text-[#111827] font-cairo mb-2 tracking-tight">
+            <h1 className="text-[32px] font-bold text-[#1A1A1A] font-cairo mb-2 tracking-tight">
               ياهلا
             </h1>
-            <p className="text-[18px] font-bold text-[#374151] font-cairo mb-7">
-              قم بادخال رقم هاتفك
+            <p className="text-[16px] font-medium text-[#6C757D] font-cairo mb-7">
+              قم بإدخال رقم هاتفك للمتابعة
             </p>
 
             {/* رسالة الخطأ إن وجدت */}
@@ -380,7 +380,7 @@ export default function LoginPage() {
             )}
 
             {/* حقل إدخال رقم الهاتف */}
-            <div className="bg-white border-[1.5px] border-[#f3f4f6] rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] flex items-center px-5 py-4 mb-8 transition-all focus-within:border-[#facc15] focus-within:ring-2 focus-within:ring-[#facc15]/20">
+            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-7 transition-all focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
               <input
                 type="tel"
                 dir="ltr"
@@ -389,36 +389,36 @@ export default function LoginPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmitPhone()}
                 placeholder=""
                 autoFocus
-                className="w-full border-none outline-none text-[20px] font-black text-[#111827] text-left bg-transparent tracking-widest placeholder-gray-300"
+                className="w-full border-none outline-none text-[20px] font-bold text-[#1A1A1A] text-left bg-transparent tracking-widest placeholder-slate-300"
               />
             </div>
 
             {/* عبارة الشروط والأحكام */}
-            <p className="text-[13px] font-semibold text-[#6b7280] text-center leading-relaxed">
-              عند التسجيل انت توافق على{' '}
-              <a href="#" onClick={(e) => e.preventDefault()} className="text-[#2563eb] hover:underline">
-                الشروط والقوانين وسياسة الخصوصية
+            <p className="text-[12.5px] font-medium text-[#6C757D] text-center leading-relaxed">
+              عند المتابعة أنت توافق على{' '}
+              <a href="#" onClick={(e) => e.preventDefault()} className="text-[#1B4965] font-semibold hover:underline">
+                شروط الاستخدام وسياسة الخصوصية
               </a>
             </p>
           </div>
 
-          {/* زر المتابعة الدائري الأصفر العائم في أسفل اليسار */}
+          {/* زر المتابعة العائم في أسفل اليسار */}
           <button
             type="button"
             onClick={handleSubmitPhone}
             disabled={isLoading}
-            className="fixed bottom-16 left-7 md:absolute md:bottom-20 md:left-8 w-16 h-16 rounded-full bg-[#facc15] text-white flex items-center justify-center shadow-[0_10px_25px_rgba(250,204,21,0.5)] cursor-pointer transition-transform active:scale-95 disabled:opacity-75 z-40 animate-fade-in-text"
+            className="fixed bottom-14 left-6 md:absolute md:bottom-16 md:left-8 w-14 h-14 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white flex items-center justify-center shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 disabled:opacity-60 z-40 animate-fade-in-text"
             aria-label="متابعة"
           >
             {isLoading ? (
-              <Spinner className="w-7 h-7 text-white" />
+              <Spinner className="w-6 h-6 text-white" />
             ) : (
               <svg
-                className="w-7 h-7 text-white"
+                className="w-6 h-6 text-white"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="3"
+                strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -435,25 +435,25 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col pt-6">
           {/* أيقونة الواتساب الخضراء */}
           <div className="text-center mb-8 flex justify-center">
-            <div className="w-[110px] h-[110px] bg-[#f0fdf4] rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(37,211,102,0.2)]">
-              <svg className="w-16 h-16 text-[#25d366]" fill="currentColor" viewBox="0 0 24 24">
+            <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center shadow-card border border-emerald-100">
+              <svg className="w-10 h-10 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.972.531 1.942.812 2.802.812l.006-.001c3.178 0 5.767-2.587 5.768-5.766 0-3.18-2.589-5.768-5.78-5.768zm3.364 8.163c-.144.405-.837.774-1.17.824-.311.045-.698.077-2.226-.554-1.828-.756-3.003-2.612-3.094-2.733-.092-.122-.743-.988-.743-1.884 0-.896.469-1.338.636-1.52.167-.183.365-.228.487-.228.121 0 .243.001.349.006.112.006.262-.042.41.314.152.365.517 1.26.562 1.352.045.092.076.2.015.321-.061.122-.091.198-.182.304-.091.106-.192.237-.274.318-.091.091-.186.19-.08.372.106.183.473.78 1.017 1.265.7.625 1.29.818 1.472.91.183.091.289.076.395-.045.106-.122.456-.531.577-.714.122-.183.243-.152.41-.091.167.061 1.063.501 1.245.592.183.091.304.137.35.213.045.076.045.441-.099.846zm-3.364-10.335c-5.523 0-10 4.477-10 10 0 1.769.459 3.486 1.332 5.006l-1.417 5.176 5.309-1.392c1.464.799 3.116 1.22 4.776 1.22 5.523 0 10-4.477 10-10s-4.477-10-10-10z" />
               </svg>
             </div>
           </div>
 
           <div className="text-right">
-            <h2 className="text-[26px] font-black text-[#111827] font-cairo mb-2">
-              ادخل رمز التفعيل
+            <h2 className="text-[24px] font-bold text-[#1A1A1A] font-cairo mb-1.5">
+              أدخل رمز التفعيل
             </h2>
-            <p className="text-[15px] font-semibold text-[#374151] mb-1">
-              لقد تم ارسال رمز التفعيل على الواتساب الرقم{' '}
-              <span dir="ltr" className="font-black text-slate-900">
+            <p className="text-[14px] font-medium text-[#6C757D] mb-1">
+              تم إرسال رمز التفعيل إلى الواتساب على الرقم{' '}
+              <span dir="ltr" className="font-bold text-[#1A1A1A]">
                 {phone}
               </span>
             </p>
-            <p className="text-[14px] font-semibold text-[#6b7280] mb-8">
-              الرجاء ادخل الرمز ادناه
+            <p className="text-[13px] font-medium text-[#6C757D] mb-7">
+              الرجاء إدخال الرمز المكون من 6 أرقام
             </p>
 
             {errorMessage && (
@@ -463,7 +463,7 @@ export default function LoginPage() {
             )}
 
             {/* خانات رمز OTP الست */}
-            <div className="flex justify-center gap-2.5 mb-8" dir="ltr">
+            <div className="flex justify-center gap-2 mb-7" dir="ltr">
               {[0, 1, 2, 3, 4, 5].map((idx) => (
                 <input
                   key={idx}
@@ -473,19 +473,19 @@ export default function LoginPage() {
                   value={otpDigits[idx]}
                   onChange={(e) => handleOtpDigitChange(e.target.value, idx)}
                   onKeyDown={(e) => handleOtpKeyDown(e, idx)}
-                  className="w-12 h-14 border-b-[3px] border-[#111827] text-center text-[28px] font-black bg-transparent outline-none focus:border-[#facc15] transition-colors"
+                  className="w-11 h-13 border border-slate-200 rounded-xl text-center text-[22px] font-bold text-[#1A1A1A] bg-slate-50 outline-none focus:bg-white focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/10 transition-all"
                 />
               ))}
             </div>
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-1">
               <button
                 type="button"
                 onClick={handleResendOtp}
                 disabled={isResending}
-                className="text-[15px] font-bold text-[#2563eb] hover:underline disabled:opacity-50"
+                className="text-[14px] font-bold text-[#1B4965] hover:underline disabled:opacity-50 cursor-pointer"
               >
-                {isResending ? 'جاري الإرسال...' : 'اعادة ارسال'}
+                {isResending ? 'جاري الإرسال...' : 'إعادة إرسال'}
               </button>
               <button
                 type="button"
@@ -493,7 +493,7 @@ export default function LoginPage() {
                   setStep('phone');
                   setErrorMessage(null);
                 }}
-                className="text-[13px] font-bold text-slate-500 hover:underline"
+                className="text-[13px] font-medium text-[#6C757D] hover:underline cursor-pointer"
               >
                 تغيير رقم الهاتف
               </button>
@@ -505,18 +505,18 @@ export default function LoginPage() {
             type="button"
             onClick={() => handleVerifyOtp(otpDigits.join(''))}
             disabled={isLoading || otpDigits.join('').length < 4}
-            className="fixed bottom-16 left-7 md:absolute md:bottom-20 md:left-8 w-16 h-16 rounded-full bg-[#facc15] text-white flex items-center justify-center shadow-[0_10px_25px_rgba(250,204,21,0.5)] cursor-pointer transition-transform active:scale-95 disabled:opacity-60 z-40"
+            className="fixed bottom-14 left-6 md:absolute md:bottom-16 md:left-8 w-14 h-14 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white flex items-center justify-center shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 disabled:opacity-60 z-40"
             aria-label="تأكيد"
           >
             {isLoading ? (
-              <Spinner className="w-7 h-7 text-white" />
+              <Spinner className="w-6 h-6 text-white" />
             ) : (
               <svg
-                className="w-7 h-7 text-white"
+                className="w-6 h-6 text-white"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="3"
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -539,11 +539,11 @@ export default function LoginPage() {
           </div>
 
           <div className="text-right animate-fade-in-text">
-            <h1 className="text-[30px] font-black text-[#111827] font-cairo mb-2">
+            <h1 className="text-[28px] font-bold text-[#1A1A1A] font-cairo mb-2">
               إنشاء حساب جديد
             </h1>
-            <p className="text-[16px] font-bold text-[#374151] font-cairo mb-7">
-              أدخل اسمك الكامل للمتابعة
+            <p className="text-[15px] font-medium text-[#6C757D] font-cairo mb-7">
+              أدخل اسمك الكريم للمتابعة
             </p>
 
             {errorMessage && (
@@ -552,7 +552,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="bg-white border-[1.5px] border-[#f3f4f6] rounded-[16px] shadow-[0_8px_30px_rgba(0,0,0,0.06)] flex items-center px-5 py-4 mb-8 focus-within:border-[#facc15]">
+            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-7 focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
               <input
                 type="text"
                 dir="rtl"
@@ -564,7 +564,7 @@ export default function LoginPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleCompleteProfile()}
                 placeholder="مثال: علي الموسوي"
                 autoFocus
-                className="w-full border-none outline-none text-[18px] font-bold text-[#111827] text-right bg-transparent placeholder-gray-400"
+                className="w-full border-none outline-none text-[17px] font-medium text-[#1A1A1A] text-right bg-transparent placeholder-slate-400"
               />
             </div>
           </div>
@@ -573,18 +573,18 @@ export default function LoginPage() {
             type="button"
             onClick={handleCompleteProfile}
             disabled={isLoading || !fullName.trim()}
-            className="fixed bottom-16 left-7 md:absolute md:bottom-20 md:left-8 w-16 h-16 rounded-full bg-[#facc15] text-white flex items-center justify-center shadow-[0_10px_25px_rgba(250,204,21,0.5)] cursor-pointer transition-transform active:scale-95 disabled:opacity-60 z-40 animate-fade-in-text"
+            className="fixed bottom-14 left-6 md:absolute md:bottom-16 md:left-8 w-14 h-14 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white flex items-center justify-center shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 disabled:opacity-60 z-40 animate-fade-in-text"
             aria-label="إنهاء التسجيل"
           >
             {isLoading ? (
-              <Spinner className="w-7 h-7 text-white" />
+              <Spinner className="w-6 h-6 text-white" />
             ) : (
               <svg
-                className="w-7 h-7 text-white"
+                className="w-6 h-6 text-white"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="3"
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -604,47 +604,47 @@ export default function LoginPage() {
             <img
               src="/logo.png"
               alt="توصيلة"
-              className="w-[200px] md:w-[230px] max-w-[75%] h-auto object-contain animate-drive-in"
+              className="w-[200px] md:w-[220px] max-w-[75%] h-auto object-contain animate-drive-in"
             />
           </div>
 
           {/* نص الترحيب وسؤال الوجهة مع حركة الظهور */}
-          <h2 className="text-[20px] md:text-[23px] font-black text-[#111827] font-cairo text-center mt-1 mb-14 md:mb-16 animate-fade-in-text">
-            ياهلا بيكم وين تردون نوديكم
+          <h2 className="text-[20px] md:text-[22px] font-bold text-[#1A1A1A] font-cairo text-center mt-1 mb-10 md:mb-14 animate-fade-in-text">
+            ياهلا بيكم، وين حابين نوصلكم اليوم؟
           </h2>
 
-          {/* بطاقتا الخيارات: تكسي و حجز خط دائمي جنباً إلى جنب */}
-          <div className="w-full flex items-center justify-center gap-6 md:gap-10">
-            {/* خيار تكسي (على اليمين في نمط RTL) */}
+          {/* بطاقتا الخيارات: تكسي و حجز خط دائمي */}
+          <div className="w-full flex items-center justify-center gap-5 md:gap-8">
+            {/* خيار تكسي */}
             <div
               onClick={() => handleSelectService('taxi')}
-              className="flex flex-col items-center cursor-pointer transition-transform hover:scale-105 active:scale-95 group select-none"
+              className="flex-1 max-w-[180px] flex flex-col items-center p-5 rounded-2xl border border-slate-200/80 bg-white shadow-card hover:border-[#1B4965] hover:shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 group select-none"
             >
-              <div className="w-[140px] md:w-[170px] flex items-center justify-center">
+              <div className="w-full flex items-center justify-center py-2">
                 <img
                   src="/logo.png"
                   alt="تكسي"
-                  className="w-full h-auto object-contain animate-drive-in-delayed"
+                  className="w-full max-w-[130px] h-auto object-contain animate-drive-in-delayed"
                 />
               </div>
-              <span className="mt-3 text-[19px] md:text-[22px] font-black text-[#111827] font-cairo text-center animate-fade-in-text-delayed">
+              <span className="mt-3 text-[17px] md:text-[18px] font-bold text-[#1A1A1A] font-cairo text-center group-hover:text-[#1B4965] transition-colors">
                 تكسي
               </span>
             </div>
 
-            {/* خيار حجز خط دائمي (على اليسار في نمط RTL) */}
+            {/* خيار حجز خط دائمي */}
             <div
               onClick={() => handleSelectService('permanent')}
-              className="flex flex-col items-center cursor-pointer transition-transform hover:scale-105 active:scale-95 group select-none"
+              className="flex-1 max-w-[180px] flex flex-col items-center p-5 rounded-2xl border border-slate-200/80 bg-white shadow-card hover:border-[#1B4965] hover:shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 group select-none"
             >
-              <div className="w-[140px] md:w-[170px] flex items-center justify-center">
+              <div className="w-full flex items-center justify-center py-2">
                 <img
                   src="/logo.png"
                   alt="حجز خط دائمي"
-                  className="w-full h-auto object-contain animate-drive-in-delayed2"
+                  className="w-full max-w-[130px] h-auto object-contain animate-drive-in-delayed2"
                 />
               </div>
-              <span className="mt-3 text-[19px] md:text-[22px] font-black text-[#111827] font-cairo text-center animate-fade-in-text-delayed2">
+              <span className="mt-3 text-[17px] md:text-[18px] font-bold text-[#1A1A1A] font-cairo text-center group-hover:text-[#1B4965] transition-colors">
                 حجز خط دائمي
               </span>
             </div>

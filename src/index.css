@@ -10,9 +10,10 @@ body {
   min-height: 100dvh;
   overflow-x: hidden;
   position: relative;
-  font-family: 'Cairo', system-ui, sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
+  font-family: 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  background-color: #f8f9fa;
+  color: #1a1a1a;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;

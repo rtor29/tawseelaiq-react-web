@@ -5,43 +5,35 @@ export default {
   theme: {
     extend: {
       colors: {
-        amber: {
-          DEFAULT: '#F59E0B',
-          50: '#FFFBEB',
-          100: '#FEF3C7',
-          200: '#FDE68A',
-          400: '#FBBF24',
-          500: '#F59E0B',
-          600: '#D97706',
-          700: '#B45309',
-          800: '#92400E',
-          900: '#78350F',
-        },
         brand: {
-          amber: '#F59E0B',
-          emerald: '#10B981',
-          rose: '#F43F5E',
-          red: '#EF4444',
-          violet: '#8B5CF6',
-          slate: '#0F172A',
-          slate2: '#1E293B',
-          surface: '#F8FAFC',
+          primary: '#1B4965',       // أزرق نفطي راقٍ للأزرار الرئيسية والتفاعل
+          primaryHover: '#14364A',  // كحلي بترولي داكن عند التمرير
+          dark: '#0D1B2A',          // كحلي منتصف الليل للعناوين البارزة
+          accent: '#62B6CB',        // سماوي رمادي هادئ للشارات والتركيز
+          amber: '#D97706',         // عنبري دافئ هادئ لنقطة الانطلاق
+          emerald: '#059669',       // أخضر زمردي هادئ للحالات النشطة
+          rose: '#E11D48',          // أحمر وردي راقٍ للإلغاء والحذف
+          surface: '#F8F9FA',       // خلفية ناعمة مريحة للعين بدلاً من الأبيض الصارخ
+          subtle: '#EDF2F7',        // رمادي فاتح ناعم للحدود والخلفيات الفرعية
+          charcoal: '#1A1A1A',      // رمادي داكن مريح جداً للنصوص الرئيسية
+          muted: '#6C757D',         // رمادي متوازن للنصوص الوصفية
         },
       },
       fontFamily: {
         cairo: ['Cairo', 'Tajawal', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
-        xl2: '1.25rem',
+        xl2: '1rem',
       },
       boxShadow: {
-        card: '0 4px 14px rgba(0,0,0,0.06)',
-        float: '0 10px 30px rgba(0,0,0,0.18)',
-        sheet: '0 -6px 24px rgba(0,0,0,0.14)',
+        card: '0 2px 8px -1px rgba(15, 23, 42, 0.06)',
+        subtle: '0 4px 16px -2px rgba(15, 23, 42, 0.08)',
+        float: '0 6px 20px -3px rgba(15, 23, 42, 0.10)',
+        sheet: '0 -4px 24px -4px rgba(15, 23, 42, 0.10)',
       },
       keyframes: {
         'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'pulse-dot': {
@@ -54,9 +46,9 @@ export default {
         },
       },
       animation: {
-        'fade-up': 'fade-up 0.25s ease-out',
+        'fade-up': 'fade-up 0.2s ease-out',
         'pulse-dot': 'pulse-dot 1.4s ease-in-out infinite',
-        'sheet-up': 'sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+        'sheet-up': 'sheet-up 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },

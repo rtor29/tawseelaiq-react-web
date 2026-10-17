@@ -844,7 +844,7 @@ export default function CustomerHomePage() {
 
   // إعداد طبقة خط المسار
   const routeLines: RouteLineData[] = routeCoordinates.length
-    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#0026ff', width: 5.5 }]
+    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#1B4965', width: 5.5 }]
     : [];
 
   return (
@@ -854,12 +854,12 @@ export default function CustomerHomePage() {
         <button
           type="button"
           onClick={() => navigate('/login')}
-          className="absolute top-4 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-gray-800 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-transform active:scale-95 cursor-pointer hover:bg-gray-50"
+          className="absolute top-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
           title="الرجوع لصفحة اختيار الخدمة"
           aria-label="الرئيسية"
         >
           <svg
-            className="h-6 w-6 text-gray-700"
+            className="h-5 w-5"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -875,16 +875,16 @@ export default function CustomerHomePage() {
         <button
           type="button"
           onClick={handleBackNav}
-          className="absolute top-4 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-gray-800 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-transform active:scale-95 cursor-pointer hover:bg-gray-50"
+          className="absolute top-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
           title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
           aria-label="رجوع"
         >
           <svg
-            className="h-6 w-6 text-gray-700"
+            className="h-5 w-5"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.5"
+            strokeWidth="2.4"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
@@ -897,12 +897,12 @@ export default function CustomerHomePage() {
       <button
         type="button"
         onClick={() => setIsProfileOpen(true)}
-        className="absolute top-4 left-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-gray-800 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-transform active:scale-95 cursor-pointer hover:bg-gray-50"
+        className="absolute top-4 left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
         title="معلومات الزبون"
         aria-label="الملف الشخصي للزبون"
       >
         <svg
-          className="h-6 w-6 text-gray-700"
+          className="h-5 w-5"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -918,8 +918,8 @@ export default function CustomerHomePage() {
       {/* زر الأمان العائم — يظهر فقط في مرحلة السائق قادم */}
       {stage === 'driver_arriving' && (
         <button type="button" onClick={() => show('ميزة الأمان قريباً 🛡️','info')}
-          className="absolute top-20 left-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-600 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-transform active:scale-95 cursor-pointer hover:bg-blue-50">
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          className="absolute top-18 left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50">
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </button>
       )}
 
@@ -975,13 +975,13 @@ export default function CustomerHomePage() {
                 className="flex flex-col items-center select-none cursor-pointer group"
                 title="تعديل نقطة الوصول"
               >
-                <div className="flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.18)] border border-gray-100 transition-transform group-hover:scale-105">
-                  <span className="text-[13px] font-black text-gray-900 font-cairo">الوصول</span>
-                  <div className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-[#0026ff]">
+                <div className="flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-card border border-slate-200 transition-transform group-hover:scale-105">
+                  <span className="text-[13px] font-bold text-[#1A1A1A] font-cairo">الوصول</span>
+                  <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#1B4965]">
                     <div className="h-2 w-2 rounded-full bg-white" />
                   </div>
                 </div>
-                <div className="h-3 w-0.5 bg-gray-600/80 -mt-0.5" />
+                <div className="h-3 w-0.5 bg-slate-600/80 -mt-0.5" />
                 <div className="h-1.5 w-4 rounded-full bg-black/20 blur-[1px]" />
               </div>
             </Marker>
@@ -1009,9 +1009,9 @@ export default function CustomerHomePage() {
           {stage === 'searching' && (
             <Marker longitude={pickup.lng} latitude={pickup.lat} anchor="center">
               <div className="relative flex items-center justify-center">
-                <div className="animate-ping-expand absolute h-40 w-40 rounded-full bg-blue-400/20" />
-                <div className="animate-ping-expand animation-delay-600 absolute h-28 w-28 rounded-full bg-blue-500/25" />
-                <div className="h-5 w-5 rounded-full bg-[#f97316] border-2 border-white shadow-md" />
+                <div className="animate-ping-expand absolute h-40 w-40 rounded-full bg-[#1B4965]/20" />
+                <div className="animate-ping-expand animation-delay-600 absolute h-28 w-28 rounded-full bg-[#1B4965]/25" />
+                <div className="h-5 w-5 rounded-full bg-[#D97706] border-2 border-white shadow-md" />
               </div>
             </Marker>
           )}
@@ -1019,14 +1019,14 @@ export default function CustomerHomePage() {
           {stage === 'driver_arriving' && (
             <Marker longitude={pickup.lng} latitude={pickup.lat} anchor="bottom">
               <div className="flex flex-col items-center">
-                <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-lg border border-gray-100">
-                  <span className="text-[12px] font-black text-gray-900">الانطلاق</span>
-                  <span className="text-[12px] font-bold text-gray-500">1 دقيقة</span>
-                  <div className="h-4 w-4 rounded-full bg-[#f97316] flex items-center justify-center">
+                <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-card border border-slate-200">
+                  <span className="text-[12px] font-bold text-[#1A1A1A]">الانطلاق</span>
+                  <span className="text-[12px] font-semibold text-[#6C757D]">1 دقيقة</span>
+                  <div className="h-4 w-4 rounded-full bg-[#D97706] flex items-center justify-center">
                     <div className="h-1.5 w-1.5 rounded-full bg-white" />
                   </div>
                 </div>
-                <div className="h-3 w-0.5 bg-gray-500" />
+                <div className="h-3 w-0.5 bg-slate-500" />
               </div>
             </Marker>
           )}
@@ -1037,7 +1037,7 @@ export default function CustomerHomePage() {
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             {stage === 'pickup' ? (
               <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in">
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#f97316] shadow-[0_4px_14px_rgba(249,115,22,0.5)]">
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#D97706] shadow-subtle">
                   <div className="h-3.5 w-3.5 rounded-full bg-white shadow-inner" />
                 </div>
                 <div className="h-3.5 w-1 rounded-full bg-slate-700/80 -mt-0.5" />
@@ -1045,7 +1045,7 @@ export default function CustomerHomePage() {
               </div>
             ) : (
               <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in">
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#0026ff] shadow-[0_4px_16px_rgba(0,38,255,0.45)]">
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[#1B4965] shadow-subtle">
                   <div className="h-3.5 w-3.5 rounded-full bg-white shadow-inner" />
                 </div>
                 <div className="h-3.5 w-1 rounded-full bg-slate-700/80 -mt-0.5" />
@@ -1060,12 +1060,12 @@ export default function CustomerHomePage() {
           <button
             type="button"
             onClick={handleUseCurrentLocation}
-            className="absolute bottom-44 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-gray-800 shadow-[0_4px_16px_rgba(0,0,0,0.18)] transition-transform active:scale-95 cursor-pointer hover:bg-gray-50"
+            className="absolute bottom-44 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
             title="موقعي الحالي عبر الـ GPS"
             aria-label="تحديد موقعي"
           >
             <svg
-              className="h-6 w-6 text-gray-700"
+              className="h-5 w-5"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -1085,47 +1085,37 @@ export default function CustomerHomePage() {
 
         {/* 6. البطاقة السفلية البيضاء في مرحلتي الانطلاق والوصول */}
         {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] bg-white px-5 pt-3 pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.12)]">
+          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-2xl bg-white px-5 pt-3 pb-8 shadow-sheet border-t border-slate-100">
             <div className="flex justify-center mb-3">
-              <svg
-                className="w-5 h-2.5 text-gray-300"
-                viewBox="0 0 24 12"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 10 12 2 4 10" />
-              </svg>
+              <div className="h-1 w-10 rounded-full bg-slate-300" />
             </div>
 
             <div
               onClick={() => { setIsSearchOpen(true); setSearchResults(NAJAF_LOCAL_PLACES.map(p => ({ name: p.name, lat: p.lat, lng: p.lon })) as unknown as PlaceResult[]); }}
-              className="mb-4 flex items-center justify-between rounded-2xl bg-[#f3f4f6] p-3.5 cursor-pointer transition active:scale-[0.99] hover:bg-gray-200/80"
+              className="mb-4 flex items-center justify-between rounded-xl bg-slate-100/90 border border-slate-200/60 p-3.5 cursor-pointer transition active:scale-[0.99] hover:bg-slate-200/70"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <svg
-                  className="h-5 w-5 text-gray-500 shrink-0"
+                  className="h-5 w-5 text-[#6C757D] shrink-0"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.4"
+                  strokeWidth="2.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <span className="truncate text-[15px] font-bold text-[#1f2937]">
+                <span className="truncate text-[15px] font-bold text-[#1A1A1A]">
                   {stage === 'pickup' ? pickupName || DEFAULT_PICKUP_NAME : dropoffName || DEFAULT_DROPOFF_NAME}
                 </span>
               </div>
 
               {stage === 'pickup' ? (
-                <div className="mr-1 h-3.5 w-3.5 shrink-0 rounded-full bg-[#f97316]" />
+                <div className="mr-1 h-3.5 w-3.5 shrink-0 rounded-full bg-[#D97706]" />
               ) : (
-                <div className="mr-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] bg-[#0026ff]">
+                <div className="mr-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-[#1B4965]">
                   <div className="h-1.5 w-1.5 rounded-full bg-white" />
                 </div>
               )}
@@ -1135,7 +1125,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={handleConfirmPickup}
-                className="w-full rounded-xl bg-[#0026ff] py-3.5 text-center text-[16px] font-bold text-white shadow-[0_6px_20px_rgba(0,38,255,0.35)] transition active:scale-[0.98] hover:bg-[#0020d9] cursor-pointer"
+                className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] hover:bg-[#14364A] cursor-pointer"
               >
                 تأكيد نقطة الانطلاق
               </button>
@@ -1143,7 +1133,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={handleConfirmDropoff}
-                className="w-full rounded-xl bg-[#0026ff] py-3.5 text-center text-[16px] font-bold text-white shadow-[0_6px_20px_rgba(0,38,255,0.35)] transition active:scale-[0.98] hover:bg-[#0020d9] cursor-pointer"
+                className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] hover:bg-[#14364A] cursor-pointer"
               >
                 تأكيد نقطة الوصول
               </button>
@@ -1151,18 +1141,18 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* 7. بطاقة خيارات فئات الرحلة (الصورة الأولى بالكامل) */}
+        {/* 7. بطاقة خيارات فئات الرحلة */}
         {stage === 'ride_options' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white pt-2 pb-6 shadow-[0_-8px_30px_rgba(0,0,0,0.15)] animate-fade-in">
+          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-white pt-2 pb-6 shadow-sheet border-t border-slate-100 animate-fade-in">
             {/* التبويبات العلوية: تكسي و بوكس */}
-            <div className="flex border-b border-gray-100">
+            <div className="flex border-b border-slate-100 px-4">
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('taxi')}
-                className={`flex-1 py-3 text-center text-[16px] font-bold transition relative ${
+                className={`flex-1 py-3 text-center text-[15px] font-bold transition relative ${
                   selectedServiceTab === 'taxi'
-                    ? 'text-gray-900 border-b-2 border-gray-900'
-                    : 'text-gray-400 hover:text-gray-600'
+                    ? 'text-[#1A1A1A] border-b-2 border-[#1B4965]'
+                    : 'text-[#6C757D] hover:text-[#1A1A1A]'
                 }`}
               >
                 تكسي
@@ -1170,10 +1160,10 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('box')}
-                className={`flex-1 py-3 text-center text-[16px] font-bold transition relative ${
+                className={`flex-1 py-3 text-center text-[15px] font-bold transition relative ${
                   selectedServiceTab === 'box'
-                    ? 'text-gray-900 border-b-2 border-gray-900'
-                    : 'text-gray-400 hover:text-gray-600'
+                    ? 'text-[#1A1A1A] border-b-2 border-[#1B4965]'
+                    : 'text-[#6C757D] hover:text-[#1A1A1A]'
                 }`}
               >
                 بوكس
@@ -1181,30 +1171,32 @@ export default function CustomerHomePage() {
             </div>
 
             {/* قائمة فئات الرحلة (سوبر، توفير، بلس) */}
-            <div className="divide-y divide-gray-100">
+            <div className="px-4 py-2 space-y-1.5">
               {RIDE_TIERS.map((tier) => {
                 const isSelected = selectedTierId === tier.id;
                 return (
                   <div
                     key={tier.id}
                     onClick={() => setSelectedTierId(tier.id)}
-                    className={`flex items-center justify-between px-6 py-3.5 cursor-pointer transition ${
-                      isSelected ? 'bg-[#f0f4ff]' : 'hover:bg-gray-50'
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer ${
+                      isSelected
+                        ? 'border-[#1B4965] bg-[#1B4965]/5 shadow-card'
+                        : 'border-slate-200/70 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
                     {/* السعر على اليسار */}
-                    <div className="text-left font-black text-[16px] text-gray-900">
+                    <div className="text-left font-bold text-[16px] text-[#1A1A1A]">
                       {tier.basePrice.toLocaleString()} دينار
                     </div>
 
                     {/* الاسم والوصف والسيارة الزرقاء على اليمين */}
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-[16px] font-black text-gray-900">{tier.name}</p>
-                        <p className="text-[12px] font-bold text-gray-400">{tier.subtitle}</p>
+                        <p className="text-[15px] font-bold text-[#1A1A1A]">{tier.name}</p>
+                        <p className="text-[12px] font-medium text-[#6C757D]">{tier.subtitle}</p>
                       </div>
 
-                      {/* رسمة السيارة الزرقاء مع الشارة */}
+                      {/* رسمة السيارة مع الشارة */}
                       <CarBadgeIllustration badge={tier.badge} size="sm" />
                     </div>
                   </div>
@@ -1213,16 +1205,16 @@ export default function CustomerHomePage() {
             </div>
 
             {/* شريط الإجراءات: خيارات الرحلة وقسيمة */}
-            <div className="my-2 flex items-center justify-around border-t border-b border-gray-100 py-3 px-6">
-              {/* خيارات الرحلة (يفتح الصورة الثانية) */}
+            <div className="my-1 flex items-center justify-around border-t border-b border-slate-100 py-3 px-6">
+              {/* خيارات الرحلة */}
               <button
                 type="button"
                 onClick={() => setIsTripOptionsOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 text-gray-700 hover:text-blue-600 transition cursor-pointer"
+                className="flex flex-1 items-center justify-center gap-2 text-[#1A1A1A] hover:text-[#1B4965] transition cursor-pointer"
               >
                 <span className="text-[14px] font-bold">خيارات الرحلة</span>
                 <svg
-                  className="h-5 w-5 text-gray-700"
+                  className="h-5 w-5 text-[#6C757D]"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1236,19 +1228,19 @@ export default function CustomerHomePage() {
               </button>
 
               {/* فاصل */}
-              <div className="h-6 w-[1px] bg-gray-200" />
+              <div className="h-5 w-[1px] bg-slate-200" />
 
               {/* قسيمة الخصم */}
               <button
                 type="button"
                 onClick={() => setIsPromoModalOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 text-gray-700 hover:text-blue-600 transition cursor-pointer"
+                className="flex flex-1 items-center justify-center gap-2 text-[#1A1A1A] hover:text-[#1B4965] transition cursor-pointer"
               >
                 <span className="text-[14px] font-bold">
                   {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
                 </span>
                 <svg
-                  className="h-5 w-5 text-gray-700"
+                  className="h-5 w-5 text-[#6C757D]"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1262,12 +1254,12 @@ export default function CustomerHomePage() {
               </button>
             </div>
 
-            {/* الزر الأزرق: طلب الفئة المحددة (مثال: طلب سوبر) */}
+            {/* الزر الرئيسي: طلب الفئة المحددة */}
             <div className="px-6 pt-2">
               <button
                 type="button"
                 onClick={handleOrderTrip}
-                className="w-full rounded-xl bg-[#0026ff] py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(0,38,255,0.35)] transition active:scale-[0.98] hover:bg-[#0020d9] cursor-pointer"
+                className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] hover:bg-[#14364A] cursor-pointer"
               >
                 طلب {currentTier.name}
               </button>
@@ -1616,8 +1608,8 @@ export default function CustomerHomePage() {
                       onClick={() => setStopDuration(mins)}
                       className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
                         stopDuration === mins
-                          ? 'bg-[#0026ff] text-white shadow-sm'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          ? 'bg-[#1B4965] text-white shadow-card'
+                          : 'bg-slate-100 text-[#1A1A1A] hover:bg-slate-200'
                       }`}
                     >
                       {mins} دقائق
@@ -1626,14 +1618,14 @@ export default function CustomerHomePage() {
                 </div>
               )}
 
-              {/* 3. رحلة ذهاب وإياب (مع التوجل كما في الصورة) */}
+              {/* 3. رحلة ذهاب وإياب */}
               <div className="flex items-center justify-between py-4">
                 {/* زر التبديل التوجل Toggle Switch */}
                 <button
                   type="button"
                   onClick={() => setIsRoundTrip((v) => !v)}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                    isRoundTrip ? 'bg-[#0026ff]' : 'bg-gray-300'
+                    isRoundTrip ? 'bg-[#1B4965]' : 'bg-slate-300'
                   }`}
                   aria-label="تفعيل رحلة ذهاب وإياب"
                 >
@@ -1644,18 +1636,18 @@ export default function CustomerHomePage() {
                   />
                 </button>
 
-                <span className="text-[16px] font-bold text-gray-800">رحلة ذهاب وإياب</span>
+                <span className="text-[15px] font-bold text-[#1A1A1A]">رحلة ذهاب وإياب</span>
               </div>
             </div>
           </div>
 
-          {/* الشريط السفلي: مبلغ الرحلة وزر التأكيد وزر الإنهاء كالصورة 2 */}
-          <div className="border-t border-gray-100 p-6 bg-white">
+          {/* الشريط السفلي: مبلغ الرحلة وزر التأكيد وزر الإنهاء */}
+          <div className="border-t border-slate-100 p-6 bg-white">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-[16px] font-black text-gray-900">
+              <span className="text-[16px] font-bold text-[#1A1A1A]">
                 {calculatedPrice.toLocaleString()} دينار
               </span>
-              <span className="text-[15px] font-bold text-gray-600">مبلغ الرحلة</span>
+              <span className="text-[14px] font-medium text-[#6C757D]">مبلغ الرحلة</span>
             </div>
 
             <div className="flex items-center gap-4">
@@ -1663,7 +1655,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={() => setIsTripOptionsOpen(false)}
-                className="py-3 px-4 text-center text-sm font-bold text-gray-600 hover:text-black transition cursor-pointer"
+                className="py-3 px-4 text-center text-sm font-bold text-[#6C757D] hover:text-[#1A1A1A] transition cursor-pointer"
               >
                 انهاء
               </button>
@@ -1675,7 +1667,7 @@ export default function CustomerHomePage() {
                   setIsTripOptionsOpen(false);
                   show('تم حفظ وتأكيد خيارات الرحلة بنجاح ✅', 'success');
                 }}
-                className="flex-1 rounded-xl bg-gray-200 py-3 text-center text-sm font-bold text-gray-700 hover:bg-gray-300 transition active:scale-[0.98] cursor-pointer"
+                className="flex-1 rounded-xl bg-[#1B4965] py-3 text-center text-sm font-bold text-white hover:bg-[#14364A] shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] cursor-pointer"
               >
                 تأكيد
               </button>
@@ -1686,17 +1678,17 @@ export default function CustomerHomePage() {
 
       {/* نافذة إدخال القسيمة */}
       {isPromoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-fade-in text-right">
-            <h3 className="text-lg font-black text-gray-900 mb-2">🏷️ قسيمة الخصم</h3>
-            <p className="text-xs font-bold text-gray-500 mb-4">أدخل كود القسيمة للحصول على خصم مباشر:</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sheet animate-fade-in text-right border border-slate-100">
+            <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">🏷️ قسيمة الخصم</h3>
+            <p className="text-xs font-medium text-[#6C757D] mb-4">أدخل كود القسيمة للحصول على خصم مباشر:</p>
             <div className="flex gap-2 mb-4">
               <input
                 type="text"
                 value={promoCodeInput}
                 onChange={(e) => setPromoCodeInput(e.target.value)}
                 placeholder="أدخل الكود (مثال: TAWSEELA20)"
-                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-right outline-none"
+                className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-right outline-none focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/10"
               />
               <button
                 type="button"
@@ -1707,7 +1699,7 @@ export default function CustomerHomePage() {
                     setIsPromoModalOpen(false);
                   }
                 }}
-                className="rounded-xl bg-[#0026ff] px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                className="rounded-xl bg-[#1B4965] px-4 py-2 text-xs font-bold text-white hover:bg-[#14364A] transition-colors"
               >
                 تطبيق
               </button>
@@ -1715,7 +1707,7 @@ export default function CustomerHomePage() {
             <button
               type="button"
               onClick={() => setIsPromoModalOpen(false)}
-              className="w-full rounded-xl bg-gray-100 py-2 text-center text-xs font-bold text-gray-700"
+              className="w-full rounded-xl bg-slate-100 py-2.5 text-center text-xs font-bold text-[#1A1A1A] hover:bg-slate-200 transition-colors"
             >
               إلغاء
             </button>
@@ -1726,9 +1718,9 @@ export default function CustomerHomePage() {
       {/* 9. نافذة البحث عن الأماكن */}
       {isSearchOpen && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-gray-100">
-            <h2 className="text-[22px] font-black text-gray-900">
-              {stage === 'pickup' ? 'الانطلاق' : 'الوصول'}
+          <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100">
+            <h2 className="text-[18px] font-bold text-[#1A1A1A]">
+              {stage === 'pickup' ? 'حدد نقطة الانطلاق' : 'حدد وجهة الوصول'}
             </h2>
             <button
               type="button"
@@ -1737,15 +1729,15 @@ export default function CustomerHomePage() {
                 setSearchQuery('');
                 setSearchResults([]);
               }}
-              className="p-1 text-gray-600 transition hover:text-black cursor-pointer"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6C757D] hover:text-[#1A1A1A] hover:bg-slate-100 transition-colors cursor-pointer"
               aria-label="إغلاق"
             >
               <svg
-                className="h-6 w-6"
+                className="h-5 w-5"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2.5"
+                strokeWidth="2.2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -1755,19 +1747,27 @@ export default function CustomerHomePage() {
             </button>
           </div>
 
+          {/* مربع البحث العلوي المندمج */}
           <div className="px-4 py-3">
-            <div className="flex items-center rounded-2xl bg-[#f1f3f5] px-3.5 py-2.5">
+            <div className="flex items-center rounded-xl bg-slate-50 border border-slate-200/80 px-3 py-2.5 transition-all focus-within:bg-white focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
               <button
                 type="button"
                 onClick={() => setIsCitySelectorOpen(true)}
-                className="flex items-center gap-1.5 shrink-0 text-[13px] font-bold text-gray-700 pl-2 cursor-pointer hover:text-blue-600 transition"
+                className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg bg-white border border-slate-200/80 text-[12.5px] font-bold text-[#1A1A1A] hover:border-[#1B4965] transition cursor-pointer"
                 title="تغيير المدينة"
               >
                 <span>{selectedCity}</span>
-                <span className="text-[10px] text-gray-500">▼</span>
+                <svg className="h-3.5 w-3.5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
 
-              <div className="mx-2 h-5 w-[1px] bg-gray-300" />
+              <div className="mx-2.5 h-4 w-[1px] bg-slate-200" />
+
+              <div className="mr-1 text-[#6C757D]">
+                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
 
               <input
                 type="text"
@@ -1775,21 +1775,21 @@ export default function CustomerHomePage() {
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder={
-                  stage === 'pickup' ? 'البحث من نقطة الانطلاق...' : 'البحث عن نقطة الوصول...'
+                  stage === 'pickup' ? 'ابحث عن موقع الانطلاق...' : 'ابحث عن وجهة الوصول...'
                 }
-                className="flex-1 bg-transparent text-[14px] font-bold text-gray-900 outline-none placeholder-gray-400"
+                className="flex-1 bg-transparent text-[14px] font-medium text-[#1A1A1A] outline-none placeholder-[#6C757D]"
               />
 
               <button
                 type="button"
                 onClick={handleMicClick}
-                className={`p-1 transition cursor-pointer ${
-                  isListeningMic ? 'text-red-500 animate-pulse' : 'text-gray-500 hover:text-blue-600'
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  isListeningMic ? 'text-red-500 bg-red-50 animate-pulse' : 'text-[#6C757D] hover:text-[#1B4965] hover:bg-slate-100'
                 }`}
                 title="البحث الصوتي"
               >
                 <svg
-                  className="h-5 w-5"
+                  className="h-4.5 w-4.5"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1806,16 +1806,16 @@ export default function CustomerHomePage() {
           </div>
 
           {/* شريط الأماكن السريعة */}
-          <div className="flex items-center gap-3 px-4 pb-4 overflow-x-auto no-scrollbar border-b border-gray-100">
+          <div className="flex items-center gap-2.5 px-4 pb-3 overflow-x-auto no-scrollbar border-b border-slate-100">
             {QUICK_CHIPS.map((chip) => (
               <div
                 key={chip.name}
                 onClick={() => handleSelectPlace(chip)}
-                className="flex items-center gap-2 rounded-full border border-gray-200 bg-[#f4f6fa] px-4 py-2 cursor-pointer transition active:scale-95 hover:bg-gray-100"
+                className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 px-3.5 py-2 cursor-pointer transition-all duration-200 active:scale-95 shadow-card shrink-0"
               >
-                <span className="text-[13px] font-bold text-gray-800">{chip.name}</span>
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e40af] text-white">
-                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <span className="text-[13px] font-bold text-[#1A1A1A]">{chip.name}</span>
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#1B4965]/10 text-[#1B4965]">
+                  <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 </div>
@@ -1824,27 +1824,39 @@ export default function CustomerHomePage() {
           </div>
 
           {/* قائمة الأماكن */}
-          <div className="flex-1 overflow-y-auto px-4 py-2">
+          <div className="flex-1 overflow-y-auto px-4 py-3 bg-[#F8F9FA]/40">
             {isSearchingPlaces && (
-              <div className="flex items-center justify-center py-6 text-gray-400">
-                <Spinner className="h-5 w-5 ml-2" />
-                <span className="text-xs font-bold">جاري البحث في الأماكن...</span>
+              <div className="flex items-center justify-center py-8 text-[#6C757D]">
+                <Spinner className="h-5 w-5 ml-2 text-[#1B4965]" />
+                <span className="text-xs font-semibold">جاري البحث في الأماكن...</span>
               </div>
             )}
 
             {searchResults.length > 0 ? (
-              <div>
-                <p className="mb-2 text-[13px] font-bold text-gray-400">{searchQuery.trim().length === 0 ? 'أماكن مقترحة' : 'نتائج البحث'}</p>
+              <div className="space-y-1">
+                <p className="mb-2 text-[12px] font-bold text-[#6C757D] px-1">
+                  {searchQuery.trim().length === 0 ? 'أماكن مقترحة' : 'نتائج البحث'}
+                </p>
                 {searchResults.map((place, idx) => (
                   <div
                     key={`${place.lat}-${place.lon}-${idx}`}
                     onClick={() => handleSelectPlace({ name: place.name, lat: place.lat, lng: place.lon })}
-                    className="flex items-center justify-between border-b border-gray-100 py-3.5 cursor-pointer hover:bg-gray-50 transition"
+                    className="group flex items-center justify-between p-3 rounded-xl border border-transparent bg-white hover:border-slate-200/80 hover:shadow-card transition-all duration-200 cursor-pointer"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">📍</span>
-                      <div>
-                        <p className="text-[14px] font-bold text-gray-900">{place.name}</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] group-hover:bg-[#1B4965]/10 transition-colors">
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                      </div>
+                      <div className="truncate">
+                        <p className="text-[14.5px] font-bold text-[#1A1A1A] group-hover:text-[#1B4965] transition-colors truncate">
+                          {place.name}
+                        </p>
+                        <p className="text-[12px] font-medium text-[#6C757D] mt-0.5 truncate">
+                          النجف الأشرف
+                        </p>
                       </div>
                     </div>
 
@@ -1856,15 +1868,15 @@ export default function CustomerHomePage() {
                         setFavoritePlaces(getFavoritePlaces());
                         show(`تمت إضافة ${place.name} إلى المفضلة ⭐`, 'success');
                       }}
-                      className="p-2 text-gray-400 transition hover:text-amber-500"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
                       title="إضافة للمفضلة"
                     >
                       <svg
-                        className="h-5 w-5"
+                        className="h-4.5 w-4.5"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth="1.8"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
@@ -1875,19 +1887,19 @@ export default function CustomerHomePage() {
                 ))}
               </div>
             ) : (
-              <div>
-                <p className="mb-3 text-[14px] font-bold text-gray-500">الأماكن الأخيرة الشائعة</p>
-                <div className="space-y-1">
+              <div className="space-y-1">
+                <p className="mb-2 text-[12px] font-bold text-[#6C757D] px-1">الأماكن الأخيرة الشائعة</p>
+                <div className="space-y-1.5">
                   {recentPlacesList.map((item) => (
                     <div
                       key={`${item.name}-${item.lat}-${item.lng}`}
                       onClick={() => handleSelectPlace(item)}
-                      className="flex items-center justify-between border-b border-gray-100 py-3.5 cursor-pointer hover:bg-gray-50 transition"
+                      className="group flex items-center justify-between p-3 rounded-xl border border-transparent bg-white hover:border-slate-200/80 hover:shadow-card transition-all duration-200 cursor-pointer"
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-1 text-gray-400">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] group-hover:bg-[#1B4965]/10 transition-colors">
                           <svg
-                            className="h-5 w-5"
+                            className="h-5 w-5 text-[#6C757D] group-hover:text-[#1B4965] transition-colors"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -1899,9 +1911,15 @@ export default function CustomerHomePage() {
                             <polyline points="12 6 12 12 16 14" />
                           </svg>
                         </div>
-                        <div>
-                          <p className="text-[15px] font-black text-gray-900">{item.name}</p>
-                          {item.address && <p className="text-[12px] font-semibold text-gray-400 mt-0.5">{item.address}</p>}
+                        <div className="truncate">
+                          <p className="text-[14.5px] font-bold text-[#1A1A1A] group-hover:text-[#1B4965] transition-colors truncate">
+                            {item.name}
+                          </p>
+                          {item.address && (
+                            <p className="text-[12px] font-medium text-[#6C757D] mt-0.5 truncate">
+                              {item.address}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -1913,15 +1931,15 @@ export default function CustomerHomePage() {
                           setFavoritePlaces(getFavoritePlaces());
                           show(`تمت إضافة ${item.name} إلى المفضلة ⭐`, 'success');
                         }}
-                        className="p-2 text-gray-400 transition hover:text-amber-500"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
                         title="إضافة للمفضلة"
                       >
                         <svg
-                          className="h-5 w-5"
+                          className="h-4.5 w-4.5"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="2"
+                          strokeWidth="1.8"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
@@ -1939,24 +1957,24 @@ export default function CustomerHomePage() {
 
       {/* 10. نافذة اختيار المدينة */}
       {isCitySelectorOpen && (
-        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-[2px]">
-          <div className="relative flex h-[82%] w-full flex-col rounded-t-[28px] bg-white pt-4 pb-2 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between px-5 pb-3">
-              <h3 className="text-[19px] font-bold text-gray-900">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-xs">
+          <div className="relative flex h-[82%] w-full flex-col rounded-t-2xl bg-white pt-4 pb-2 shadow-sheet animate-fade-in border-t border-slate-100">
+            <div className="flex items-center justify-between px-5 pb-3 border-b border-slate-100">
+              <h3 className="text-[17px] font-bold text-[#1A1A1A]">
                 {stage === 'pickup' ? 'إختيار مدينة نقطة الانطلاق' : 'إختيار مدينة نقطة الوصول'}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsCitySelectorOpen(false)}
-                className="p-1 text-gray-600 transition hover:text-black cursor-pointer"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6C757D] hover:text-[#1A1A1A] hover:bg-slate-100 transition-colors cursor-pointer"
                 aria-label="إغلاق"
               >
                 <svg
-                  className="h-6 w-6"
+                  className="h-5 w-5"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.4"
+                  strokeWidth="2.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
@@ -1966,14 +1984,14 @@ export default function CustomerHomePage() {
               </button>
             </div>
 
-            <div className="px-5 mb-2">
-              <div className="flex items-center rounded-2xl bg-[#f4f5f7] px-4 py-3">
+            <div className="px-5 my-3">
+              <div className="flex items-center rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-2.5 focus-within:bg-white focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10 transition-all">
                 <svg
-                  className="h-5 w-5 text-gray-400 shrink-0 ml-2"
+                  className="h-5 w-5 text-[#6C757D] shrink-0 ml-2"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.2"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
@@ -1985,16 +2003,16 @@ export default function CustomerHomePage() {
                   value={citySearchQuery}
                   onChange={(e) => setCitySearchQuery(e.target.value)}
                   placeholder="البحث في المدن..."
-                  className="w-full bg-transparent text-[15px] font-bold text-gray-800 outline-none placeholder-gray-400 text-right"
+                  className="w-full bg-transparent text-[14px] font-medium text-[#1A1A1A] outline-none placeholder-[#6C757D] text-right"
                 />
               </div>
             </div>
 
-            <div className="px-5 py-3 border-b border-gray-100">
+            <div className="px-5 py-3 border-b border-slate-100">
               <button
                 type="button"
                 onClick={handleSelectCurrentCity}
-                className="flex items-center gap-3 text-[#0026ff] hover:text-[#001ed0] cursor-pointer transition active:scale-[0.99]"
+                className="flex items-center gap-3 text-[#1B4965] hover:text-[#14364A] cursor-pointer transition active:scale-[0.99] font-bold text-[15px]"
               >
                 <svg
                   className="h-5 w-5 shrink-0"
@@ -2012,19 +2030,19 @@ export default function CustomerHomePage() {
                   <line x1="2" y1="12" x2="5" y2="12" />
                   <line x1="19" y1="12" x2="22" y2="12" />
                 </svg>
-                <span className="text-[16px] font-bold">مدينتك الحالية</span>
+                <span>مدينتك الحالية</span>
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 divide-y divide-gray-100">
+            <div className="flex-1 overflow-y-auto px-5 divide-y divide-slate-100">
               {filteredCities.map((city) => (
                 <div
                   key={city.id}
                   onClick={() => handleSelectCity(city)}
-                  className="flex items-center justify-between py-3.5 cursor-pointer hover:bg-gray-50 transition active:scale-[0.99]"
+                  className="flex items-center justify-between py-3.5 cursor-pointer hover:bg-slate-50 transition active:scale-[0.99]"
                 >
                   <div className="text-right">
-                    <p className="text-[16px] font-bold text-gray-900">{city.name}</p>
+                    <p className="text-[15px] font-bold text-[#1A1A1A]">{city.name}</p>
                     <p className="text-[13px] font-semibold text-gray-400 mt-0.5">{city.sub}</p>
                   </div>
                   <div className="text-gray-400">
@@ -2297,19 +2315,19 @@ export default function CustomerHomePage() {
 
           <div
             onClick={() => setActiveDrawerSubModal('support')}
-            className="flex items-center justify-between bg-[#f0f4ff] px-6 py-4 cursor-pointer hover:bg-blue-100/70 transition border-t border-blue-50"
+            className="flex items-center justify-between bg-slate-50 px-6 py-4 cursor-pointer hover:bg-slate-100/70 transition border-t border-slate-100"
           >
             <div />
             <div className="flex items-center gap-3.5">
               <div className="text-right">
-                <h4 className="text-[15px] font-black text-gray-900">التواصل مع الدعم</h4>
-                <p className="text-[13px] font-semibold text-gray-500 mt-0.5">
-                  لأي مشاكل، يرجى التواصل معنا.
+                <h4 className="text-[15px] font-bold text-[#1A1A1A]">التواصل مع الدعم</h4>
+                <p className="text-[12.5px] font-medium text-[#6C757D] mt-0.5">
+                  لأي مشاكل أو استفسارات، فريقنا بخدمتكم.
                 </p>
               </div>
-              <div className="text-[#0026ff]">
+              <div className="text-[#1B4965]">
                 <svg
-                  className="h-7 w-7"
+                  className="h-6 w-6"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -2328,14 +2346,14 @@ export default function CustomerHomePage() {
 
       {/* نوافذ فرعية لدرج الزبون */}
       {activeDrawerSubModal !== 'none' && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-fade-in text-right">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sheet animate-fade-in text-right border border-slate-100">
             {activeDrawerSubModal === 'wallet' && (
               <div>
-                <h3 className="text-lg font-black text-gray-900 mb-2">💳 وسائل الدفع والرصيد</h3>
-                <div className="my-4 rounded-2xl bg-blue-50 p-4 text-center">
-                  <p className="text-xs font-bold text-blue-600">الرصيد المتاح</p>
-                  <p className="text-2xl font-black text-[#0026ff] mt-1">{walletBalance} د.ع</p>
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">💳 وسائل الدفع والرصيد</h3>
+                <div className="my-4 rounded-xl bg-slate-50 border border-slate-100 p-4 text-center">
+                  <p className="text-xs font-semibold text-[#6C757D]">الرصيد المتاح</p>
+                  <p className="text-2xl font-bold text-[#1B4965] mt-1">{walletBalance} د.ع</p>
                 </div>
                 <button
                   type="button"
@@ -2343,7 +2361,7 @@ export default function CustomerHomePage() {
                     show('لشحن الرصيد، يرجى التوجه إلى مركز الدعم المعتمد أو استخدام بطاقة الشحن', 'info');
                     setActiveDrawerSubModal('none');
                   }}
-                  className="w-full rounded-xl bg-[#0026ff] py-2.5 text-center text-sm font-bold text-white shadow-md hover:bg-blue-700 cursor-pointer"
+                  className="w-full rounded-xl bg-[#1B4965] py-2.5 text-center text-sm font-bold text-white shadow-subtle hover:bg-[#14364A] transition-colors cursor-pointer"
                 >
                   شحن الرصيد
                 </button>
@@ -2352,20 +2370,20 @@ export default function CustomerHomePage() {
 
             {activeDrawerSubModal === 'trips' && (
               <div>
-                <h3 className="text-lg font-black text-gray-900 mb-3">🕒 سجل الرحلات السابقة</h3>
-                <div className="rounded-2xl border border-dashed border-gray-200 p-6 text-center text-gray-400 bg-gray-50/50">
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-3">🕒 سجل الرحلات السابقة</h3>
+                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-[#6C757D] bg-slate-50/50">
                   <span className="text-3xl block mb-2">🚗</span>
-                  <p className="text-sm font-bold text-gray-700">لا توجد رحلات سابقة بعد</p>
-                  <p className="text-xs text-gray-400 mt-1">عند إكمال أول مشوار ستظهر تفاصيل وسجل رحلاتك هنا تلقائياً</p>
+                  <p className="text-sm font-bold text-[#1A1A1A]">لا توجد رحلات سابقة بعد</p>
+                  <p className="text-xs text-[#6C757D] mt-1">عند إكمال أول مشوار ستظهر تفاصيل وسجل رحلاتك هنا تلقائياً</p>
                 </div>
               </div>
             )}
 
             {activeDrawerSubModal === 'favorites' && (
               <div>
-                <h3 className="text-lg font-black text-gray-900 mb-3">⭐ العناوين المفضلة</h3>
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-3">⭐ العناوين المفضلة</h3>
                 {favoritePlaces.length === 0 ? (
-                  <p className="text-xs font-semibold text-gray-400 text-center py-6">
+                  <p className="text-xs font-medium text-[#6C757D] text-center py-6">
                     لا توجد عناوين مفضلة بعد. يمكنك إضافة أي موقع إلى المفضلة بالنقر على النجمة ⭐ في البحث.
                   </p>
                 ) : (
@@ -2373,7 +2391,7 @@ export default function CustomerHomePage() {
                     {favoritePlaces.map((fav) => (
                       <div
                         key={fav.id}
-                        className="flex items-center justify-between rounded-xl border border-gray-100 p-3 bg-gray-50 hover:bg-blue-50/50 transition cursor-pointer"
+                        className="flex items-center justify-between rounded-xl border border-slate-100 p-3 bg-slate-50 hover:bg-slate-100/70 transition cursor-pointer"
                         onClick={() => {
                           handleSelectPlace({ name: fav.name, lat: fav.lat, lng: fav.lng, address: fav.address });
                           setActiveDrawerSubModal('none');
@@ -2382,8 +2400,8 @@ export default function CustomerHomePage() {
                         }}
                       >
                         <div>
-                          <p className="text-sm font-black text-gray-800">{fav.name}</p>
-                          <p className="text-xs font-semibold text-gray-500">{fav.address || 'النجف الأشرف'}</p>
+                          <p className="text-sm font-bold text-[#1A1A1A]">{fav.name}</p>
+                          <p className="text-xs font-medium text-[#6C757D]">{fav.address || 'النجف الأشرف'}</p>
                         </div>
                         <button
                           type="button"
@@ -2393,7 +2411,7 @@ export default function CustomerHomePage() {
                             setFavoritePlaces(updated);
                             show('تم حذف العنوان من المفضلة', 'info');
                           }}
-                          className="p-1.5 text-gray-400 hover:text-red-500 transition text-sm"
+                          className="p-1.5 text-[#6C757D] hover:text-red-500 transition text-sm"
                           title="حذف من المفضلة"
                         >
                           🗑️
@@ -2407,19 +2425,19 @@ export default function CustomerHomePage() {
 
             {activeDrawerSubModal === 'coupons' && (
               <div>
-                <h3 className="text-lg font-black text-gray-900 mb-3">🏷️ قسائم الخصومات والجوائز</h3>
-                <p className="text-xs font-bold text-gray-500 mb-3">أدخل كود الخصم لتطبيقه على رحلتك القادمة.</p>
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-3">🏷️ قسائم الخصومات والجوائز</h3>
+                <p className="text-xs font-medium text-[#6C757D] mb-3">أدخل كود الخصم لتطبيقه على رحلتك القادمة.</p>
               </div>
             )}
 
             {activeDrawerSubModal === 'referral' && (
               <div className="text-center">
-                <h3 className="text-lg font-black text-gray-900 mb-2">🎁 دعوة الأصدقاء</h3>
-                <p className="text-xs font-bold text-gray-500 mb-4">
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">🎁 دعوة الأصدقاء</h3>
+                <p className="text-xs font-medium text-[#6C757D] mb-4">
                   شارك كود الدعوة مع أصدقائك واحصل على خصم 20%!
                 </p>
-                <div className="rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 py-3 mb-4">
-                  <span className="font-mono text-xl font-black text-[#0026ff] tracking-widest">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-3 mb-4">
+                  <span className="font-mono text-xl font-bold text-[#1B4965] tracking-widest">
                     TAXI-IQ-2026
                   </span>
                 </div>
@@ -2428,10 +2446,10 @@ export default function CustomerHomePage() {
 
             {activeDrawerSubModal === 'settings' && (
               <div className="space-y-4">
-                <h3 className="text-lg font-black text-gray-900 mb-2">⚙️ إعدادات الحساب والتطبيق</h3>
-                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">⚙️ إعدادات الحساب والتطبيق</h3>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-700">التنبيهات الصوتية 🔔</span>
+                    <span className="text-xs font-bold text-[#1A1A1A]">التنبيهات الصوتية 🔔</span>
                     <input
                       type="checkbox"
                       checked={userSettings.soundEnabled}
@@ -2439,11 +2457,11 @@ export default function CustomerHomePage() {
                         const upd = saveUserSettings({ soundEnabled: e.target.checked });
                         setUserSettings(upd);
                       }}
-                      className="h-4 w-4 accent-blue-600 rounded cursor-pointer"
+                      className="h-4 w-4 accent-[#1B4965] rounded cursor-pointer"
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-700">إشعارات الرسائل والوصول 💬</span>
+                    <span className="text-xs font-bold text-[#1A1A1A]">إشعارات الرسائل والوصول 💬</span>
                     <input
                       type="checkbox"
                       checked={userSettings.notificationsEnabled}
@@ -2451,11 +2469,11 @@ export default function CustomerHomePage() {
                         const upd = saveUserSettings({ notificationsEnabled: e.target.checked });
                         setUserSettings(upd);
                       }}
-                      className="h-4 w-4 accent-blue-600 rounded cursor-pointer"
+                      className="h-4 w-4 accent-[#1B4965] rounded cursor-pointer"
                     />
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-700">توسيط الخريطة التلقائي 🗺️</span>
+                    <span className="text-xs font-bold text-[#1A1A1A]">توسيط الخريطة التلقائي 🗺️</span>
                     <input
                       type="checkbox"
                       checked={userSettings.autoCenterMap}
@@ -2463,7 +2481,7 @@ export default function CustomerHomePage() {
                         const upd = saveUserSettings({ autoCenterMap: e.target.checked });
                         setUserSettings(upd);
                       }}
-                      className="h-4 w-4 accent-blue-600 rounded cursor-pointer"
+                      className="h-4 w-4 accent-[#1B4965] rounded cursor-pointer"
                     />
                   </div>
                 </div>
@@ -2479,8 +2497,8 @@ export default function CustomerHomePage() {
 
             {activeDrawerSubModal === 'about' && (
               <div className="text-center">
-                <h3 className="text-lg font-black text-gray-900 mb-2">ℹ️ حول منصة توصيلة</h3>
-                <p className="text-xs font-bold text-gray-500 leading-relaxed mb-4">
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">ℹ️ حول منصة توصيلة</h3>
+                <p className="text-xs font-medium text-[#6C757D] leading-relaxed mb-4">
                   تطبيق النقل الذكي الأول المخصص لمحافظة النجف الأشرف وجمهورية العراق.
                   <br />
                   الإصدار 1.0.0 (Release)
@@ -2490,20 +2508,20 @@ export default function CustomerHomePage() {
 
             {activeDrawerSubModal === 'support' && (
               <div>
-                <h3 className="text-lg font-black text-gray-900 mb-2">🎧 التواصل مع الدعم</h3>
+                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">🎧 التواصل مع الدعم</h3>
                 <div className="space-y-2 mb-4">
                   <a
                     href="https://wa.me/9647706204066"
                     target="_blank"
                     rel="noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
                   >
                     <span>💬</span>
                     <span>مراسلة الدعم عبر واتساب</span>
                   </a>
                   <a
                     href="tel:07706204066"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0026ff] py-2.5 text-xs font-bold text-white hover:bg-blue-700"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1B4965] py-2.5 text-xs font-bold text-white hover:bg-[#14364A] transition-colors"
                   >
                     <span>📞</span>
                     <span>اتصال مباشر بفريق الدعم</span>

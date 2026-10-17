@@ -25,7 +25,7 @@ function PageLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="flex flex-col items-center gap-3">
-        <Spinner className="h-8 w-8 text-[#0026ff]" />
+        <Spinner className="h-8 w-8 text-[#1B4965]" />
         <span className="text-xs font-bold text-gray-500">جاري التحميل...</span>
       </div>
     </div>
