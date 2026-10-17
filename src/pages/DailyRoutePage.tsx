@@ -143,16 +143,16 @@ export default function DailyRoutePage() {
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : [];
         const mapped: DriverItem[] = data.map((d: any, idx: number) => {
-          const dLat = Number(d.permanentLat ?? d.latitude ?? d.currentLat ?? (userLoc.lat + 0.003 * (idx + 1)));
-          const dLng = Number(d.permanentLon ?? d.longitude ?? d.currentLon ?? (userLoc.lng + 0.002 * (idx + 1)));
+          const dLat = Number(d.currentLat ?? d.latitude ?? (userLoc.lat + 0.003 * (idx + 1)));
+          const dLng = Number(d.currentLon ?? d.longitude ?? (userLoc.lng + 0.002 * (idx + 1)));
           return {
             id: d.driverId || idx + 1,
             driverId: d.driverId || `d-${idx}`,
             name: d.driverName || d.fullName || 'كابتن توصيله',
             lat: dLat,
             lng: dLng,
-            from: d.permanentLocationName || d.routeStartName || 'المركز',
-            to: d.permanentDropoffName || d.routeEndName || 'جامعة الكوفة',
+            from: d.routeStartName || (d.route && d.route.includes('➔') ? d.route.split('➔')[0].trim() : 'المركز'),
+            to: d.routeEndName || (d.route && d.route.includes('➔') ? d.route.split('➔')[1].trim() : 'جامعة الكوفة'),
             rating: Number(d.rating || 5.0),
             plate: d.plateNumber || 'النجف',
             seats: 4,

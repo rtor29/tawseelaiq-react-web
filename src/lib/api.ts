@@ -42,8 +42,6 @@ export const endpoints = {
   driverStatus: (id: string) => `/drivers/${id}/status`,
   createRoute: (driverId: string) => `/drivers/${driverId}/routes`,
   driverLive: (driverId: string) => `/driver/${driverId}/live`,
-  driverPermanentLocation: (id: string) => `/driver/permanent-location/${id}`,
-  driverSetPermanentLocation: '/admin/driver/set-permanent-location',
 
   // Matching & bookings
   findMatchingRoutes: '/matching/find-routes',
