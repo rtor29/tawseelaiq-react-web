@@ -69,17 +69,10 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
     navigate(path);
   }
 
-  function logout() {
-    try {
-      authStore.clear();
-      storage.clearSession();
-      storage.clearAll();
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      // ignore
-    }
-    onClose();
+  function handleLogout() {
+    authStore.clear();
+    localStorage.clear();
+    if (onClose) onClose();
     navigate('/login', { replace: true });
   }
 
@@ -242,7 +235,7 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
           </button>
           <button
             type="button"
-            onClick={logout}
+            onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-right text-sm font-semibold text-red-600 transition hover:bg-red-50"
           >
             <span className="text-red-500">
