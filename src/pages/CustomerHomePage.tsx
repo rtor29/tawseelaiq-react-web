@@ -1428,7 +1428,15 @@ export default function CustomerHomePage() {
 
   // تسجيل الخروج
   function handleLogout() {
-    authStore.clear();
+    try {
+      authStore.clear();
+      storage.clearSession();
+      storage.clearAll();
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
     setIsProfileOpen(false);
     navigate('/login', { replace: true });
   }
@@ -3182,6 +3190,32 @@ export default function CustomerHomePage() {
                     strokeLinejoin="round"
                   >
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* زر تسجيل الخروج */}
+            <div
+              onClick={handleLogout}
+              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-rose-50/60 transition border-t border-b border-slate-100 active:scale-[0.99]"
+            >
+              <div />
+              <div className="flex items-center gap-4">
+                <p className="text-[17px] font-black text-rose-600">تسجيل الخروج</p>
+                <div className="text-rose-600">
+                  <svg
+                    className="h-6 w-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                 </div>
               </div>

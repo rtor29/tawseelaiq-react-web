@@ -70,7 +70,15 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
   }
 
   function logout() {
-    authStore.clear();
+    try {
+      authStore.clear();
+      storage.clearSession();
+      storage.clearAll();
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
     onClose();
     navigate('/login', { replace: true });
   }
