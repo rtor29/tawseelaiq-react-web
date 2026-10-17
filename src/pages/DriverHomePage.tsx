@@ -105,6 +105,8 @@ export default function DriverHomePage() {
   // نافذة اختيار تطبيق الملاحة
   const [isNavModalOpen, setIsNavModalOpen] = useState(false);
   const [navCoordinates, setNavCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [navTargetName, setNavTargetName] = useState<string>('');
+  const [navType, setNavType] = useState<'pickup' | 'dropoff'>('pickup');
 
   useEffect(() => {
     void realtime.connect(storage.getToken());
@@ -430,15 +432,33 @@ export default function DriverHomePage() {
     setIsNavModalOpen(false);
   }
 
-  function handleOpenNavModal() {
+  function handleOpenNavModal(target?: 'pickup' | 'dropoff') {
     if (!activeRide) return;
-    const destLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
-    const destLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
-    if (destLat && destLon) {
-      setNavCoordinates({ lat: Number(destLat), lng: Number(destLon) });
-      setIsNavModalOpen(true);
+    const mode = target || (activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff');
+    setNavType(mode);
+
+    if (mode === 'pickup') {
+      const pLat = activeRide.pickupLat ?? activeRide.pickup_lat ?? activeRide.pickup?.lat;
+      const pLon = activeRide.pickupLon ?? activeRide.pickup_lon ?? activeRide.pickup?.lng ?? activeRide.pickup?.lon;
+      const pName = activeRide.pickupName || 'موقع الراكب';
+      if (pLat && pLon) {
+        setNavCoordinates({ lat: Number(pLat), lng: Number(pLon) });
+        setNavTargetName(pName);
+        setIsNavModalOpen(true);
+      } else {
+        show('إحداثيات موقع الراكب غير متوفرة حالياً', 'warning');
+      }
     } else {
-      show('إحداثيات الوجهة غير متوفرة حالياً', 'warning');
+      const dLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
+      const dLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
+      const dName = activeRide.dropoffName || 'وجهة الراكب';
+      if (dLat && dLon) {
+        setNavCoordinates({ lat: Number(dLat), lng: Number(dLon) });
+        setNavTargetName(dName);
+        setIsNavModalOpen(true);
+      } else {
+        show('إحداثيات وجهة الراكب غير متوفرة حالياً', 'warning');
+      }
     }
   }
 
@@ -877,35 +897,53 @@ export default function DriverHomePage() {
                 </div>
 
                 <div className="space-y-2">
-                  {activeRide.status === 'Accepted' ? (
-                    <button
-                      type="button"
-                      onClick={handleDriverArrived}
-                      className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
-                    >
-                      📍 وصلت إلى موقع الانطلاق
-                    </button>
+                  {activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? (
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenNavModal('pickup')}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white py-3.5 px-4 text-center text-[15px] font-black shadow-[0_4px_16px_rgba(245,158,11,0.35)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
+                      >
+                        <span>التوجه إلى موقع الراكب 🧭</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDriverArrived}
+                        className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
+                      >
+                        📍 وصلت إلى موقع الانطلاق
+                      </button>
+                    </div>
                   ) : activeRide.status === 'Arrived' ? (
-                    <button
-                      type="button"
-                      onClick={handleDriverStartRide}
-                      className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[15.5px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition-all duration-200 active:scale-[0.98] cursor-pointer hover:bg-orange-600"
-                    >
-                      لقد وصلت، انطلق إلى وجهتك 🚗
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleDriverStartRide}
+                        className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[15.5px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition-all duration-200 active:scale-[0.98] cursor-pointer hover:bg-orange-600"
+                      >
+                        لقد وصلت، انطلق إلى وجهتك 🚗
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenNavModal('dropoff')}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 py-2.5 text-center text-[13.5px] font-bold text-[#1B4965] hover:bg-slate-200/80 transition active:scale-95 cursor-pointer shadow-xs"
+                      >
+                        <span>التوجه إلى وجهة الراكب 🧭</span>
+                      </button>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       <button
                         type="button"
-                        onClick={handleOpenNavModal}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 py-2.5 text-center text-[13.5px] font-bold text-[#1B4965] hover:bg-slate-200/80 transition active:scale-95 cursor-pointer shadow-xs"
+                        onClick={() => handleOpenNavModal('dropoff')}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white py-3.5 px-4 text-center text-[15px] font-black shadow-[0_4px_16px_rgba(27,73,101,0.35)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
                       >
-                        <span>🧭 فتح تطبيق الملاحة (Google Maps / Waze)</span>
+                        <span>التوجه إلى وجهة الراكب 🧭</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleDriverComplete}
-                        className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-[#14364A]"
+                        className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
                       >
                         🏁 إنهاء المشوار واستلام الأجرة
                       </button>
@@ -938,21 +976,6 @@ export default function DriverHomePage() {
                       </button>
                     )}
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const isHeadToDropoff = activeRide.status === 'Arrived' || activeRide.status === 'InProgress' || activeRide.status === 'in_progress';
-                      const destLat = isHeadToDropoff ? (activeRide.dropoffLat || activeRide.dropoff_lat) : (activeRide.pickupLat || activeRide.pickup_lat);
-                      const destLon = isHeadToDropoff ? (activeRide.dropoffLon || activeRide.dropoff_lon) : (activeRide.pickupLon || activeRide.pickup_lon);
-                      if (destLat && destLon) {
-                        window.open(`https://maps.google.com/?daddr=${destLat},${destLon}`, '_blank');
-                      }
-                    }}
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-center text-[13.5px] font-bold text-[#1A1A1A] transition hover:bg-slate-50 cursor-pointer"
-                  >
-                    فتح الملاحة (خرائط جوجل) 🗺️
-                  </button>
                 </div>
               </div>
             ) : incomingRequest ? (
@@ -1161,10 +1184,15 @@ export default function DriverHomePage() {
               🧭
             </div>
             <h3 className="text-[17px] font-bold text-[#1A1A1A] mb-1">
-              اختر تطبيق الملاحة للتوجه إلى الوجهة:
+              {navType === 'pickup'
+                ? 'اختر تطبيق الملاحة للتوجه إلى موقع الراكب:'
+                : 'اختر تطبيق الملاحة للتوجه إلى وجهة الراكب:'}
             </h3>
             <p className="text-[13px] font-medium text-[#6C757D] mb-4">
-              الوجهة: <span className="font-bold text-[#1A1A1A]">{activeRide?.dropoffName || 'الموقع المحدد'}</span>
+              {navType === 'pickup' ? 'نقطة الانطلاق:' : 'وجهة الوصول:'}{' '}
+              <span className="font-bold text-[#1A1A1A]">
+                {navTargetName || (navType === 'pickup' ? activeRide?.pickupName : activeRide?.dropoffName) || 'الموقع المحدد'}
+              </span>
             </p>
 
             <div className="space-y-2.5">
@@ -1196,7 +1224,7 @@ export default function DriverHomePage() {
                 onClick={() => setIsNavModalOpen(false)}
                 className="w-full rounded-xl py-2.5 text-[13.5px] font-bold text-[#6C757D] hover:text-[#1A1A1A] transition cursor-pointer"
               >
-                المتابعة داخل التطبيق
+                إلغاء / المتابعة داخل التطبيق
               </button>
             </div>
           </div>

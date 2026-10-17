@@ -15,6 +15,8 @@ import { config } from '../lib/config';
 import { realtime } from '../lib/realtime';
 import { searchPlaces, reverseGeocode, getDirections, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import {
+  calculateBearing,
+  distanceMeters,
   distanceKm,
   getCurrentPositionWithFallback,
   isIosDevice,
@@ -270,6 +272,9 @@ export default function CustomerHomePage() {
     driverLon?: number;
   } | null>(null);
   const [liveDriverPosition, setLiveDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverHeading, setDriverHeading] = useState<number>(0);
+  const prevDriverPositionRef = useRef<{ lat: number; lng: number } | null>(null);
+  const lastRouteUpdateTimeRef = useRef<number>(0);
 
   // حالة البحث النصي للأماكن
   const [searchQuery, setSearchQuery] = useState('');
@@ -1134,11 +1139,70 @@ export default function CustomerHomePage() {
     return () => clearInterval(interval);
   }, [rideRequestId, stage, pickup, dropoff, rideStatus, triggerDriverRatingModal]);
 
-  // اشتراك لحظي في أحداث الرحلة عبر SignalR / Realtime
+  // معالجة تحديث موقع السائق الحي مع حساب زاوية الاتجاه رياضياً ورسم خط المسار
+  const handleDriverPositionUpdate = useCallback(
+    (newPos: { lat: number; lng: number }, serverHeading?: number) => {
+      if (!newPos || typeof newPos.lat !== 'number' || typeof newPos.lng !== 'number') return;
+
+      const prev = prevDriverPositionRef.current;
+      if (prev) {
+        const movedMeters = distanceMeters(prev.lat, prev.lng, newPos.lat, newPos.lng);
+        // إذا تحركت السيارة بمقدار مترين أو أكثر، نقوم بحساب زاوية الاتجاه رياضياً بالمعادلة الكروية
+        if (movedMeters >= 2) {
+          const computedBearing = calculateBearing(prev.lat, prev.lng, newPos.lat, newPos.lng);
+          setDriverHeading(computedBearing);
+        } else if (typeof serverHeading === 'number' && !isNaN(serverHeading) && serverHeading > 0) {
+          setDriverHeading(serverHeading);
+        }
+      } else {
+        // عند استلام أول موقع، توجيه السيارة نحو نقطة التقاط الراكب (أو الوجهة إذا كانت الرحلة جارية)
+        if (typeof serverHeading === 'number' && !isNaN(serverHeading) && serverHeading > 0) {
+          setDriverHeading(serverHeading);
+        } else {
+          const target = (rideStatus === 'InProgress' || rideStatus === 'in_progress') ? dropoff : pickup;
+          if (target && target.lat && target.lng) {
+            const initialBearing = calculateBearing(newPos.lat, newPos.lng, target.lat, target.lng);
+            setDriverHeading(initialBearing);
+          }
+        }
+      }
+
+      prevDriverPositionRef.current = newPos;
+      setLiveDriverPosition(newPos);
+
+      // رسم وتحديث خط المسار من موقع السائق المباشر إلى موقع الراكب
+      const now = Date.now();
+      const targetPoint = (rideStatus === 'InProgress' || rideStatus === 'in_progress') ? dropoff : pickup;
+      if (
+        stage === 'driver_arriving' &&
+        targetPoint &&
+        targetPoint.lat &&
+        targetPoint.lng &&
+        now - lastRouteUpdateTimeRef.current > 6000
+      ) {
+        lastRouteUpdateTimeRef.current = now;
+        void getDirections(newPos, targetPoint)
+          .then((res) => {
+            if (res.coordinates?.length) {
+              setRouteCoordinates(res.coordinates.map((c) => [c.lng, c.lat]));
+            }
+          })
+          .catch(() => {
+            setRouteCoordinates([
+              [newPos.lng, newPos.lat],
+              [targetPoint.lng, targetPoint.lat],
+            ]);
+          });
+      }
+    },
+    [stage, rideStatus, pickup, dropoff]
+  );
+
+  // اشتراك لحظي في أحداث الرحلة وموقع السائق عبر SignalR / Realtime
   useEffect(() => {
     if (!rideRequestId) return;
     void realtime.joinTrip(rideRequestId);
-    const unsub = realtime.onTripStatus((e) => {
+    const unsubStatus = realtime.onTripStatus((e) => {
       if (e.tripId === rideRequestId) {
         if (e.status === 'Accepted') {
           setRideStatus('Accepted');
@@ -1171,16 +1235,29 @@ export default function CustomerHomePage() {
           setRideRequestId(null);
           setAssignedDriverInfo(null);
           setLiveDriverPosition(null);
+          prevDriverPositionRef.current = null;
+          setDriverHeading(0);
           setRouteCoordinates(null);
         }
       }
     });
 
+    const unsubLocation = realtime.onDriverLocation((e) => {
+      if (
+        (e.driverId === assignedDriverInfo?.driverId || !assignedDriverInfo?.driverId) &&
+        typeof e.latitude === 'number' &&
+        typeof e.longitude === 'number'
+      ) {
+        handleDriverPositionUpdate({ lat: e.latitude, lng: e.longitude }, e.heading);
+      }
+    });
+
     return () => {
-      unsub();
+      unsubStatus();
+      unsubLocation();
       void realtime.leaveTrip(rideRequestId);
     };
-  }, [rideRequestId, dropoff, rideStatus, stage, assignedDriverInfo, triggerDriverRatingModal]);
+  }, [rideRequestId, dropoff, rideStatus, stage, assignedDriverInfo, triggerDriverRatingModal, handleDriverPositionUpdate]);
 
   // تتبع موقع السائق الحي على الخريطة
   useEffect(() => {
@@ -1192,15 +1269,16 @@ export default function CustomerHomePage() {
         const { data } = await http.get<{
           latitude?: number;
           longitude?: number;
+          heading?: number;
         }>(`/driver/${assignedDriverInfo.driverId}/live`);
         if (data && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
-          setLiveDriverPosition({ lat: data.latitude, lng: data.longitude });
+          handleDriverPositionUpdate({ lat: data.latitude, lng: data.longitude }, data.heading);
         }
       } catch (_) {}
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [stage, assignedDriverInfo?.driverId]);
+  }, [stage, assignedDriverInfo?.driverId, handleDriverPositionUpdate]);
 
   // إلغاء الرحلة حقيقياً
   async function handleConfirmCancelTrip() {
@@ -1222,6 +1300,9 @@ export default function CustomerHomePage() {
     setRideRequestId(null);
     setAssignedDriverInfo(null);
     setLiveDriverPosition(null);
+    prevDriverPositionRef.current = null;
+    setDriverHeading(0);
+    setRouteCoordinates(null);
   }
 
   // تسجيل الخروج
@@ -1395,14 +1476,16 @@ export default function CustomerHomePage() {
             <VehicleMarker
               targetLat={liveDriverPosition.lat}
               targetLng={liveDriverPosition.lng}
-              targetHeading={140}
+              targetHeading={driverHeading}
+              title={assignedDriverInfo?.driverName ? `كابتن ${assignedDriverInfo.driverName.split(' ')[0]}` : undefined}
               isAvailable={false}
             />
           ) : assignedDriverInfo?.driverLat && assignedDriverInfo?.driverLon ? (
             <VehicleMarker
               targetLat={assignedDriverInfo.driverLat}
               targetLng={assignedDriverInfo.driverLon}
-              targetHeading={140}
+              targetHeading={driverHeading}
+              title={assignedDriverInfo?.driverName ? `كابتن ${assignedDriverInfo.driverName.split(' ')[0]}` : undefined}
               isAvailable={false}
             />
           ) : null}

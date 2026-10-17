@@ -18,6 +18,31 @@ export function distanceKm(a: LngLat, b: LngLat): number {
   return distanceMeters(a.lat, a.lng, b.lat, b.lng) / 1000;
 }
 
+/**
+ * حساب زاوية الاتجاه (Bearing / Heading) بالدرجات بين نقطتين جغرافيين
+ * الصيغة الكروية الرياضية:
+ * bearing = atan2(sin(Δλ) * cos(φ2), cos(φ1) * sin(φ2) - sin(φ1) * cos(φ2) * cos(Δλ))
+ */
+export function calculateBearing(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δλ = toRad(lon2 - lon1);
+
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+  const θ = Math.atan2(y, x);
+  const deg = (θ * 180) / Math.PI;
+  return (deg + 360) % 360;
+}
+
 function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
