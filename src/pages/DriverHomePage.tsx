@@ -48,7 +48,7 @@ interface IncomingRideRequest {
 }
 
 export default function DriverHomePage() {
-  const { show } = useToast();
+  const { show, dismissAll } = useToast();
   const navigate = useNavigate();
   const session = authStore.getSession();
   const driverId = session?.userId || storage.getUserId() || '';
@@ -68,6 +68,19 @@ export default function DriverHomePage() {
 
   // حالة العمل الحالية: خمول | خط دائمي | تكسي (تبدأ بوضع الخمول افتراضياً)
   const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>('idle');
+
+  // تبديل حالة العمل مع مسح الإشعارات السابقة وعرض الإشعار الدقيق لمدة ثانيتين
+  function handleSwitchWorkStatus(newStatus: 'idle' | 'permanent' | 'taxi') {
+    dismissAll();
+    setWorkStatus(newStatus);
+    if (newStatus === 'taxi') {
+      show('تم تفعيل وضع التكسي', 'success', 2000);
+    } else if (newStatus === 'permanent') {
+      show('تم تفعيل وضع الخط الدائمي', 'success', 2000);
+    } else {
+      show('تم تفعيل وضع الخمول (غير متاح)', 'info', 2000);
+    }
+  }
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [pendingSeatRequests, setPendingSeatRequests] = useState<PendingSeatBooking[]>([]);
   const lastNotifiedSeatBookingIdRef = useRef<string | null>(null);
@@ -431,9 +444,16 @@ export default function DriverHomePage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-white font-cairo select-none" dir="rtl">
+    <div
+      className="flex min-h-screen flex-col bg-white font-cairo overflow-y-auto pb-32"
+      style={{
+        WebkitOverflowScrolling: 'touch',
+        touchAction: 'pan-y',
+      }}
+      dir="rtl"
+    >
       {/* 1. الترويسة العلوية */}
-      <header className="flex items-center justify-between border-b border-slate-100 px-6 pt-5 pb-4 bg-white">
+      <header className="shrink-0 sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 px-6 pt-5 pb-4 bg-white/95 backdrop-blur-sm shadow-sm">
         {/* اليمين: معلومات السائق والصورة */}
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/80 shadow-subtle">
@@ -457,7 +477,7 @@ export default function DriverHomePage() {
       </header>
 
       {/* المحتوى الرئيسي */}
-      <main className="flex-1 overflow-y-auto px-5 py-4 bg-[#F8F9FA]/40">
+      <main className="flex-1 px-5 py-4 bg-[#F8F9FA]/40 pb-12">
         {/* تنبيه وصول رسالة من الراكب */}
         {latestPassengerMsg && activeRide && (
           <div
@@ -494,7 +514,7 @@ export default function DriverHomePage() {
         {/* تنبيه وجود طلبات حجز مقاعد جديدة في الخط الدائمي */}
         {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && (
           <div
-            onClick={() => setWorkStatus('permanent')}
+            onClick={() => handleSwitchWorkStatus('permanent')}
             className="mb-4 flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-[#1A1A1A] shadow-card cursor-pointer transition active:scale-[0.99] hover:bg-amber-100/60 animate-fade-in"
           >
             <span className="rounded-lg bg-[#D97706] px-3 py-1.5 text-[12px] font-bold text-white shadow-xs flex items-center gap-1">
@@ -521,10 +541,7 @@ export default function DriverHomePage() {
             {/* خمول */}
             <button
               type="button"
-              onClick={() => {
-                setWorkStatus('idle');
-                show('تم تحويل الحالة إلى خمول', 'info');
-              }}
+              onClick={() => handleSwitchWorkStatus('idle')}
               className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
                 workStatus === 'idle'
                   ? 'bg-white text-[#1A1A1A] font-bold shadow-card'
@@ -537,10 +554,7 @@ export default function DriverHomePage() {
             {/* خط دائمي */}
             <button
               type="button"
-              onClick={() => {
-                setWorkStatus('permanent');
-                show('تم تفعيل الخط الدائمي', 'success');
-              }}
+              onClick={() => handleSwitchWorkStatus('permanent')}
               className={`relative flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
                 workStatus === 'permanent'
                   ? 'bg-[#1B4965] text-white font-bold shadow-card'
@@ -559,10 +573,7 @@ export default function DriverHomePage() {
             {/* تكسي */}
             <button
               type="button"
-              onClick={() => {
-                setWorkStatus('taxi');
-                show('تم تفعيل وضع التكسي', 'success');
-              }}
+              onClick={() => handleSwitchWorkStatus('taxi')}
               className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
                 workStatus === 'taxi'
                   ? 'bg-emerald-600 text-white font-bold shadow-card'
