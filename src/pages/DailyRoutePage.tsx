@@ -13,6 +13,7 @@ import { useToast } from '../components/Toast';
 import { distanceKm, getCurrentPositionWithFallback, isIosDevice, isStandalonePwa } from '../lib/geo';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
+import { normalizePhoneLoose } from '../lib/phone';
 
 const USER_LOC = { lat: 32.0298, lng: 44.3285 };
 
@@ -59,6 +60,40 @@ export default function DailyRoutePage() {
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<DriverItem | null>(null);
   const [isBooking, setIsBooking] = useState(false);
+  const [subscribedDriverIds, setSubscribedDriverIds] = useState<Set<string>>(new Set());
+
+  // جلب حجوزات واشتراكات الراكب الحالية في الخطوط الدائمة لمنع تكرار الحجز
+  useEffect(() => {
+    const session = authStore.getSession();
+    const customerId = session?.userId || storage.getUserId();
+    const phone = storage.getPhone();
+    const target = customerId || phone;
+    if (!target) return;
+
+    http
+      .get<{ success?: boolean; bookings?: any[] }>(`/customer/${encodeURIComponent(target)}/bookings`)
+      .then((res) => {
+        const bookings = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
+        const activeSet = new Set<string>();
+        for (const b of bookings) {
+          const status = String(b.status || '').toLowerCase();
+          if (['pending', 'confirmed', 'active'].includes(status) || !b.status) {
+            if (b.driverId) activeSet.add(String(b.driverId));
+            if (b.driver_id) activeSet.add(String(b.driver_id));
+            if (b.driverPhone) activeSet.add(normalizePhoneLoose(b.driverPhone));
+          }
+        }
+        setSubscribedDriverIds(activeSet);
+      })
+      .catch(() => {});
+  }, []);
+
+  const isAlreadySubscribed = Boolean(
+    selectedDriver &&
+      (subscribedDriverIds.has(String(selectedDriver.driverId)) ||
+        subscribedDriverIds.has(String(selectedDriver.id)) ||
+        (selectedDriver.phone && subscribedDriverIds.has(normalizePhoneLoose(selectedDriver.phone))))
+  );
 
   // جلب موقع المستخدم الحقيقي عبر GPS المتوافق مع iOS Safari
   useEffect(() => {
@@ -140,7 +175,7 @@ export default function DailyRoutePage() {
 
   // إرسال طلب حجز مقعد في الخط الدائمي للكابتن
   async function handleBookSeat() {
-    if (!selectedDriver) return;
+    if (!selectedDriver || isBooking || isAlreadySubscribed) return;
     setIsBooking(true);
     try {
       const session = authStore.getSession();
@@ -165,13 +200,37 @@ export default function DailyRoutePage() {
 
       if (data?.success) {
         show('تم إرسال طلب حجز المقعد للكابتن بنجاح! 🚖 بانتظار موافقة الكابتن لتأكيد الحجز.', 'success', 6000);
+        const dId = String(selectedDriver.driverId || selectedDriver.id);
+        setSubscribedDriverIds((prev) => {
+          const next = new Set(prev);
+          next.add(dId);
+          if (selectedDriver.phone) next.add(normalizePhoneLoose(selectedDriver.phone));
+          return next;
+        });
         setSelectedDriver(null);
       } else {
         show(data?.error || 'تعذر إرسال طلب الحجز', 'error');
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error || 'حدث خطأ في الاتصال أثناء إرسال طلب الحجز';
-      show(msg, 'error');
+      if (err?.response?.status === 409) {
+        show(
+          err?.response?.data?.error || 'أنت مشترك بالفعل في هذا الخط، لا يمكنك تكرار الحجز.',
+          'warning',
+          6000
+        );
+        if (selectedDriver) {
+          const dId = String(selectedDriver.driverId || selectedDriver.id);
+          setSubscribedDriverIds((prev) => {
+            const next = new Set(prev);
+            next.add(dId);
+            if (selectedDriver.phone) next.add(normalizePhoneLoose(selectedDriver.phone));
+            return next;
+          });
+        }
+      } else {
+        const msg = err?.response?.data?.error || 'حدث خطأ في الاتصال أثناء إرسال طلب الحجز';
+        show(msg, 'error');
+      }
     } finally {
       setIsBooking(false);
     }
@@ -348,21 +407,37 @@ export default function DailyRoutePage() {
 
             {/* أزرار حجز المقعد والتواصل */}
             <div className="flex flex-col gap-2.5 px-5 pt-4">
-              <button
-                type="button"
-                disabled={isBooking}
-                onClick={handleBookSeat}
-                className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(16,185,129,0.35)] cursor-pointer hover:bg-emerald-700 active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-70"
-              >
-                {isBooking ? (
-                  <span className="animate-pulse">جاري إرسال طلب الحجز للكابتن...</span>
-                ) : (
-                  <>
-                    <span>حجز مقعد</span>
-                    <span className="text-[18px]">💺</span>
-                  </>
-                )}
-              </button>
+              {isAlreadySubscribed ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full rounded-xl bg-gray-600/90 py-3.5 text-center text-[15px] font-black text-white/90 shadow-none cursor-not-allowed flex items-center justify-center gap-2 border border-white/10"
+                  >
+                    <span>مشترك بالفعل في هذا الخط</span>
+                    <span className="text-[17px]">✅</span>
+                  </button>
+                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-300">
+                    أنت مسجل بالفعل في هذا الخط. يمكنك التواصل المباشر مع الكابتن أدناه.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isBooking}
+                  onClick={handleBookSeat}
+                  className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(16,185,129,0.35)] cursor-pointer hover:bg-emerald-700 active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                  {isBooking ? (
+                    <span className="animate-pulse">جاري إرسال طلب الحجز للكابتن...</span>
+                  ) : (
+                    <>
+                      <span>حجز مقعد</span>
+                      <span className="text-[18px]">💺</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               <div className="flex items-center gap-2">
                 <button

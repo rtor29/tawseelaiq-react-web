@@ -5,6 +5,7 @@ import { authStore } from '../lib/auth';
 import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
 import { useToast } from '../components/Toast';
+import { normalizePhoneLoose } from '../lib/phone';
 
 const ChatModal = lazy(() => import('../components/ChatModal'));
 
@@ -145,7 +146,7 @@ export default function DriverHomePage() {
       .catch(() => {});
   }, [workStatus, driverId, driverName, rawPhone]);
 
-  // دالة تحديث قائمة المشتركين المؤكدين في الخط الدائمي
+  // دالة تحديث قائمة المشتركين المؤكدين في الخط الدائمي مع إزالة التكرار الصارم
   const fetchSubscribers = useCallback(async () => {
     if (!driverId && !rawPhone) return;
     const targetId = driverId || rawPhone;
@@ -158,8 +159,22 @@ export default function DriverHomePage() {
       const confirmed = list.filter(
         (b: any) => b.status === 'Confirmed' || (!b.status && b.bookingConfirmed !== false)
       );
+
+      // تطبيق إزالة التكرار الصارم بحيث يظهر كل راكب مرة واحدة فقط
+      const seen = new Set<string>();
+      const uniqueConfirmed: any[] = [];
+      for (const b of confirmed) {
+        const pNorm = normalizePhoneLoose(b.customerPhone || b.phone || '');
+        const cId = b.customerId || b.customer_id;
+        const key = cId ? `cid:${cId}` : pNorm ? `ph:${pNorm}` : `bk:${b.id || b.bookingId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueConfirmed.push(b);
+        }
+      }
+
       setSubscribers(
-        confirmed.map((b: any, idx: number) => ({
+        uniqueConfirmed.map((b: any, idx: number) => ({
           id: b.id || b.bookingId || String(idx),
           name: b.customerName || b.passengerName || 'مشترك خط دائمي',
           from: b.pickupLocation || b.pickupAddress || b.from || 'نقطة الانطلاق',
@@ -189,11 +204,24 @@ export default function DriverHomePage() {
 
         const list = data?.requests || data?.bookings || [];
         const pending = list.filter((b: any) => b.status === 'Pending');
-        setPendingSeatRequests(pending);
+
+        // إزالة التكرار لطلبات الحجز المعلقة لنفس الراكب
+        const seenPending = new Set<string>();
+        const uniquePending: any[] = [];
+        for (const b of pending) {
+          const pNorm = normalizePhoneLoose(b.customerPhone || b.phone || '');
+          const cId = b.customerId || b.customer_id;
+          const key = cId ? `cid:${cId}` : pNorm ? `ph:${pNorm}` : `bk:${b.id || b.bookingId}`;
+          if (!seenPending.has(key)) {
+            seenPending.add(key);
+            uniquePending.push(b);
+          }
+        }
+        setPendingSeatRequests(uniquePending);
 
         // تنبيه السائق عند وصول طلب جديد لم يسبق تنبيهه عليه
-        if (pending.length > 0) {
-          const newest = pending[0];
+        if (uniquePending.length > 0) {
+          const newest = uniquePending[0];
           const reqId = newest.id || newest.bookingId;
           if (reqId && reqId !== lastNotifiedSeatBookingIdRef.current) {
             lastNotifiedSeatBookingIdRef.current = reqId;
@@ -783,7 +811,7 @@ export default function DriverHomePage() {
             {/* ركاب الخط الدائمي المشتركون */}
             <div>
               <h3 className="text-center text-[16px] font-black text-gray-900 mb-3">
-                ركاب الخط الدائمي المشتركين - {subscribers.length} ركاب
+                ركاب الخط الدائمي المشتركين - {subscribers.length === 1 ? 'راكب واحد' : subscribers.length === 2 ? 'راكبان' : `${subscribers.length} ركاب`}
               </h3>
 
               {subscribers.length === 0 ? (
