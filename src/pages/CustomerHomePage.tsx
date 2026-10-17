@@ -194,7 +194,7 @@ export default function CustomerHomePage() {
   const isPassenger = !isCaptain;
 
   // حالة الرحلة اللحظية: Pending | Accepted | Arrived | InProgress | Completed | Cancelled
-  const [rideStatus, setRideStatus] = useState<string>('Pending');
+  const [rideStatus, setRideStatus] = useState<string | null>(null);
 
   const customerName = session?.fullName || storage.getFullName() || 'المستخدم';
   const rawPhone = storage.getPhone() || '';
@@ -216,7 +216,7 @@ export default function CustomerHomePage() {
   const [dropoffName, setDropoffName] = useState(DEFAULT_DROPOFF_NAME);
 
   // مسار الشوارع بين النقطتين
-  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][] | null>(null);
 
   // تبويب الخدمات في البطاقة: تكسي أو بوكس
   const [selectedServiceTab, setSelectedServiceTab] = useState<'taxi' | 'box'>('taxi');
@@ -858,6 +858,44 @@ export default function CustomerHomePage() {
     }
   }
 
+  // مسح خط المسار من خريطة Mapbox وإزالة الدبابيس وتصفير الحالة عند انتهاء الرحلة
+  const handleRideCompletedCleanup = useCallback(() => {
+    hasNotifiedArrivalRef.current = false;
+    localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+
+    // 1. مسح طبقة ومصدر خط المسار من خريطة Mapbox
+    const map = mapRef.current?.getMap?.();
+    if (map) {
+      try {
+        if (map.getLayer('route-line')) map.removeLayer('route-line');
+        if (map.getSource('route-source')) map.removeSource('route-source');
+        if (map.getLayer('line-layer-route-line')) map.removeLayer('line-layer-route-line');
+        if (map.getSource('line-route-line')) map.removeSource('line-route-line');
+      } catch (_) {}
+    }
+
+    // 2. إزالة أي علامات أو دبابيس (Markers) متبقية خاصة بوجهة الرحلة السابقة
+    setDropoff(DEFAULT_DROPOFF);
+    setDropoffName(DEFAULT_DROPOFF_NAME);
+
+    // 3. تصفير الـ state الخاصة بالمسار
+    setRouteCoordinates(null);
+
+    // 4. إعادة تركيز الكاميرا على الموقع الحالي للمستخدم أو وسط النجف
+    const targetLng = pickup?.lng || DEFAULT_PICKUP.lng;
+    const targetLat = pickup?.lat || DEFAULT_PICKUP.lat;
+    mapRef.current?.flyTo({ center: [targetLng, targetLat], zoom: 15.2, duration: 800 });
+
+    // 5. تصفير حالة الرحلة والرجوع لمرحلة الانطلاق
+    setStage('pickup');
+    setRideRequestId(null);
+    setRideStatus(null);
+    setAssignedDriverInfo(null);
+    setLiveDriverPosition(null);
+
+    show('تم إكمال الرحلة بنجاح. شكراً لاستخدامك توصيلة! ✨', 'success', 5000);
+  }, [pickup]);
+
   // تتبع حالة الرحلة لحظياً من الخادم
   useEffect(() => {
     if (!rideRequestId || (stage !== 'searching' && stage !== 'driver_arriving')) return;
@@ -900,14 +938,8 @@ export default function CustomerHomePage() {
                 mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
               }
             }
-          } else if (req.status === 'Completed') {
-            hasNotifiedArrivalRef.current = false;
-            localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
-            show('تم إكمال الرحلة بنجاح. شكراً لاستخدامك توصيلة! ✨', 'success');
-            setStage('pickup');
-            setRideRequestId(null);
-            setAssignedDriverInfo(null);
-            setLiveDriverPosition(null);
+          } else if (req.status === 'Completed' || req.status === 'completed' || req.status === 'RideCompleted') {
+            handleRideCompletedCleanup();
           } else if (req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
             hasNotifiedArrivalRef.current = false;
             localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
@@ -916,6 +948,7 @@ export default function CustomerHomePage() {
             setRideRequestId(null);
             setAssignedDriverInfo(null);
             setLiveDriverPosition(null);
+            setRouteCoordinates(null);
           }
 
           if (req.assignedDriverName || req.assignedDriverPhone) {
@@ -932,7 +965,7 @@ export default function CustomerHomePage() {
     }, 1800);
 
     return () => clearInterval(interval);
-  }, [rideRequestId, stage, pickup, dropoff, rideStatus]);
+  }, [rideRequestId, stage, pickup, dropoff, rideStatus, handleRideCompletedCleanup]);
 
   // اشتراك لحظي في أحداث الرحلة عبر SignalR / Realtime
   useEffect(() => {
@@ -960,14 +993,8 @@ export default function CustomerHomePage() {
               mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
             }
           }
-        } else if (e.status === 'Completed') {
-          hasNotifiedArrivalRef.current = false;
-          localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
-          show('تم إكمال الرحلة بنجاح. شكراً لاستخدامك توصيلة! ✨', 'success');
-          setStage('pickup');
-          setRideRequestId(null);
-          setAssignedDriverInfo(null);
-          setLiveDriverPosition(null);
+        } else if (e.status === 'Completed' || e.status === 'completed' || e.status === 'RideCompleted') {
+          handleRideCompletedCleanup();
         } else if (e.status === 'Cancelled') {
           hasNotifiedArrivalRef.current = false;
           localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
@@ -976,6 +1003,7 @@ export default function CustomerHomePage() {
           setRideRequestId(null);
           setAssignedDriverInfo(null);
           setLiveDriverPosition(null);
+          setRouteCoordinates(null);
         }
       }
     });
@@ -984,7 +1012,7 @@ export default function CustomerHomePage() {
       unsub();
       void realtime.leaveTrip(rideRequestId);
     };
-  }, [rideRequestId, dropoff, rideStatus, stage]);
+  }, [rideRequestId, dropoff, rideStatus, stage, handleRideCompletedCleanup]);
 
   // تتبع موقع السائق الحي على الخريطة
   useEffect(() => {
@@ -1041,7 +1069,7 @@ export default function CustomerHomePage() {
   );
 
   // إعداد طبقة خط المسار
-  const routeLines: RouteLineData[] = routeCoordinates.length
+  const routeLines: RouteLineData[] = routeCoordinates && routeCoordinates.length
     ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#1B4965', width: 5.5 }]
     : [];
 

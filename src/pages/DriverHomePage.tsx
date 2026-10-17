@@ -96,6 +96,10 @@ export default function DriverHomePage() {
   } | null>(null);
   const lastSeenMsgIdRef = useRef<string | null>(null);
 
+  // نافذة اختيار تطبيق الملاحة
+  const [isNavModalOpen, setIsNavModalOpen] = useState(false);
+  const [navCoordinates, setNavCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => {
     void realtime.connect(storage.getToken());
   }, []);
@@ -392,6 +396,32 @@ export default function DriverHomePage() {
     } catch (_) {}
   }
 
+  // فتح تطبيق خرائط جوجل بدقة للتوجه إلى الوجهة
+  function handleOpenGoogleMaps(lat: number, lng: number) {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+    window.open(url, '_blank');
+    setIsNavModalOpen(false);
+  }
+
+  // فتح تطبيق ويز (Waze) للتوجه إلى الوجهة
+  function handleOpenWaze(lat: number, lng: number) {
+    const url = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+    window.open(url, '_blank');
+    setIsNavModalOpen(false);
+  }
+
+  function handleOpenNavModal() {
+    if (!activeRide) return;
+    const destLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
+    const destLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
+    if (destLat && destLon) {
+      setNavCoordinates({ lat: Number(destLat), lng: Number(destLon) });
+      setIsNavModalOpen(true);
+    } else {
+      show('إحداثيات الوجهة غير متوفرة حالياً', 'warning');
+    }
+  }
+
   // السائق انطلق إلى الوجهة بعد صعود الراكب
   async function handleDriverStartRide() {
     if (!activeRide || !driverId) return;
@@ -401,19 +431,15 @@ export default function DriverHomePage() {
         driverId,
       });
       if (data?.success) {
-        show('تم بدء الرحلة والانطلاق إلى الوجهة 🚗💨', 'success');
+        show('تم بدء الرحلة والانطلاق إلى الوجهة 🚗💨', 'success', 3000);
         setActiveRide((prev: any) => ({ ...prev, status: 'InProgress' }));
 
-        // تشغيل الملاحة تلقائياً نحو وجهة الوصول
-        const destLat = activeRide.dropoffLat || activeRide.dropoff_lat;
-        const destLon = activeRide.dropoffLon || activeRide.dropoff_lon;
+        // فتح نافذة اختيار تطبيق الملاحة فوراً
+        const destLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
+        const destLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
         if (destLat && destLon) {
-          const wazeUrl = `waze://ul?ll=${destLat},${destLon}&navigate=yes`;
-          const googleUrl = `https://maps.google.com/?daddr=${destLat},${destLon}`;
-          const a = document.createElement('a');
-          a.href = wazeUrl;
-          a.click();
-          setTimeout(() => { window.open(googleUrl, '_blank'); }, 1200);
+          setNavCoordinates({ lat: Number(destLat), lng: Number(destLon) });
+          setIsNavModalOpen(true);
         }
       } else {
         show(data?.message || 'تعذر بدء الرحلة', 'error');
@@ -821,16 +847,25 @@ export default function DriverHomePage() {
                       onClick={handleDriverStartRide}
                       className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[15.5px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition-all duration-200 active:scale-[0.98] cursor-pointer hover:bg-orange-600"
                     >
-                      🚗 السائق وصل — انطلاق إلى الوجهة
+                      لقد وصلت، انطلق إلى وجهتك 🚗
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={handleDriverComplete}
-                      className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-[#14364A]"
-                    >
-                      🏁 إنهاء المشوار واستلام الأجرة
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleOpenNavModal}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 py-2.5 text-center text-[13.5px] font-bold text-[#1B4965] hover:bg-slate-200/80 transition active:scale-95 cursor-pointer shadow-xs"
+                      >
+                        <span>🧭 فتح تطبيق الملاحة (Google Maps / Waze)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDriverComplete}
+                        className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-[#14364A]"
+                      >
+                        🏁 إنهاء المشوار واستلام الأجرة
+                      </button>
+                    </div>
                   )}
 
                   {/* أزرار التواصل المباشر مع الراكب */}
@@ -1069,6 +1104,59 @@ export default function DriverHomePage() {
             peerRole="الراكب"
           />
         </Suspense>
+      )}
+
+      {/* نافذة اختيار تطبيق الملاحة المنبثقة (Action Sheet / Modal) */}
+      {isNavModalOpen && navCoordinates && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-100 animate-slide-down text-center"
+            dir="rtl"
+          >
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-[#D97706] text-2xl shadow-xs">
+              🧭
+            </div>
+            <h3 className="text-[17px] font-bold text-[#1A1A1A] mb-1">
+              اختر تطبيق الملاحة للتوجه إلى الوجهة:
+            </h3>
+            <p className="text-[13px] font-medium text-[#6C757D] mb-4">
+              الوجهة: <span className="font-bold text-[#1A1A1A]">{activeRide?.dropoffName || 'الموقع المحدد'}</span>
+            </p>
+
+            <div className="space-y-2.5">
+              {/* زر خريطة جوجل */}
+              <button
+                type="button"
+                onClick={() => handleOpenGoogleMaps(navCoordinates.lat, navCoordinates.lng)}
+                className="w-full flex items-center justify-center gap-3 rounded-xl bg-slate-50 border border-slate-200/90 py-3.5 px-4 font-bold text-[#1A1A1A] hover:bg-slate-100 transition active:scale-[0.98] cursor-pointer shadow-xs"
+              >
+                <svg className="h-5 w-5 text-red-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+                </svg>
+                <span className="text-[14.5px]">خرائط جوجل (Google Maps)</span>
+              </button>
+
+              {/* زر ويز */}
+              <button
+                type="button"
+                onClick={() => handleOpenWaze(navCoordinates.lat, navCoordinates.lng)}
+                className="w-full flex items-center justify-center gap-3 rounded-xl bg-sky-50 border border-sky-200 py-3.5 px-4 font-bold text-[#0284c7] hover:bg-sky-100 transition active:scale-[0.98] cursor-pointer shadow-xs"
+              >
+                <span className="text-xl">🚙</span>
+                <span className="text-[14.5px]">تطبيق ويز (Waze)</span>
+              </button>
+
+              {/* زر الإلغاء / المتابعة داخل التطبيق */}
+              <button
+                type="button"
+                onClick={() => setIsNavModalOpen(false)}
+                className="w-full rounded-xl py-2.5 text-[13.5px] font-bold text-[#6C757D] hover:text-[#1A1A1A] transition cursor-pointer"
+              >
+                المتابعة داخل التطبيق
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
