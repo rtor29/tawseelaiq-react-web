@@ -82,10 +82,47 @@ export default function DriverHomePage() {
   // حالة العمل الحالية: خمول | خط دائمي | تكسي (تبدأ بوضع الخمول افتراضياً)
   const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>('idle');
 
-  // تبديل حالة العمل مع مسح الإشعارات السابقة وعرض الإشعار الدقيق لمدة ثانيتين
+  // إرسال تحديث حالة ونمط عمل السائق إلى الخادم مع إحداثيات GPS الحية فوراً
+  const sendDriverStatusUpdate = useCallback((statusToSync: 'idle' | 'permanent' | 'taxi') => {
+    if (!driverId) return;
+    const isOnline = statusToSync !== 'idle';
+    const workMode = statusToSync === 'idle' ? 'خمول' : statusToSync === 'permanent' ? 'خط دائمي' : 'مشوار قصير';
+
+    const sendPayload = (lat: number, lng: number) => {
+      const payload = {
+        driverId,
+        mode: statusToSync,
+        workStatus: statusToSync,
+        workMode,
+        driverName,
+        driverPhone: rawPhone,
+        isOnline,
+        lat,
+        lng,
+        latitude: lat,
+        longitude: lng,
+      };
+      // الإرسال لنقطتي النهاية لضمان التوافق التام 100%
+      http.post('/driver/toggle-mode', payload).catch(() => {});
+      http.post('/driver/toggle-online', payload).catch(() => {});
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => sendPayload(pos.coords.latitude, pos.coords.longitude),
+        () => sendPayload(31.9961, 44.3168),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+      );
+    } else {
+      sendPayload(31.9961, 44.3168);
+    }
+  }, [driverId, driverName, rawPhone]);
+
+  // تبديل حالة العمل مع مسح الإشعارات السابقة وعرض الإشعار الدقيق لمدة ثانيتين وإرسال التحديث فوراً
   function handleSwitchWorkStatus(newStatus: 'idle' | 'permanent' | 'taxi') {
     dismissAll();
     setWorkStatus(newStatus);
+    sendDriverStatusUpdate(newStatus);
     if (newStatus === 'taxi') {
       show('تم تفعيل وضع التكسي', 'success', 2000);
     } else if (newStatus === 'permanent') {
@@ -140,22 +177,8 @@ export default function DriverHomePage() {
 
   // تحديث حالة السائق على الخادم عند تغيير حالة العمل
   useEffect(() => {
-    if (!driverId) return;
-    const isOnline = workStatus !== 'idle';
-    const workMode = workStatus === 'idle' ? 'خمول' : workStatus === 'permanent' ? 'خط دائمي' : 'مشوار قصير';
-    http
-      .post('/driver/toggle-online', {
-        driverId,
-        isOnline,
-        workStatus,
-        workMode,
-        driverName,
-        driverPhone: rawPhone,
-        latitude: 32.0298,
-        longitude: 44.3285,
-      })
-      .catch(() => {});
-  }, [workStatus, driverId, driverName, rawPhone]);
+    sendDriverStatusUpdate(workStatus);
+  }, [workStatus, sendDriverStatusUpdate]);
 
   // دالة تحديث قائمة المشتركين المؤكدين في الخط الدائمي مع إزالة التكرار الصارم
   // تتبع معرفات طلبات الإلغاء لتنبيه السائق فوراً عند وصول طلب جديد
