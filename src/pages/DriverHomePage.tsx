@@ -15,6 +15,10 @@ interface Subscriber {
   from: string;
   to: string;
   phone: string;
+  status?: string;
+  cancellationPending?: boolean;
+  cancellationReason?: string;
+  cancellationDetails?: string;
 }
 
 interface PendingSeatBooking {
@@ -109,6 +113,11 @@ export default function DriverHomePage() {
   const [navTargetName, setNavTargetName] = useState<string>('');
   const [navType, setNavType] = useState<'pickup' | 'dropoff'>('pickup');
 
+  // نافذة موافقة السائق على إلغاء اشتراك الراكب
+  const [cancellingSub, setCancellingSub] = useState<Subscriber | null>(null);
+  const [driverApprovalReason, setDriverApprovalReason] = useState('تم التراضي مع الراكب');
+  const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
+
   useEffect(() => {
     void realtime.connect(storage.getToken());
   }, []);
@@ -155,9 +164,13 @@ export default function DriverHomePage() {
         `/driver/${encodeURIComponent(targetId)}/bookings`
       );
       const list = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
-      // فقط الحجوزات المؤكدة تظهر في ركاب الخط الدائمي المشتركين
+      // الحجوزات المؤكدة أو التي بها طلب إلغاء معلق تظهر في ركاب الخط الدائمي
       const confirmed = list.filter(
-        (b: any) => b.status === 'Confirmed' || (!b.status && b.bookingConfirmed !== false)
+        (b: any) =>
+          b.status === 'Confirmed' ||
+          b.status === 'cancellation_pending' ||
+          b.cancellationPending === true ||
+          (!b.status && b.bookingConfirmed !== false && b.status !== 'Cancelled')
       );
 
       // تطبيق إزالة التكرار الصارم بحيث يظهر كل راكب مرة واحدة فقط
@@ -180,6 +193,10 @@ export default function DriverHomePage() {
           from: b.pickupLocation || b.pickupAddress || b.from || 'نقطة الانطلاق',
           to: b.dropoffLocation || b.dropoffAddress || b.to || 'الوجهة',
           phone: b.customerPhone || b.phone || '',
+          status: b.status,
+          cancellationPending: b.status === 'cancellation_pending' || Boolean(b.cancellationPending),
+          cancellationReason: b.cancellationReason || b.passengerReason || '',
+          cancellationDetails: b.cancellationDetails || b.passengerDetails || '',
         }))
       );
     } catch (_) {}
@@ -428,6 +445,58 @@ export default function DriverHomePage() {
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ في رفض الحجز', 'error');
+    }
+  }
+
+  // رفض طلب إلغاء الاشتراك في الخط الدائمي
+  async function handleRejectCancellation(bookingId: string) {
+    if (!bookingId) return;
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string }>('/driver/respond-route-cancellation', {
+        bookingId,
+        driverId: driverId || rawPhone,
+        action: 'reject',
+      });
+      if (data?.success) {
+        show(data.message || 'تم رفض طلب الإلغاء والإبقاء على اشتراك الراكب بنجاح', 'success');
+        void fetchSubscribers();
+      } else {
+        show('تعذر رفض طلب الإلغاء', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ أثناء رفض الإلغاء', 'error');
+    }
+  }
+
+  // فتح نافذة كتابة سبب الموافقة على الإلغاء
+  function handleOpenApproveModal(sub: Subscriber) {
+    setCancellingSub(sub);
+    setDriverApprovalReason('تم التراضي مع الراكب');
+  }
+
+  // تأكيد الموافقة على الإلغاء من قبل السائق
+  async function handleConfirmApproveCancellation() {
+    if (!cancellingSub) return;
+    setIsSubmittingCancellation(true);
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string }>('/driver/respond-route-cancellation', {
+        bookingId: cancellingSub.id,
+        driverId: driverId || rawPhone,
+        action: 'approve',
+        driverApprovalReason: driverApprovalReason.trim() || 'تم التراضي مع الراكب',
+      });
+      if (data?.success) {
+        show(data.message || 'تمت الموافقة على إلغاء الاشتراك وإنهاء الحجز بنجاح', 'success');
+        setSubscribers((prev) => prev.filter((s) => s.id !== cancellingSub.id));
+        setCancellingSub(null);
+        void fetchSubscribers();
+      } else {
+        show('تعذر قبول طلب الإلغاء', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ أثناء اعتماد الإلغاء', 'error');
+    } finally {
+      setIsSubmittingCancellation(false);
     }
   }
 
@@ -820,33 +889,92 @@ export default function DriverHomePage() {
                   <p className="text-[12px] text-gray-400 mt-1">ستظهر اشتراكات الركاب المؤكدة هنا تلقائياً بعد قبول الحجز</p>
                 </div>
               ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {subscribers.map((sub) => (
                   <div
                     key={sub.id}
-                    className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm transition hover:shadow-md"
+                    className={`rounded-xl border bg-white p-3.5 shadow-sm transition hover:shadow-md ${
+                      sub.cancellationPending ? 'border-amber-400 bg-amber-50/40 ring-1 ring-amber-400/50' : 'border-gray-200'
+                    }`}
                   >
-                    {/* يسار: زر واتساب */}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
-                      className="flex items-center gap-2 rounded-lg py-1 px-2 transition hover:bg-emerald-50 active:scale-95 cursor-pointer"
-                    >
-                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#22c55e] text-white shadow-sm">
-                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-                        </svg>
-                      </div>
-                      <span className="text-[13.5px] font-bold text-[#16a34a]">واتساب</span>
-                    </button>
+                    <div className="flex items-center justify-between">
+                      {/* يسار: زر واتساب */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
+                        className="flex items-center gap-2 rounded-lg py-1 px-2 transition hover:bg-emerald-50 active:scale-95 cursor-pointer"
+                      >
+                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#22c55e] text-white shadow-sm">
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                          </svg>
+                        </div>
+                        <span className="text-[13.5px] font-bold text-[#16a34a]">واتساب</span>
+                      </button>
 
-                    {/* يمين: اسم الراكب والمسار */}
-                    <div className="text-right">
-                      <p className="text-[16px] font-black text-gray-900 leading-tight">{sub.name}</p>
-                      <p className="text-[13px] font-bold text-gray-700 mt-1">
-                        {sub.from} <span className="text-gray-500 font-sans mx-0.5">➔</span> {sub.to}
-                      </p>
+                      {/* يمين: اسم الراكب والمسار */}
+                      <div className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {sub.cancellationPending && (
+                            <span className="rounded-md bg-amber-500 text-white font-black px-2 py-0.5 text-[10.5px] animate-pulse">
+                              طلب إلغاء ⚠️
+                            </span>
+                          )}
+                          <p className="text-[16px] font-black text-gray-900 leading-tight">{sub.name}</p>
+                        </div>
+                        <p className="text-[13px] font-bold text-gray-700 mt-1">
+                          {sub.from} <span className="text-gray-500 font-sans mx-0.5">➔</span> {sub.to}
+                        </p>
+                      </div>
                     </div>
+
+                    {/* تنبيه طلب إلغاء الاشتراك مع الإجراءات الثلاثة */}
+                    {sub.cancellationPending && (
+                      <div className="mt-3 pt-3 border-t border-amber-200/90 space-y-2.5">
+                        <div className="rounded-xl bg-amber-100/80 p-3 text-right text-[12.5px] text-amber-950 border border-amber-300">
+                          <p className="font-black text-amber-900 flex items-center justify-end gap-1.5">
+                            <span>طلب الراكب إلغاء الاشتراك في الخط</span>
+                            <span className="text-[14px]">⚠️</span>
+                          </p>
+                          <p className="mt-1 font-bold text-gray-800">
+                            السبب: <span className="text-red-700">{sub.cancellationReason || 'ظروف شخصية'}</span>
+                          </p>
+                          {sub.cancellationDetails && (
+                            <p className="text-[12px] text-gray-600 mt-0.5">
+                              تفاصيل: {sub.cancellationDetails}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* الإجراءات الثلاثة الواضحة للسائق */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (sub.phone) window.open(`tel:${sub.phone}`);
+                              else show('رقم هاتف الراكب غير متوفر', 'info');
+                            }}
+                            className="flex items-center justify-center gap-1 rounded-xl bg-blue-600 hover:bg-blue-700 py-2.5 px-2 text-white text-[12.5px] font-black transition active:scale-95 cursor-pointer shadow-xs"
+                          >
+                            <span>اتصال بالراكب 📞</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRejectCancellation(sub.id)}
+                            className="rounded-xl bg-slate-200 hover:bg-slate-300 py-2.5 px-2 text-slate-800 text-[12.5px] font-bold transition active:scale-95 cursor-pointer"
+                          >
+                            رفض الإلغاء
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenApproveModal(sub)}
+                            className="rounded-xl bg-red-600 hover:bg-red-700 py-2.5 px-2 text-white text-[12.5px] font-black transition active:scale-95 cursor-pointer shadow-xs"
+                          >
+                            الموافقة على الإلغاء
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -895,13 +1023,26 @@ export default function DriverHomePage() {
             {activeRide && (activeRide.status === 'Accepted' || activeRide.status === 'Arrived' || activeRide.status === 'InProgress' || activeRide.status === 'in_progress') ? (
               <div className="rounded-xl border border-emerald-500/80 bg-white p-4 shadow-subtle animate-fade-in">
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                  <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 border border-emerald-200/60">
-                    {activeRide.status === 'Arrived'
-                      ? 'وصلت إلى الراكب 📍'
-                      : (activeRide.status === 'InProgress' || activeRide.status === 'in_progress')
-                      ? 'في الطريق إلى الوجهة 🚗'
-                      : 'مشوار نشط 🚖'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 border border-emerald-200/60">
+                      {activeRide.status === 'Arrived'
+                        ? 'وصلت إلى الراكب 📍'
+                        : (activeRide.status === 'InProgress' || activeRide.status === 'in_progress')
+                        ? 'في الطريق إلى الوجهة 🚗'
+                        : 'مشوار نشط 🚖'}
+                    </span>
+                    {/* أيقونة ملاحة مصغرة في زاوية البطاقة لمن يحتاج إعادة فتح الخريطة دون تشويش */}
+                    <button
+                      type="button"
+                      title="فتح الملاحة الخارجية (Google Maps / Waze)"
+                      onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition cursor-pointer border border-slate-200"
+                    >
+                      <svg className="h-4 w-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                      </svg>
+                    </button>
+                  </div>
                   <span className="text-[15px] font-bold text-[#1A1A1A]">
                     {activeRide.fare} د.ع
                   </span>
@@ -951,27 +1092,13 @@ export default function DriverHomePage() {
                       >
                         لقد وصلت، انطلق إلى وجهتك 🚗
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenNavModal('dropoff')}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 py-2.5 text-center text-[13.5px] font-bold text-[#1B4965] hover:bg-slate-200/80 transition active:scale-95 cursor-pointer shadow-xs"
-                      >
-                        <span>التوجه إلى وجهة الراكب 🧭</span>
-                      </button>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <button
                         type="button"
-                        onClick={() => handleOpenNavModal('dropoff')}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white py-3.5 px-4 text-center text-[15px] font-black shadow-[0_4px_16px_rgba(27,73,101,0.35)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
-                      >
-                        <span>التوجه إلى وجهة الراكب 🧭</span>
-                      </button>
-                      <button
-                        type="button"
                         onClick={handleDriverComplete}
-                        className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
+                        className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15.5px] font-black text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
                       >
                         🏁 إنهاء المشوار واستلام الأجرة
                       </button>
@@ -1259,6 +1386,62 @@ export default function DriverHomePage() {
         </div>
       )}
 
+      {/* نافذة موافقة السائق على إلغاء اشتراك الراكب */}
+      {cancellingSub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in" dir="rtl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl text-right space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-[16px] font-black text-gray-900">الموافقة على طلب إلغاء الاشتراك</h3>
+              <button
+                type="button"
+                onClick={() => setCancellingSub(null)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-3 text-[13px] text-gray-700 space-y-1">
+              <p><strong>الراكب:</strong> {cancellingSub.name}</p>
+              <p><strong>سبب طلب الراكب:</strong> <span className="font-bold text-red-600">{cancellingSub.cancellationReason || 'ظروف شخصية'}</span></p>
+              {cancellingSub.cancellationDetails && (
+                <p><strong>ملاحظات إضافية:</strong> {cancellingSub.cancellationDetails}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[13px] font-bold text-gray-800 mb-1.5">
+                سبب موافقة الكابتن على الإلغاء (يُسجل في سجلات الإدارة):
+              </label>
+              <input
+                type="text"
+                value={driverApprovalReason}
+                onChange={(e) => setDriverApprovalReason(e.target.value)}
+                placeholder="مثال: تم التراضي مع الراكب، نقل سكن، إلخ..."
+                className="w-full rounded-xl border border-gray-300 p-3 text-[13.5px] font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setCancellingSub(null)}
+                className="flex-1 rounded-xl bg-gray-100 hover:bg-gray-200 py-3 text-center text-[14px] font-bold text-gray-700 transition active:scale-95 cursor-pointer"
+              >
+                تراجع
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingCancellation}
+                onClick={handleConfirmApproveCancellation}
+                className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 py-3 text-center text-[14px] font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingCancellation ? 'جاري التأكيد...' : 'تأكيد الإلغاء وحذف الراكب ✅'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

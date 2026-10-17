@@ -61,6 +61,13 @@ export default function DailyRoutePage() {
   const [selectedDriver, setSelectedDriver] = useState<DriverItem | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [subscribedDriverIds, setSubscribedDriverIds] = useState<Set<string>>(new Set());
+  const [customerBookings, setCustomerBookings] = useState<any[]>([]);
+
+  // نافذة طلب إلغاء الاشتراك للراكب
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('تغير أوقات الدوام');
+  const [cancelDetails, setCancelDetails] = useState('');
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
 
   // جلب حجوزات واشتراكات الراكب الحالية في الخطوط الدائمة لمنع تكرار الحجز
   useEffect(() => {
@@ -74,10 +81,11 @@ export default function DailyRoutePage() {
       .get<{ success?: boolean; bookings?: any[] }>(`/customer/${encodeURIComponent(target)}/bookings`)
       .then((res) => {
         const bookings = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
+        setCustomerBookings(bookings);
         const activeSet = new Set<string>();
         for (const b of bookings) {
           const status = String(b.status || '').toLowerCase();
-          if (['pending', 'confirmed', 'active'].includes(status) || !b.status) {
+          if (['pending', 'confirmed', 'active', 'cancellation_pending'].includes(status) || !b.status) {
             if (b.driverId) activeSet.add(String(b.driverId));
             if (b.driver_id) activeSet.add(String(b.driver_id));
             if (b.driverPhone) activeSet.add(normalizePhoneLoose(b.driverPhone));
@@ -93,6 +101,21 @@ export default function DailyRoutePage() {
       (subscribedDriverIds.has(String(selectedDriver.driverId)) ||
         subscribedDriverIds.has(String(selectedDriver.id)) ||
         (selectedDriver.phone && subscribedDriverIds.has(normalizePhoneLoose(selectedDriver.phone))))
+  );
+
+  const matchingBooking = selectedDriver
+    ? customerBookings.find((b: any) => {
+        const sDriverId = String(selectedDriver.driverId || selectedDriver.id);
+        const sPhone = normalizePhoneLoose(selectedDriver.phone || '');
+        const bDriverId = String(b.driverId || b.driver_id || '');
+        const bPhone = normalizePhoneLoose(b.driverPhone || '');
+        return (bDriverId && bDriverId === sDriverId) || (sPhone && bPhone && sPhone === bPhone);
+      })
+    : null;
+
+  const isCancellationPending = Boolean(
+    matchingBooking &&
+      (matchingBooking.status === 'cancellation_pending' || matchingBooking.cancellationPending)
   );
 
   // جلب موقع المستخدم الحقيقي عبر GPS المتوافق مع iOS Safari
@@ -233,6 +256,50 @@ export default function DailyRoutePage() {
       }
     } finally {
       setIsBooking(false);
+    }
+  }
+
+  // إرسال طلب إلغاء الاشتراك في الخط الدائمي إلى الكابتن
+  async function handleRequestCancellation() {
+    if (!selectedDriver) return;
+    setIsSubmittingCancel(true);
+    try {
+      const session = authStore.getSession();
+      const customerId = session?.userId || storage.getUserId() || '';
+      const customerPhone = storage.getPhone() || '';
+      const bookingId = matchingBooking?.id || matchingBooking?.bookingId;
+
+      const { data } = await http.post<{ success: boolean; message?: string }>('/customer/request-route-cancellation', {
+        bookingId,
+        customerId,
+        customerPhone,
+        driverId: String(selectedDriver.driverId || selectedDriver.id),
+        reason: cancelReason,
+        details: cancelDetails.trim(),
+      });
+
+      if (data?.success) {
+        show('تم إرسال طلب الإلغاء للسائق للمراجعة ✅', 'success', 5000);
+        setIsCancelModalOpen(false);
+        setCustomerBookings((prev) => [
+          ...prev.filter((b) => b.id !== bookingId),
+          {
+            ...(matchingBooking || {}),
+            id: bookingId,
+            driverId: String(selectedDriver.driverId || selectedDriver.id),
+            status: 'cancellation_pending',
+            cancellationPending: true,
+            cancellationReason: cancelReason,
+            cancellationDetails: cancelDetails.trim(),
+          },
+        ]);
+      } else {
+        show('تعذر إرسال طلب الإلغاء', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ أثناء إرسال طلب الإلغاء', 'error');
+    } finally {
+      setIsSubmittingCancel(false);
     }
   }
 
@@ -407,7 +474,17 @@ export default function DailyRoutePage() {
 
             {/* أزرار حجز المقعد والتواصل */}
             <div className="flex flex-col gap-2.5 px-5 pt-4">
-              {isAlreadySubscribed ? (
+              {isCancellationPending ? (
+                <div className="space-y-2">
+                  <div className="w-full rounded-xl bg-amber-500/25 border border-amber-400/50 py-3.5 text-center text-[14.5px] font-black text-amber-300 flex items-center justify-center gap-2 shadow-xs">
+                    <span>طلب الإلغاء قيد مراجعة الكابتن</span>
+                    <span className="text-[17px] animate-pulse">⏳</span>
+                  </div>
+                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-semibold text-amber-200">
+                    تم إرسال طلبك ({matchingBooking?.cancellationReason || cancelReason}) وبانتظار مراجعة الكابتن.
+                  </p>
+                </div>
+              ) : isAlreadySubscribed ? (
                 <div className="space-y-2">
                   <button
                     type="button"
@@ -420,6 +497,13 @@ export default function DailyRoutePage() {
                   <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-300">
                     أنت مسجل بالفعل في هذا الخط. يمكنك التواصل المباشر مع الكابتن أدناه.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelModalOpen(true)}
+                    className="w-full rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 py-2.5 text-center text-[13px] font-bold text-red-300 transition active:scale-95 cursor-pointer"
+                  >
+                    طلب إلغاء الاشتراك في الخط ✕
+                  </button>
                 </div>
               ) : (
                 <button
@@ -471,6 +555,89 @@ export default function DailyRoutePage() {
           </div>
         );
       })()}
+
+      {/* نافذة طلب إلغاء الاشتراك في الخط الدائمي */}
+      {isCancelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fade-in" dir="rtl">
+          <div className="w-full max-w-md rounded-2xl bg-[#1e293b] border border-white/10 p-5 shadow-2xl text-right text-white space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-[16px] font-black">طلب إلغاء الاشتراك في الخط</h3>
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="rounded-full p-1 text-white/50 hover:bg-white/10 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-[13px] text-white/70">
+              يرجى تحديد سبب الإلغاء لمراجعته مع الكابتن ({selectedDriver?.name}):
+            </p>
+
+            {/* الأسباب الجاهزة */}
+            <div className="space-y-2">
+              {[
+                'تغير أوقات الدوام',
+                'العثور على بديل',
+                'عدم التزام السائق',
+                'ظروف شخصية',
+                'أخرى',
+              ].map((r) => (
+                <label
+                  key={r}
+                  onClick={() => setCancelReason(r)}
+                  className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
+                    cancelReason === r
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold'
+                      : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-[13.5px]">{r}</span>
+                  <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                    cancelReason === r ? 'border-amber-400 bg-amber-400' : 'border-white/30'
+                  }`}>
+                    {cancelReason === r && <div className="h-1.5 w-1.5 rounded-full bg-slate-900" />}
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* حقل نصي لتفاصيل إضافية */}
+            <div>
+              <label className="block text-[12.5px] font-bold text-white/80 mb-1">
+                تفاصيل إضافية (اختياري):
+              </label>
+              <textarea
+                rows={2}
+                value={cancelDetails}
+                onChange={(e) => setCancelDetails(e.target.value)}
+                placeholder="أدخل أي تفاصيل إضافية لمشاركتها مع الكابتن والإدارة..."
+                className="w-full rounded-xl bg-white/5 border border-white/15 p-2.5 text-[13px] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="flex-1 rounded-xl bg-white/10 hover:bg-white/20 py-3 text-center text-[13.5px] font-bold text-white transition active:scale-95 cursor-pointer"
+              >
+                تراجع
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingCancel}
+                onClick={handleRequestCancellation}
+                className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 py-3 text-center text-[14px] font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingCancel ? 'جاري الإرسال...' : 'تأكيد طلب الإلغاء ✕'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
