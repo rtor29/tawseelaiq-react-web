@@ -13,8 +13,14 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { realtime } from '../lib/realtime';
-import { distanceKm } from '../lib/geo';
 import { searchPlaces, reverseGeocode, getDirections, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import {
+  distanceKm,
+  getCurrentPositionWithFallback,
+  isIosDevice,
+  isStandalonePwa,
+  najafCenterLngLat,
+} from '../lib/geo';
 import {
   getFavoritePlaces,
   addFavoritePlace,
@@ -273,6 +279,34 @@ export default function CustomerHomePage() {
   const searchTimer = useRef<number | null>(null);
   const hasNotifiedArrivalRef = useRef(false);
 
+  // حالة الـ GPS والتنبيهات المخصصة لـ iOS Safari
+  const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [showMapHint, setShowMapHint] = useState(false);
+  const locationErrorTimerRef = useRef<number | null>(null);
+  const mapHintTimerRef = useRef<number | null>(null);
+
+  const triggerLocationError = useCallback((msg: string) => {
+    if (locationErrorTimerRef.current) {
+      window.clearTimeout(locationErrorTimerRef.current);
+    }
+    setLocationError(msg);
+    // إخفاء رسالة الخطأ تلقائياً بعد مرور 5 ثوانٍ
+    locationErrorTimerRef.current = window.setTimeout(() => {
+      setLocationError(null);
+    }, 5000);
+  }, []);
+
+  const triggerMapHint = useCallback(() => {
+    if (mapHintTimerRef.current) {
+      window.clearTimeout(mapHintTimerRef.current);
+    }
+    setShowMapHint(true);
+    mapHintTimerRef.current = window.setTimeout(() => {
+      setShowMapHint(false);
+    }, 6000);
+  }, []);
+
   // كاش المتصفح: الأماكن المفضلة، الأماكن الأخيرة، وإعدادات المستخدم
   const [favoritePlaces, setFavoritePlaces] = useState<FavoritePlace[]>(() => getFavoritePlaces());
   const [recentPlacesList, setRecentPlacesList] = useState<RecentPlaceItem[]>(() => getRecentPlaces());
@@ -415,6 +449,7 @@ export default function CustomerHomePage() {
   // تحديث العنوان عند تحريك الخريطة في مرحلتي الانطلاق والوصول
   const handleMapMoveEnd = useCallback(
     async (e: { viewState: { latitude: number; longitude: number } }) => {
+      if (showMapHint) setShowMapHint(false);
       if (stage === 'ride_options' || stage === 'searching' || stage === 'driver_arriving') return;
 
       const newPt: LngLat = { lat: e.viewState.latitude, lng: e.viewState.longitude };
@@ -432,7 +467,7 @@ export default function CustomerHomePage() {
         } catch (_) {}
       }
     },
-    [stage]
+    [stage, showMapHint]
   );
 
   // النقر المباشر على الخريطة
@@ -455,14 +490,17 @@ export default function CustomerHomePage() {
     }
   }
 
-  // زر تحديد الموقع الحالي عبر GPS
+  // زر تحديد الموقع الحالي عبر GPS المتوافق مع معايير iOS Safari الصارمة
   function handleUseCurrentLocation() {
-    if (!navigator.geolocation) {
-      show('خاصية تحديد الموقع غير مدعومة في هذا المتصفح', 'warning');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
+    setIsLocatingCurrent(true);
+    setLocationError(null);
+
+    getCurrentPositionWithFallback(
       async (pos) => {
+        setIsLocatingCurrent(false);
+        setLocationError(null);
+        setShowMapHint(false);
+
         const point: LngLat = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         mapRef.current?.flyTo({ center: [point.lng, point.lat], zoom: 15.5, duration: 800 });
         const addr = await reverseGeocode(point);
@@ -476,12 +514,39 @@ export default function CustomerHomePage() {
           if (addr) setDropoffName(addr);
           else setDropoffName('موقعي الحالي عبر الـ GPS 📍');
         }
-        show('تم تحديد موقعك الحالي بنجاح 📍', 'success');
+        show('تم تحديد موقعك الحالي بنجاح 📍', 'success', 3000);
       },
-      () => {
-        show('تعذر تحديد موقع GPS، يمكنك سحب الخريطة لتحديد مكانك', 'warning');
+      (_err, isPermissionDenied) => {
+        setIsLocatingCurrent(false);
+
+        // 4. التراجع عن استخدام الموقع التقديري إذا تعذر تماماً:
+        // تعيين الكاميرا افتراضياً على وسط محافظة النجف (مركز المدينة)
+        const najafCenter = najafCenterLngLat();
+        mapRef.current?.flyTo({ center: [najafCenter.lng, najafCenter.lat], zoom: 14.8, duration: 800 });
+
+        // تفعيل التلميح البصري فوق الخريطة: "يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍"
+        triggerMapHint();
+
+        if (isPermissionDenied) {
+          // 2. معالجة خطأ PERMISSION_DENIED لـ iOS Safari و PWA
+          const isIOS = isIosDevice();
+          const isPWA = isStandalonePwa();
+          const permissionMessage = isIOS
+            ? isPWA
+              ? 'يرجى السماح بالوصول للموقع من إعدادات الهاتف > الخصوصية > خدمات الموقع > تطبيق توصيلة'
+              : 'يرجى السماح بالوصول للموقع من إعدادات الهاتف > الخصوصية > خدمات الموقع > Safari'
+            : 'يرجى السماح بالوصول إلى موقعك الجغرافي من إعدادات المتصفح';
+
+          triggerLocationError(permissionMessage);
+          show(permissionMessage, 'warning', 5000);
+        } else {
+          // 1 & 3. تعذر تحديد الموقع بعد المحاولات أو Timeout
+          const generalErrMsg = 'تعذر تحديد موقع GPS، يمكنك سحب الخريطة لتحديد مكانك';
+          triggerLocationError(generalErrMsg);
+          show(generalErrMsg, 'warning', 5000);
+        }
       },
-      { enableHighAccuracy: true, timeout: 9000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
     );
   }
 
@@ -1188,17 +1253,37 @@ export default function CustomerHomePage() {
           </div>
         )}
 
+        {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
+        {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
+          <div className="pointer-events-auto absolute top-28 inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
+            <div className="flex items-center gap-2 rounded-full bg-white/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-[#1B4965] shadow-lg border border-amber-300">
+              <span>يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍</span>
+              <button
+                type="button"
+                onClick={() => setShowMapHint(false)}
+                className="text-slate-400 hover:text-slate-700 mr-1 cursor-pointer"
+                aria-label="إغلاق التلميح"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 5. زر إعادة التمركز وتحديد الموقع عبر الـ GPS */}
         {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
           <button
             type="button"
+            disabled={isLocatingCurrent}
             onClick={handleUseCurrentLocation}
-            className="absolute bottom-44 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+            className={`absolute bottom-44 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50 ${
+              isLocatingCurrent ? 'opacity-80' : ''
+            }`}
             title="موقعي الحالي عبر الـ GPS"
             aria-label="تحديد موقعي"
           >
             <svg
-              className="h-5 w-5"
+              className={`h-5 w-5 ${isLocatingCurrent ? 'animate-spin text-[#D97706]' : ''}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -1253,6 +1338,28 @@ export default function CustomerHomePage() {
                 </div>
               )}
             </div>
+
+            {/* رسالة الخطأ الصفراء التوضيحية تظهر بنعومة وتختفي بعد 5 ثوانٍ */}
+            {locationError && (
+              <div className="mb-3 overflow-hidden rounded-xl bg-amber-50 border border-amber-300 p-3 text-right shadow-xs animate-slide-down transition-all duration-300">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLocationError(null)}
+                    className="text-amber-800/70 hover:text-amber-950 text-[12px] p-1 cursor-pointer"
+                    aria-label="إغلاق التنبيه"
+                  >
+                    ✕
+                  </button>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[12.5px] font-bold text-amber-900 leading-snug break-words">
+                      {locationError}
+                    </span>
+                    <span className="text-amber-600 text-[15px] shrink-0">⚠️</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {stage === 'pickup' ? (
               <button

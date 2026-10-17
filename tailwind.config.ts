@@ -36,6 +36,14 @@ export default {
           '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'slide-down': {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
         'pulse-dot': {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.35' },
@@ -47,6 +55,8 @@ export default {
       },
       animation: {
         'fade-up': 'fade-up 0.2s ease-out',
+        'fade-in': 'fade-in 0.2s ease-out',
+        'slide-down': 'slide-down 0.25s ease-out',
         'pulse-dot': 'pulse-dot 1.4s ease-in-out infinite',
         'sheet-up': 'sheet-up 0.25s cubic-bezier(0.22, 1, 0.36, 1)',
       },

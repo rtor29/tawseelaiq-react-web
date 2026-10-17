@@ -10,7 +10,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { http } from '../lib/api';
 import { config } from '../lib/config';
 import { useToast } from '../components/Toast';
-import { distanceKm } from '../lib/geo';
+import { distanceKm, getCurrentPositionWithFallback, isIosDevice, isStandalonePwa } from '../lib/geo';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 
@@ -60,19 +60,17 @@ export default function DailyRoutePage() {
   const [selectedDriver, setSelectedDriver] = useState<DriverItem | null>(null);
   const [isBooking, setIsBooking] = useState(false);
 
-  // جلب موقع المستخدم الحقيقي عبر GPS
+  // جلب موقع المستخدم الحقيقي عبر GPS المتوافق مع iOS Safari
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setUserLoc(loc);
-          mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14.2, duration: 800 });
-        },
-        () => {},
-        { timeout: 8000 }
-      );
-    }
+    getCurrentPositionWithFallback(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLoc(loc);
+        mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14.2, duration: 800 });
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+    );
   }, []);
 
   // جلب سائقي الخط الدائمي الحقيقيين من الخادم
@@ -110,23 +108,33 @@ export default function DailyRoutePage() {
     show('تم تحديد موقعك على الخريطة لحساب القرب من السائقين 📍', 'info');
   }
 
-  // زر تحديد الموقع الحالي عبر الـ GPS
+  // زر تحديد الموقع الحالي عبر الـ GPS المتوافق مع iOS Safari
   function handleUseCurrentLocation() {
-    if (!navigator.geolocation) {
-      show('خاصية تحديد الموقع غير مدعومة في هذا المتصفح', 'warning');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
+    getCurrentPositionWithFallback(
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLoc(loc);
         mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 15, duration: 800 });
-        show('تم تحديد موقعك الحالي 📍', 'success');
+        show('تم تحديد موقعك الحالي 📍', 'success', 3000);
       },
-      () => {
-        show('تعذر تحديد الموقع الحالي، يرجى تفعيل الـ GPS', 'warning');
+      (_err, isPermissionDenied) => {
+        if (isPermissionDenied) {
+          const isIOS = isIosDevice();
+          const isPWA = isStandalonePwa();
+          show(
+            isIOS
+              ? isPWA
+                ? 'يرجى السماح بالوصول للموقع من إعدادات الهاتف > الخصوصية > خدمات الموقع > تطبيق توصيلة'
+                : 'يرجى السماح بالوصول للموقع من إعدادات الهاتف > الخصوصية > خدمات الموقع > Safari'
+              : 'يرجى السماح للتطبيق بالوصول إلى موقعك من إعدادات المتصفح',
+            'warning',
+            5000
+          );
+        } else {
+          show('تعذر تحديد الموقع الحالي عبر GPS، يمكنك سحب الخريطة لتحديده 📍', 'warning', 5000);
+        }
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
     );
   }
 

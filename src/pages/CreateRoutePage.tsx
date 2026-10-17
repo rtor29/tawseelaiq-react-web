@@ -14,6 +14,7 @@ import type { LngLat } from '../types';
 import { TopBar } from '../components/TopBar';
 import { Button, Field, SelectField, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { getCurrentPositionWithFallback, isIosDevice, isStandalonePwa } from '../lib/geo';
 
 type MapMode = 'start' | 'end' | 'waypoint';
 
@@ -93,7 +94,7 @@ export default function CreateRoutePage() {
 
   function useGpsAsStart() {
     setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
+    getCurrentPositionWithFallback(
       async (pos) => {
         const point: LngLat = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setStartPoint(point);
@@ -102,13 +103,27 @@ export default function CreateRoutePage() {
         setStartName(placeName ?? `موقعي الحالي (${point.lat.toFixed(4)}, ${point.lng.toFixed(4)})`);
         await traceRoute(point, endPoint, waypoints);
         setIsLocating(false);
-        show('تم تحديد موقعك الحالي كنقطة الانطلاق بنجاح! 📍', 'success');
+        show('تم تحديد موقعك الحالي كنقطة الانطلاق بنجاح! 📍', 'success', 3000);
       },
-      (err) => {
+      (_err, isPermissionDenied) => {
         setIsLocating(false);
-        show(`تعذر تحديد الموقع: ${err.message}`, 'warning');
+        if (isPermissionDenied) {
+          const isIOS = isIosDevice();
+          const isPWA = isStandalonePwa();
+          show(
+            isIOS
+              ? isPWA
+                ? 'يرجى السماح بالوصول للموقع من إعدادات الهاتف > الخصوصية > خدمات الموقع > تطبيق توصيلة'
+                : 'يرجى السماح بالوصول للموقع من إعدادات الهاتف > الخصوصية > خدمات الموقع > Safari'
+              : 'يرجى السماح للتطبيق بالوصول إلى موقعك من إعدادات المتصفح',
+            'warning',
+            5000
+          );
+        } else {
+          show('تعذر تحديد موقع GPS، يمكنك النقر على الخريطة لتحديده 📍', 'warning', 5000);
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
     );
   }
 

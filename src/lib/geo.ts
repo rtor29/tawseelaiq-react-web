@@ -30,3 +30,91 @@ export function formatDistanceAr(meters: number): string {
 export function najafCenterLngLat(): LngLat {
   return { lat: NAJAF_CENTER.lat, lng: NAJAF_CENTER.lon };
 }
+
+export function isIosDevice(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+export function isStandalonePwa(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as any).standalone === true
+  );
+}
+
+export interface GeolocationFetchOptions {
+  enableHighAccuracy?: boolean;
+  timeout?: number;
+  maximumAge?: number;
+}
+
+/**
+ * الحصول على الموقع الجغرافي بما يتوافق مع قيود Safari على iOS:
+ * 1. timeout ممتد إلى 10 ثوانٍ مع كاش يصل إلى 10 دقائق لتسريع الاستجابة.
+ * 2. محاولة بديلة تلقائية (Fallback) بدون دقة عالية (enableHighAccuracy: false) عند الـ Timeout.
+ * 3. تمييز صريح لخطأ PERMISSION_DENIED لتقديم إرشادات Safari و iOS الصحيحة للمستخدم.
+ */
+export function getCurrentPositionWithFallback(
+  onSuccess: (pos: GeolocationPosition) => void,
+  onError: (err: GeolocationPositionError, isPermissionDenied: boolean, isTimeout: boolean) => void,
+  options?: GeolocationFetchOptions
+) {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    onError(
+      {
+        code: 2,
+        message: 'Geolocation not supported',
+        PERMISSION_DENIED: 1,
+        POSITION_UNAVAILABLE: 2,
+        TIMEOUT: 3,
+      } as GeolocationPositionError,
+      false,
+      false
+    );
+    return;
+  }
+
+  const initialHighAccuracy = options?.enableHighAccuracy ?? true;
+  const timeoutMs = options?.timeout ?? 10000;
+  const maxAgeMs = options?.maximumAge ?? 600000;
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => onSuccess(pos),
+    (err) => {
+      // 1. معالجة خطأ رفض الإذن PERMISSION_DENIED (Code 1)
+      if (err.code === 1) {
+        onError(err, true, false);
+        return;
+      }
+
+      // 2. خطة بديلة (Fallback) عند حدوث خطأ TIMEOUT (Code 3) أو تعذر الدقة العالية (Code 2):
+      // إعادة المحاولة فوراً وتلقائياً بدون تفعيل الدقة العالية (enableHighAccuracy: false)
+      if (initialHighAccuracy && (err.code === 3 || err.code === 2)) {
+        navigator.geolocation.getCurrentPosition(
+          (fallbackPos) => onSuccess(fallbackPos),
+          (fallbackErr) => {
+            onError(fallbackErr, fallbackErr.code === 1, fallbackErr.code === 3);
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 600000,
+          }
+        );
+        return;
+      }
+
+      onError(err, false, err.code === 3);
+    },
+    {
+      enableHighAccuracy: initialHighAccuracy,
+      timeout: timeoutMs,
+      maximumAge: maxAgeMs,
+    }
+  );
+}
