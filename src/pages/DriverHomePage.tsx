@@ -71,13 +71,6 @@ export default function DriverHomePage() {
     return storage.getPoints();
   });
 
-  // نافذة تقييم المشوار والنقاط بنمط بلي (Baly Rating & Points Modal)
-  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
-  const [completedRideSummary, setCompletedRideSummary] = useState<any | null>(null);
-  const [ratingStars, setRatingStars] = useState<number>(5);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [ratingComment, setRatingComment] = useState<string>('');
-  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
   // حالة العمل الحالية: خمول | خط دائمي | تكسي (تبدأ بوضع الخمول افتراضياً)
   const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>('idle');
@@ -479,75 +472,32 @@ export default function DriverHomePage() {
   // السائق أنهى المشوار
   async function handleDriverComplete() {
     if (!activeRide || !driverId) return;
+    const fareAmount = activeRide.fare || activeRide.price || '5,000';
     try {
       const { data } = await http.post<{ success: boolean; message?: string }>('/ride/complete', {
         requestId: activeRide.id,
         driverId,
       });
       if (data?.success) {
-        show('تم إنهاء المشوار بنجاح واستلام الأجرة 🏁 شكراً لك كابتن!', 'success', 2500);
-        setCompletedRideSummary({ ...activeRide });
+        show(`تم إكمال المشوار بنجاح، استلمت: ${fareAmount} د.ع 💵`, 'success', 3000);
         setActiveRide(null);
-        setRatingStars(5);
-        setSelectedTags([]);
-        setRatingComment('');
-        setIsRatingModalOpen(true);
+
+        // تحديث نقاط الكابتن لحظياً
+        http
+          .get<{ success: boolean; points?: number }>(`/driver/${driverId}/points`)
+          .then((res) => {
+            if (res.data?.success && res.data.points != null) {
+              setDriverPoints(res.data.points);
+              storage.setPoints(res.data.points);
+            }
+          })
+          .catch(() => {});
       } else {
         show(data?.message || 'تعذر إنهاء الرحلة', 'error');
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ في إنهاء الرحلة', 'error');
     }
-  }
-
-  // تأكيد تقييم المشوار واستلام النقاط
-  async function handleSubmitRating() {
-    if (!completedRideSummary || !driverId) {
-      setIsRatingModalOpen(false);
-      return;
-    }
-    setIsSubmittingRating(true);
-    try {
-      const { data } = await http.post<{
-        success: boolean;
-        message?: string;
-        pointsEarned: number;
-        totalPoints: number;
-      }>('/driver/rate-trip', {
-        rideId: completedRideSummary.id,
-        driverId,
-        passengerId: completedRideSummary.customerId || completedRideSummary.customerPhone,
-        rating: ratingStars,
-        tags: selectedTags,
-        comment: ratingComment,
-      });
-
-      if (data?.success) {
-        setDriverPoints(data.totalPoints);
-        storage.setPoints(data.totalPoints);
-        show(`شكراً كابتن! تمت إضافة +${data.pointsEarned} نقطة كابتن إلى رصيدك 🌟`, 'success', 3000);
-      } else {
-        show(data?.message || 'تم حفظ التقييم بنجاح', 'info', 2000);
-      }
-    } catch (_) {
-      show('تم تسجيل الرحلة بنجاح', 'info', 2000);
-    } finally {
-      setIsSubmittingRating(false);
-      setIsRatingModalOpen(false);
-      setCompletedRideSummary(null);
-    }
-  }
-
-  function handleSkipRating() {
-    setIsRatingModalOpen(false);
-    setCompletedRideSummary(null);
-    show('تم تخطي التقييم، أنت جاهز لاستقبال طلبات جديدة 🚗', 'info', 2000);
-  }
-
-  function toggleRatingTag(tag: string) {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
   }
 
   function handleOpenWhatsApp(phone: string, name: string) {
@@ -1253,188 +1203,7 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {/* نافذة تقييم المشوار والنقاط بنمط بلي (Baly Rating & Points Modal) */}
-      {isRatingModalOpen && completedRideSummary && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in overflow-y-auto">
-          <div
-            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-slide-down my-auto"
-            dir="rtl"
-          >
-            {/* رأس النافذة الاحتفالي */}
-            <div className="text-center mb-4">
-              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 text-slate-950 text-2xl shadow-md shadow-amber-500/20 animate-bounce">
-                🌟
-              </div>
-              <h3 className="text-[19px] font-black text-[#1A1A1A]">
-                تقييم المشوار ومكافأة الكابتن
-              </h3>
-              <p className="text-[12.5px] font-medium text-emerald-600 mt-0.5">
-                أحسنت كابتن! تم إنهاء الرحلة واستلام الأجرة بنجاح 🏁
-              </p>
-            </div>
 
-            {/* بطاقة ملخص الرحلة */}
-            <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 mb-4 text-right space-y-2">
-              <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-700 text-xs font-bold">
-                    👤
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-[#6C757D] block">الراكب</span>
-                    <span className="text-[13.5px] font-bold text-[#1A1A1A]">
-                      {completedRideSummary.customerName || 'الراكب'}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-left font-sans">
-                  <span className="text-[11px] text-[#6C757D] block">المبلغ المستلم</span>
-                  <span className="text-[14px] font-black text-emerald-700">
-                    {completedRideSummary.fare || completedRideSummary.price || '5,000'} د.ع
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-[12px] space-y-1 text-slate-600 pt-0.5">
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="text-emerald-500 text-xs">🟢</span>
-                  <span className="text-slate-400">من:</span>
-                  <span className="font-semibold text-slate-800 truncate">{completedRideSummary.pickupName || 'موقع الانطلاق'}</span>
-                </div>
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="text-rose-500 text-xs">🔴</span>
-                  <span className="text-slate-400">إلى:</span>
-                  <span className="font-semibold text-slate-800 truncate">{completedRideSummary.dropoffName || 'موقع الوصول'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* شريط مكافأة النقاط الحي */}
-            <div className="mb-4 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-center">
-              <span className="text-[11px] font-bold text-amber-800 block mb-0.5">مكافأة الكابتن الفورية:</span>
-              <p className="text-[15.5px] font-black text-amber-700 flex items-center justify-center gap-1">
-                <span>{ratingStars >= 5 ? '+60 نقطة كابتن 🌟' : '+50 نقطة كابتن 🌟'}</span>
-                <span className="text-[11px] font-medium text-amber-800/90">
-                  {ratingStars >= 5 ? '(+50 رحلة + 10 بونص تميز)' : '(+50 نقطة رحلة مكتملة)'}
-                </span>
-              </p>
-            </div>
-
-            {/* تقييم النجوم التفاعلي */}
-            <div className="text-center mb-4">
-              <label className="text-[13px] font-bold text-slate-800 block mb-2">
-                كيف كانت تجربتك مع الراكب في هذا المشوار؟
-              </label>
-              <div className="flex items-center justify-center gap-2 py-1" dir="ltr">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRatingStars(star)}
-                    className="p-1 transition-transform duration-150 active:scale-125 hover:scale-110 cursor-pointer"
-                  >
-                    <svg
-                      className={`h-9 w-9 transition-colors ${
-                        star <= ratingStars ? 'text-amber-400 fill-amber-400 filter drop-shadow-sm' : 'text-slate-200 fill-slate-200'
-                      }`}
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[12px] font-bold text-amber-600 mt-1">
-                {ratingStars === 5
-                  ? 'ممتاز جداً 🌟 (موصى به)'
-                  : ratingStars === 4
-                  ? 'جيد جداً 👍'
-                  : ratingStars === 3
-                  ? 'جيد 👌'
-                  : ratingStars === 2
-                  ? 'أقل من المتوقع 😐'
-                  : 'تجربة صعبة ⚠️'}
-              </p>
-            </div>
-
-            {/* وسوم التقييم السريعة */}
-            <div className="mb-4">
-              <label className="text-[12px] font-bold text-slate-700 block mb-2 text-right">
-                وسوم سريعة (اختياري):
-              </label>
-              <div className="flex flex-wrap gap-1.5 justify-start">
-                {[
-                  '✨ راكب محترم',
-                  '⏰ التزام بالوقت',
-                  '💵 دفع سلس',
-                  '💬 تواصل ممتاز',
-                  '📍 موقع دقيق',
-                ].map((tag) => {
-                  const isSelected = selectedTags.includes(tag);
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleRatingTag(tag)}
-                      className={`px-3 py-1.5 rounded-xl text-[12px] font-bold transition cursor-pointer border ${
-                        isSelected
-                          ? 'bg-[#1B4965] text-white border-[#1B4965] shadow-xs'
-                          : 'bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200'
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* حقل ملاحظات اختياري */}
-            <div className="mb-5 text-right">
-              <label className="text-[12px] font-bold text-slate-700 block mb-1.5">
-                ملاحظات إضافية (اختياري):
-              </label>
-              <textarea
-                value={ratingComment}
-                onChange={(e) => setRatingComment(e.target.value)}
-                placeholder="أضف أي تفاصيل أو ملاحظات حول المشوار..."
-                rows={2}
-                maxLength={300}
-                className="w-full rounded-xl border border-slate-200 p-2.5 text-[12.5px] text-[#1A1A1A] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
-              />
-            </div>
-
-            {/* أزرار الإجراءات */}
-            <div className="space-y-2">
-              <button
-                type="button"
-                disabled={isSubmittingRating}
-                onClick={handleSubmitRating}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1B4965] py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 hover:bg-[#14364A] active:scale-[0.98] cursor-pointer disabled:opacity-60"
-              >
-                {isSubmittingRating ? (
-                  <span>جاري تسجيل التقييم والنقاط...</span>
-                ) : (
-                  <>
-                    <span>تأكيد التقييم والمتابعة</span>
-                    <span className="text-amber-300 font-extrabold font-sans">
-                      ({ratingStars >= 5 ? '+60' : '+50'} نقطة) 🚀
-                    </span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSkipRating}
-                className="w-full py-2.5 text-center text-[13px] font-bold text-slate-500 hover:text-slate-800 transition cursor-pointer"
-              >
-                تخطي التقييم الآن
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

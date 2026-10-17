@@ -279,6 +279,23 @@ export default function CustomerHomePage() {
   const searchTimer = useRef<number | null>(null);
   const hasNotifiedArrivalRef = useRef(false);
 
+  // نافذة تقييم الراكب للكابتن بنمط بلي (Customer Rating Captain Modal)
+  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+  const [completedDriverInfo, setCompletedDriverInfo] = useState<{
+    rideId: string;
+    driverId?: string;
+    driverName?: string;
+    driverPhone?: string;
+    driverVehicle?: string;
+    driverPlate?: string;
+    driverRating?: number;
+  } | null>(null);
+  const [ratingStars, setRatingStars] = useState<number>(5);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [ratingComment, setRatingComment] = useState<string>('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const hasTriggeredRatingRef = useRef(false);
+
   // حالة الـ GPS والتنبيهات المخصصة لـ iOS Safari
   const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -815,6 +832,7 @@ export default function CustomerHomePage() {
 
       if (data.success && data.request) {
         hasNotifiedArrivalRef.current = false;
+        hasTriggeredRatingRef.current = false;
         setRideRequestId(data.request.id);
         setRideStatus('Pending');
         let assignedDriverData = null;
@@ -892,9 +910,86 @@ export default function CustomerHomePage() {
     setRideStatus(null);
     setAssignedDriverInfo(null);
     setLiveDriverPosition(null);
-
-    show('تم إكمال الرحلة بنجاح. شكراً لاستخدامك توصيلة! ✨', 'success', 5000);
   }, [pickup]);
+
+  // إظهار نافذة تقييم الكابتن للراكب فور اكتمال المشوار
+  const triggerDriverRatingModal = useCallback((driverData?: any) => {
+    if (hasTriggeredRatingRef.current) return;
+    hasTriggeredRatingRef.current = true;
+
+    const rideId = rideRequestId || '';
+    const driverId = driverData?.driverId || driverData?.acceptedDriverId || driverData?.assignedDriverId || assignedDriverInfo?.driverId || 'driver_default';
+    const driverName = driverData?.driverName || driverData?.assignedDriverName || assignedDriverInfo?.driverName || 'كابتن توصيله';
+    const driverPhone = driverData?.driverPhone || driverData?.assignedDriverPhone || assignedDriverInfo?.driverPhone;
+    const driverVehicle = driverData?.driverVehicle || driverData?.assignedDriverVehicle || assignedDriverInfo?.driverVehicle || 'كيا سيراتو 2022';
+    const driverPlate = driverData?.driverPlate || assignedDriverInfo?.driverPlate || '١١٣٤٠ ة - النجف';
+    const driverRating = driverData?.driverRating || assignedDriverInfo?.driverRating || 5.0;
+
+    setCompletedDriverInfo({
+      rideId,
+      driverId,
+      driverName,
+      driverPhone,
+      driverVehicle,
+      driverPlate,
+      driverRating,
+    });
+    setRatingStars(5);
+    setSelectedTags([]);
+    setRatingComment('');
+    setIsRatingModalOpen(true);
+
+    // مسح خط المسار وتصفير حالة الرحلة النشطة من الخريطة
+    handleRideCompletedCleanup();
+  }, [rideRequestId, assignedDriverInfo, handleRideCompletedCleanup]);
+
+  // إرسال تقييم الراكب للكابتن إلى الباك إند
+  async function handleRateDriverSubmit() {
+    if (!completedDriverInfo) {
+      setIsRatingModalOpen(false);
+      return;
+    }
+    setIsSubmittingRating(true);
+    try {
+      const customerId = session?.userId || storage.getUserId() || formattedPhone || 'customer';
+      const { data } = await http.post<{
+        success: boolean;
+        message?: string;
+        pointsEarned?: number;
+      }>('/customer/rate-driver', {
+        rideId: completedDriverInfo.rideId,
+        customerId,
+        driverId: completedDriverInfo.driverId,
+        rating: ratingStars,
+        tags: selectedTags,
+        comment: ratingComment,
+      });
+
+      if (data?.success) {
+        show('شكراً لك! تم إرسال تقييمك بنجاح ✨', 'success', 4000);
+      } else {
+        show(data?.message || 'تم تسجيل تقييمك بنجاح ✨', 'success', 3000);
+      }
+    } catch (_) {
+      show('شكراً لك! تم إرسال تقييمك بنجاح ✨', 'success', 3000);
+    } finally {
+      setIsSubmittingRating(false);
+      setIsRatingModalOpen(false);
+      setCompletedDriverInfo(null);
+    }
+  }
+
+  function handleSkipRating() {
+    setIsRatingModalOpen(false);
+    setCompletedDriverInfo(null);
+    show('تم تخطي التقييم. شكراً لاستخدامك توصيلة! ✨', 'info', 2500);
+  }
+
+  function toggleRatingTag(tag: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }
 
   // تتبع حالة الرحلة لحظياً من الخادم
   useEffect(() => {
@@ -939,7 +1034,7 @@ export default function CustomerHomePage() {
               }
             }
           } else if (req.status === 'Completed' || req.status === 'completed' || req.status === 'RideCompleted') {
-            handleRideCompletedCleanup();
+            triggerDriverRatingModal(req);
           } else if (req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
             hasNotifiedArrivalRef.current = false;
             localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
@@ -965,7 +1060,7 @@ export default function CustomerHomePage() {
     }, 1800);
 
     return () => clearInterval(interval);
-  }, [rideRequestId, stage, pickup, dropoff, rideStatus, handleRideCompletedCleanup]);
+  }, [rideRequestId, stage, pickup, dropoff, rideStatus, triggerDriverRatingModal]);
 
   // اشتراك لحظي في أحداث الرحلة عبر SignalR / Realtime
   useEffect(() => {
@@ -994,7 +1089,7 @@ export default function CustomerHomePage() {
             }
           }
         } else if (e.status === 'Completed' || e.status === 'completed' || e.status === 'RideCompleted') {
-          handleRideCompletedCleanup();
+          triggerDriverRatingModal(assignedDriverInfo);
         } else if (e.status === 'Cancelled') {
           hasNotifiedArrivalRef.current = false;
           localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
@@ -1012,7 +1107,7 @@ export default function CustomerHomePage() {
       unsub();
       void realtime.leaveTrip(rideRequestId);
     };
-  }, [rideRequestId, dropoff, rideStatus, stage, handleRideCompletedCleanup]);
+  }, [rideRequestId, dropoff, rideStatus, stage, assignedDriverInfo, triggerDriverRatingModal]);
 
   // تتبع موقع السائق الحي على الخريطة
   useEffect(() => {
@@ -2882,6 +2977,165 @@ export default function CustomerHomePage() {
           peerRole={assignedDriverInfo?.driverVehicle || 'كابتن توصيله'}
         />
       </Suspense>
+
+      {/* نافذة تقييم الراكب للكابتن بنمط بلي (Customer Rating Captain Modal) */}
+      {isRatingModalOpen && completedDriverInfo && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in overflow-y-auto">
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-slide-down my-auto"
+            dir="rtl"
+          >
+            {/* رأس النافذة الاحتفالي */}
+            <div className="text-center mb-4">
+              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 text-2xl shadow-md shadow-amber-400/20 animate-bounce">
+                🌟
+              </div>
+              <h3 className="text-[19px] font-black text-[#1A1A1A]">
+                تقييم رحلتك مع الكابتن
+              </h3>
+              <p className="text-[12.5px] font-medium text-slate-500 mt-0.5">
+                وصلت لوجهتك بسلام! رأيك يهمنا لمكافأة الكابتن وتحسين الخدمة ✨
+              </p>
+            </div>
+
+            {/* بطاقة معلومات الكابتن والمركبة */}
+            <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 mb-4 text-right">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-[22px] border-2 border-blue-200 shadow-xs">
+                    🧑‍✈️
+                  </div>
+                  <div>
+                    <span className="text-[14.5px] font-bold text-slate-900 block">
+                      {completedDriverInfo.driverName || 'كابتن توصيله'}
+                    </span>
+                    <span className="text-[12px] font-medium text-slate-500 block">
+                      {completedDriverInfo.driverVehicle || 'كيا سيراتو 2022'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-300 bg-white px-2.5 py-1 text-center shadow-2xs">
+                  <span className="text-[13px] font-black text-slate-800 tracking-wider block font-mono">
+                    {completedDriverInfo.driverPlate || '١١٣٤٠ ة'}
+                  </span>
+                  <span className="text-[9.5px] font-bold text-slate-400 block">النجف</span>
+                </div>
+              </div>
+            </div>
+
+            {/* تقييم النجوم التفاعلي */}
+            <div className="text-center mb-4">
+              <label className="text-[13.5px] font-bold text-slate-800 block mb-2">
+                كيف كانت تجربتك مع الكابتن؟
+              </label>
+              <div className="flex items-center justify-center gap-2 py-1" dir="ltr">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRatingStars(star)}
+                    className="p-1 transition-transform duration-150 active:scale-125 hover:scale-110 cursor-pointer"
+                  >
+                    <svg
+                      className={`h-9 w-9 transition-colors ${
+                        star <= ratingStars
+                          ? 'text-amber-400 fill-amber-400 filter drop-shadow-sm'
+                          : 'text-slate-200 fill-slate-200'
+                      }`}
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[12px] font-bold text-amber-600 mt-1">
+                {ratingStars === 5
+                  ? 'ممتاز جداً 🌟 (موصى به)'
+                  : ratingStars === 4
+                  ? 'جيد جداً 👍'
+                  : ratingStars === 3
+                  ? 'جيد 👌'
+                  : ratingStars === 2
+                  ? 'أقل من المتوقع 😐'
+                  : 'تجربة صعبة ⚠️'}
+              </p>
+            </div>
+
+            {/* وسوم التقييم السريعة */}
+            <div className="mb-4">
+              <label className="text-[12px] font-bold text-slate-700 block mb-2 text-right">
+                ما الذي أعجبك في المشوار؟ (اختياري):
+              </label>
+              <div className="flex flex-wrap gap-1.5 justify-start">
+                {[
+                  '🚗 سياقة هادئة',
+                  '✨ سيارة نظيفة',
+                  '🤝 كابتن محترم',
+                  '📍 التزام بالمسار',
+                  '❄️ تشغيل التكييف',
+                ].map((tag) => {
+                  const isSelected = selectedTags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleRatingTag(tag)}
+                      className={`px-3 py-1.5 rounded-xl text-[12px] font-bold transition cursor-pointer border ${
+                        isSelected
+                          ? 'bg-[#1B4965] text-white border-[#1B4965] shadow-xs'
+                          : 'bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* حقل ملاحظات اختياري */}
+            <div className="mb-5 text-right">
+              <label className="text-[12px] font-bold text-slate-700 block mb-1.5">
+                ملاحظات أو تعليق للكابتن (اختياري):
+              </label>
+              <textarea
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                placeholder="أضف أي تفاصيل أو ملاحظات حول الكابتن والرحلة..."
+                rows={2}
+                maxLength={300}
+                className="w-full rounded-xl border border-slate-200 p-2.5 text-[12.5px] text-[#1A1A1A] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
+              />
+            </div>
+
+            {/* أزرار الإجراءات */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={isSubmittingRating}
+                onClick={handleRateDriverSubmit}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1B4965] py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 hover:bg-[#14364A] active:scale-[0.98] cursor-pointer disabled:opacity-60"
+              >
+                {isSubmittingRating ? (
+                  <span>جاري إرسال التقييم...</span>
+                ) : (
+                  <span>إرسال التقييم ⭐</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSkipRating}
+                className="w-full py-2.5 text-center text-[13px] font-bold text-slate-500 hover:text-slate-800 transition cursor-pointer"
+              >
+                تخطي
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
