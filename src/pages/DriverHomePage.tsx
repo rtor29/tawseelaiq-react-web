@@ -171,29 +171,30 @@ export default function DriverHomePage() {
       // الحجوزات المؤكدة أو التي بها طلب إلغاء معلق تظهر في ركاب الخط الدائمي
       const confirmed = list.filter(
         (b: any) =>
-          b.status === 'Confirmed' ||
-          b.status === 'cancellation_pending' ||
-          Boolean(b.cancellationPending) ||
-          Boolean(b.cancellation_requested) ||
-          b.cancellation_status === 'pending' ||
-          Boolean(b.cancellationReason || b.cancellation_reason) ||
-          (!b.status && b.bookingConfirmed !== false && b.status !== 'Cancelled')
+          b.status !== 'Cancelled' &&
+          b.status !== 'Declined' &&
+          (b.status === 'Confirmed' ||
+            b.status === 'cancellation_pending' ||
+            Boolean(b.cancellationPending) ||
+            Boolean(b.cancellation_requested) ||
+            b.cancellation_status === 'pending' ||
+            (!b.status && b.bookingConfirmed !== false))
       );
 
       // ترتيب الحجوزات بحيث تظهر الحجوزات التي بها طلب إلغاء معلق أولاً لضمان عدم ضياعها في الفلترة
       confirmed.sort((a: any, b: any) => {
         const aPending =
-          a.status === 'cancellation_pending' ||
-          Boolean(a.cancellationPending) ||
-          Boolean(a.cancellation_requested) ||
-          a.cancellation_status === 'pending' ||
-          Boolean(a.cancellationReason || a.cancellation_reason);
+          a.status !== 'Cancelled' &&
+          (a.status === 'cancellation_pending' ||
+            Boolean(a.cancellationPending) ||
+            Boolean(a.cancellation_requested) ||
+            a.cancellation_status === 'pending');
         const bPending =
-          b.status === 'cancellation_pending' ||
-          Boolean(b.cancellationPending) ||
-          Boolean(b.cancellation_requested) ||
-          b.cancellation_status === 'pending' ||
-          Boolean(b.cancellationReason || b.cancellation_reason);
+          b.status !== 'Cancelled' &&
+          (b.status === 'cancellation_pending' ||
+            Boolean(b.cancellationPending) ||
+            Boolean(b.cancellation_requested) ||
+            b.cancellation_status === 'pending');
         if (aPending && !bPending) return -1;
         if (!aPending && bPending) return 1;
         return 0;
@@ -215,11 +216,11 @@ export default function DriverHomePage() {
       // فحص وصول طلب إلغاء جديد لتنبيه السائق صوتياً وإشعاراً فورياً
       const currentCancelSubs = uniqueConfirmed.filter(
         (b: any) =>
-          b.status === 'cancellation_pending' ||
-          Boolean(b.cancellationPending) ||
-          Boolean(b.cancellation_requested) ||
-          b.cancellation_status === 'pending' ||
-          Boolean(b.cancellationReason || b.cancellation_reason)
+          b.status !== 'Cancelled' &&
+          (b.status === 'cancellation_pending' ||
+            Boolean(b.cancellationPending) ||
+            Boolean(b.cancellation_requested) ||
+            b.cancellation_status === 'pending')
       );
 
       const newCancels = currentCancelSubs.filter((b: any) => {
@@ -241,11 +242,11 @@ export default function DriverHomePage() {
       setSubscribers(
         uniqueConfirmed.map((b: any, idx: number) => {
           const isCancelPending =
-            b.status === 'cancellation_pending' ||
-            Boolean(b.cancellationPending) ||
-            Boolean(b.cancellation_requested) ||
-            b.cancellation_status === 'pending' ||
-            Boolean(b.cancellationReason || b.cancellation_reason);
+            b.status !== 'Cancelled' &&
+            (b.status === 'cancellation_pending' ||
+              Boolean(b.cancellationPending) ||
+              Boolean(b.cancellation_requested) ||
+              b.cancellation_status === 'pending');
 
           return {
             id: b.id || b.bookingId || String(idx),
