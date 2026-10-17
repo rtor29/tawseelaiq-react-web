@@ -50,6 +50,8 @@ interface IncomingRideRequest {
   pickupLat: number;
   pickupLon: number;
   distanceKm?: number;
+  surgeMultiplier?: number;
+  surgeBadge?: { text: string; type: string; percent?: number };
 }
 
 export default function DriverHomePage() {
@@ -1204,11 +1206,18 @@ export default function DriverHomePage() {
               /* طلب وارد مع خيارات القبول والرفض */
               <div className="rounded-xl border border-emerald-500 bg-white p-4 shadow-subtle animate-fade-in">
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                  <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[12px] font-bold text-emerald-700">
-                    طلب مشوار جديد وارد! 🚖
-                  </span>
-                  <span className="text-[16px] font-bold text-[#1A1A1A]">
-                    {incomingRequest.fare} د.ع
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[12px] font-bold text-emerald-700">
+                      طلب مشوار جديد! 🚖
+                    </span>
+                    {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
+                      <span className="rounded-lg bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs flex items-center gap-1 animate-pulse">
+                        ⚡ {incomingRequest.surgeBadge?.text || `تعرفة ذروة (+${Math.round(((incomingRequest.surgeMultiplier || 1) - 1) * 100)}%)`}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[17px] font-black text-[#1A1A1A]">
+                    {Number(incomingRequest.fare || 0).toLocaleString()} د.ع
                   </span>
                 </div>
 

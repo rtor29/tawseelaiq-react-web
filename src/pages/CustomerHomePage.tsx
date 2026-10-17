@@ -301,6 +301,16 @@ export default function CustomerHomePage() {
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const hasTriggeredRatingRef = useRef(false);
 
+  // التسعير الديناميكي الذكي للرحلات الفورية (Baly-like Surge Pricing)
+  const [dynamicPricingData, setDynamicPricingData] = useState<{
+    superFare?: number;
+    savingFare?: number;
+    plusFare?: number;
+    selectedFare?: number;
+    surgeBadge?: { text: string; type: string; percent?: number; reason?: string } | null;
+    discountBadge?: { text: string; type: string; amountIqd?: number } | null;
+  }>({});
+
   // حالة الورقة السفلية لتفاصيل الرحلة (Interactive Draggable / Collapsible Sheet)
   const [rideSheetState, setRideSheetState] = useState<'expanded' | 'collapsed'>('expanded');
   const sheetTouchStartYRef = useRef<number | null>(null);
@@ -862,13 +872,71 @@ export default function CustomerHomePage() {
     show('السائق وصل! 🚗 جاري تشغيل الملاحة...', 'success', 5000);
   }
 
-  // حساب سعر الرحلة الحالي حسب الفئة والخيارات الإضافية (ذهاب وإياب، وجهة ثانية، إلخ)
+  // جلب الأسعار الديناميكية الذكية وحساب الذروة (Baly-like Dynamic Surge Pricing)
+  useEffect(() => {
+    if (stage !== 'ride_options' && stage !== 'searching') return;
+    let isCancelled = false;
+
+    const fetchDynamicPricing = async () => {
+      try {
+        const dist = Math.max(0.5, Math.round(distanceKm(pickup, dropoff) * 10) / 10);
+        const dur = Math.max(5, Math.round(dist * 2.5));
+
+        const res = await http.post<any>('/rides/calculate-fare', {
+          pickupLat: pickup.lat,
+          pickupLon: pickup.lng,
+          dropoffLat: dropoff.lat,
+          dropoffLon: dropoff.lng,
+          distanceKm: dist,
+          durationMins: dur,
+          vehicleType: selectedTierId,
+          isRoundTrip,
+          hasSecondStop: Boolean(secondDestination.trim()),
+          promoCode: appliedPromo ? 'PROMO20' : ''
+        });
+
+        if (isCancelled || !res.data || !res.data.success) return;
+
+        const mainData = res.data;
+        const mainFare = mainData.fare || 2500;
+
+        // Calculate proportionate rates for other tiers
+        let superFare = mainFare;
+        if (selectedTierId === 'saving') {
+          superFare = Math.round((mainFare / 0.90) / 250) * 250;
+        } else if (selectedTierId === 'plus') {
+          superFare = Math.round((mainFare / 1.20) / 250) * 250;
+        }
+        const savingFare = Math.round((superFare * 0.90) / 250) * 250;
+        const plusFare = Math.round((superFare * 1.20) / 250) * 250;
+
+        setDynamicPricingData({
+          superFare,
+          savingFare,
+          plusFare,
+          selectedFare: mainFare,
+          surgeBadge: mainData.surgeBadge || null,
+          discountBadge: mainData.discountBadge || null
+        });
+      } catch (e) {
+        console.warn('[Pricing] Could not fetch dynamic fare:', e);
+      }
+    };
+
+    fetchDynamicPricing();
+    return () => { isCancelled = true; };
+  }, [stage, pickup.lat, pickup.lng, dropoff.lat, dropoff.lng, selectedTierId, isRoundTrip, secondDestination, appliedPromo]);
+
+  // حساب سعر الرحلة الحالي حسب الفئة والخيارات الإضافية (مع الأخذ بالاعتبار محرك التسعير الديناميكي)
   const currentTier = RIDE_TIERS.find((t) => t.id === selectedTierId) || RIDE_TIERS[0];
-  let calculatedPrice = currentTier.basePrice;
-  if (isRoundTrip) calculatedPrice *= 2;
-  if (secondDestination.trim()) calculatedPrice += 1000;
-  if (stopDuration) calculatedPrice += 500;
-  if (appliedPromo) calculatedPrice = Math.max(1000, Math.round(calculatedPrice * 0.8));
+  let calculatedPrice = dynamicPricingData.selectedFare || currentTier.basePrice;
+  if (!dynamicPricingData.selectedFare) {
+    if (isRoundTrip) calculatedPrice *= 2;
+    if (secondDestination.trim()) calculatedPrice += 1000;
+    if (stopDuration) calculatedPrice += 500;
+    if (appliedPromo) calculatedPrice = Math.max(1000, Math.round(calculatedPrice * 0.8));
+    calculatedPrice = Math.round(calculatedPrice / 250) * 250;
+  }
 
   // طلب التكسي النهائي — إرسال حقيقي للخادم
   async function handleOrderTrip() {
@@ -899,6 +967,7 @@ export default function CustomerHomePage() {
         dropoffLat: dropoff.lat,
         dropoffLon: dropoff.lng,
         fare: calculatedPrice,
+        promoCode: appliedPromo ? 'PROMO20' : '',
         distanceKm: Math.max(0.5, Math.round(dist * 10) / 10),
         durationMins: Math.max(5, Math.round(dist * 2.5)),
         vehicleType: selectedTierId === 'plus' ? 'vip' : 'eco',
@@ -1696,10 +1765,40 @@ export default function CustomerHomePage() {
               </button>
             </div>
 
+            {/* شارة الذروة أو الخصم الذكي المفعّل */}
+            {dynamicPricingData.surgeBadge && (
+              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center justify-between text-amber-950 animate-fade-in shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
+                  <span className="text-[12.5px] font-bold text-amber-950">{dynamicPricingData.surgeBadge.text}</span>
+                </div>
+                <span className="text-[10.5px] font-bold text-amber-700 bg-white px-2 py-0.5 rounded-md border border-amber-200">
+                  تحديث حي
+                </span>
+              </div>
+            )}
+            {dynamicPricingData.discountBadge && !dynamicPricingData.surgeBadge && (
+              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-between text-emerald-950 animate-fade-in shadow-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
+                  <span className="text-[12.5px] font-bold text-emerald-950">{dynamicPricingData.discountBadge.text}</span>
+                </div>
+                <span className="text-[10.5px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                  عرض خاص
+                </span>
+              </div>
+            )}
+
             {/* قائمة فئات الرحلة (سوبر، توفير، بلس) */}
             <div className="px-4 py-2 space-y-1.5">
               {RIDE_TIERS.map((tier) => {
                 const isSelected = selectedTierId === tier.id;
+                const dynamicPrice = tier.id === 'saving'
+                  ? (dynamicPricingData.savingFare || tier.basePrice)
+                  : tier.id === 'plus'
+                  ? (dynamicPricingData.plusFare || tier.basePrice)
+                  : (dynamicPricingData.superFare || tier.basePrice);
+
                 return (
                   <div
                     key={tier.id}
@@ -1712,7 +1811,7 @@ export default function CustomerHomePage() {
                   >
                     {/* السعر على اليسار */}
                     <div className="text-left font-bold text-[16px] text-[#1A1A1A]">
-                      {tier.basePrice.toLocaleString()} دينار
+                      {dynamicPrice.toLocaleString()} دينار
                     </div>
 
                     {/* الاسم والوصف والسيارة الزرقاء على اليمين */}
