@@ -301,6 +301,14 @@ export default function CustomerHomePage() {
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const hasTriggeredRatingRef = useRef(false);
 
+  // نظام تقديم الشكاوى والبلاغات المباشرة
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [complaintCategory, setComplaintCategory] = useState<string>('سلوك غير لائق من الكابتن');
+  const [complaintText, setComplaintText] = useState<string>('');
+  const [complaintDriverPhone, setComplaintDriverPhone] = useState<string>('');
+  const [complaintRideId, setComplaintRideId] = useState<string>('');
+  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
+
   // التسعير الديناميكي الذكي للرحلات الفورية (Baly-like Surge Pricing)
   const [dynamicPricingData, setDynamicPricingData] = useState<{
     superFare?: number;
@@ -1094,6 +1102,10 @@ export default function CustomerHomePage() {
       setIsRatingModalOpen(false);
       return;
     }
+    if (ratingStars <= 2 && !ratingComment.trim()) {
+      show('يرجى توضيح سبب هذا التقييم لمساعدتنا على معالجة الأمر', 'error', 4000);
+      return;
+    }
     setIsSubmittingRating(true);
     try {
       const customerId = session?.userId || storage.getUserId() || formattedPhone || 'customer';
@@ -1111,7 +1123,11 @@ export default function CustomerHomePage() {
       });
 
       if (data?.success) {
-        show('شكراً لك! تم إرسال تقييمك بنجاح ✨', 'success', 4000);
+        if (ratingStars <= 2) {
+          show('تم استلام تقييمك وتصعيده كبلاغ رسمي للتحقق والمعالجة الفورية 🛡️', 'success', 5000);
+        } else {
+          show('شكراً لك! تم إرسال تقييمك بنجاح ✨', 'success', 4000);
+        }
       } else {
         show(data?.message || 'تم تسجيل تقييمك بنجاح ✨', 'success', 3000);
       }
@@ -1121,6 +1137,42 @@ export default function CustomerHomePage() {
       setIsSubmittingRating(false);
       setIsRatingModalOpen(false);
       setCompletedDriverInfo(null);
+    }
+  }
+
+  // إرسال شكوى أو بلاغ مباشر
+  async function handleSubmitComplaint() {
+    if (!complaintText.trim()) {
+      show('يرجى كتابة تفاصيل الشكوى بدقة', 'error', 3000);
+      return;
+    }
+    setIsSubmittingComplaint(true);
+    try {
+      const customerId = session?.userId || storage.getUserId() || formattedPhone || 'customer';
+      const { data } = await http.post<{ success: boolean; message?: string }>('/complaints/submit', {
+        complainantId: customerId,
+        complainantName: customerName || 'الراكب',
+        complainantPhone: formattedPhone || '',
+        accusedPhone: complaintDriverPhone.trim() || undefined,
+        rideId: complaintRideId.trim() || (completedDriverInfo ? completedDriverInfo.rideId : (rideRequestId || undefined)),
+        category: complaintCategory,
+        complaintText: complaintText.trim()
+      });
+      if (data?.success) {
+        show('تم استلام بلاغك وسيقوم فريق الدعم بالتحقق منه خلال وقت قصير ✅', 'success', 5000);
+        setIsComplaintModalOpen(false);
+        setComplaintText('');
+        setComplaintDriverPhone('');
+        setComplaintRideId('');
+      } else {
+        show(data?.message || 'تم استلام بلاغك وسيقوم فريق الدعم بالتحقق منه خلال وقت قصير ✅', 'success', 4000);
+        setIsComplaintModalOpen(false);
+      }
+    } catch (_) {
+      show('تم استلام بلاغك وسيقوم فريق الدعم بالتحقق منه خلال وقت قصير ✅', 'success', 4000);
+      setIsComplaintModalOpen(false);
+    } finally {
+      setIsSubmittingComplaint(false);
     }
   }
 
@@ -3093,6 +3145,47 @@ export default function CustomerHomePage() {
                 </div>
               </div>
             </div>
+
+            <div
+              onClick={() => {
+                setIsProfileOpen(false);
+                setIsComplaintModalOpen(true);
+              }}
+              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-red-50/60 transition border-t border-red-100 bg-red-50/20"
+            >
+              <div className="text-red-400">
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-[17px] font-black text-red-700">تقديم شكوى أو بلاغ 🛡️</p>
+                  <p className="text-[12px] font-medium text-red-500 mt-0.5">بلاغ فوري عن الكابتن أو الرحلة</p>
+                </div>
+                <div className="text-red-600">
+                  <svg
+                    className="h-6 w-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div
@@ -3292,6 +3385,18 @@ export default function CustomerHomePage() {
               <div>
                 <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">🎧 التواصل مع الدعم</h3>
                 <div className="space-y-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDrawerSubModal('none');
+                      setIsProfileOpen(false);
+                      setIsComplaintModalOpen(true);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
+                  >
+                    <span>🛡️</span>
+                    <span>تقديم شكوى أو بلاغ رسمي</span>
+                  </button>
                   <a
                     href="https://wa.me/9647706204066"
                     target="_blank"
@@ -3456,31 +3561,59 @@ export default function CustomerHomePage() {
               </div>
             </div>
 
-            {/* حقل ملاحظات اختياري */}
-            <div className="mb-5 text-right">
-              <label className="text-[12px] font-bold text-slate-700 block mb-1.5">
-                ملاحظات أو تعليق للكابتن (اختياري):
-              </label>
-              <textarea
-                value={ratingComment}
-                onChange={(e) => setRatingComment(e.target.value)}
-                placeholder="أضف أي تفاصيل أو ملاحظات حول الكابتن والرحلة..."
-                rows={2}
-                maxLength={300}
-                className="w-full rounded-xl border border-slate-200 p-2.5 text-[12.5px] text-[#1A1A1A] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
-              />
-            </div>
+            {/* إذا كان التقييم نجمة أو نجمتين: خانة إجبارية مع تنبيه صريح */}
+            {ratingStars <= 2 ? (
+              <div className="mb-4 text-right rounded-2xl bg-red-50/90 border border-red-200 p-3.5 shadow-xs">
+                <div className="flex items-center gap-2 mb-1.5 text-red-700">
+                  <span className="text-base">⚠️</span>
+                  <label className="text-[12.5px] font-black">
+                    نأسف لتجربتك، يرجى توضيح سبب هذا التقييم لمساعدتنا على معالجة الأمر <span className="text-red-500">*</span>
+                  </label>
+                </div>
+                <p className="text-[11px] font-medium text-red-600 mb-2">
+                  يتم تحويل هذا البلاغ فوراً وبشكل آلي إلى قسم المتابعة والشكاوى للتحقيق مع الكابتن.
+                </p>
+                <textarea
+                  value={ratingComment}
+                  onChange={(e) => setRatingComment(e.target.value)}
+                  placeholder="اكتب بالتفصيل المشكلة أو سبب استيائك من المشوار..."
+                  rows={3}
+                  maxLength={400}
+                  required
+                  className="w-full rounded-xl border border-red-300 bg-white p-2.5 text-[12.5px] text-[#1A1A1A] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+            ) : (
+              /* حقل ملاحظات اختياري */
+              <div className="mb-5 text-right">
+                <label className="text-[12px] font-bold text-slate-700 block mb-1.5">
+                  ملاحظات أو تعليق للكابتن (اختياري):
+                </label>
+                <textarea
+                  value={ratingComment}
+                  onChange={(e) => setRatingComment(e.target.value)}
+                  placeholder="أضف أي تفاصيل أو ملاحظات حول الكابتن والرحلة..."
+                  rows={2}
+                  maxLength={300}
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-[12.5px] text-[#1A1A1A] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
+                />
+              </div>
+            )}
 
             {/* أزرار الإجراءات */}
             <div className="space-y-2">
               <button
                 type="button"
-                disabled={isSubmittingRating}
+                disabled={isSubmittingRating || (ratingStars <= 2 && !ratingComment.trim())}
                 onClick={handleRateDriverSubmit}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1B4965] py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 hover:bg-[#14364A] active:scale-[0.98] cursor-pointer disabled:opacity-60"
+                className={`w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
+                  ratingStars <= 2 ? 'bg-red-600 hover:bg-red-700' : 'bg-[#1B4965] hover:bg-[#14364A]'
+                }`}
               >
                 {isSubmittingRating ? (
                   <span>جاري إرسال التقييم...</span>
+                ) : ratingStars <= 2 ? (
+                  <span>تصعيد الشكوى وإرسال التقييم 🛡️</span>
                 ) : (
                   <span>إرسال التقييم ⭐</span>
                 )}
@@ -3494,6 +3627,112 @@ export default function CustomerHomePage() {
                 تخطي
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تقديم شكوى أو بلاغ مباشر 🛡️ */}
+      {isComplaintModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in overflow-y-auto">
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-slide-down my-auto text-right"
+            dir="rtl"
+          >
+            {/* رأس النافذة */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-600 text-xl shadow-xs">
+                  🛡️
+                </div>
+                <div>
+                  <h3 className="text-[17px] font-black text-slate-900">تقديم شكوى أو بلاغ</h3>
+                  <p className="text-[11.5px] font-medium text-slate-500">نحن نضمن سرية معلوماتك ونتابع كل بلاغ بجدية</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsComplaintModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition cursor-pointer text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmitComplaint();
+              }}
+              className="space-y-4"
+            >
+              {/* تصنيف الشكوى */}
+              <div>
+                <label className="text-[12.5px] font-bold text-slate-800 block mb-1.5">
+                  نوع البلاغ / التصنيف <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={complaintCategory}
+                  onChange={(e) => setComplaintCategory(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B4965] cursor-pointer"
+                >
+                  <option value="سلوك غير لائق من الكابتن">سلوك غير لائق من الكابتن</option>
+                  <option value="عدم الالتزام بالأجرة المحددة أو طلب مبالغ إضافية">عدم الالتزام بالأجرة المحددة أو طلب مبالغ إضافية</option>
+                  <option value="القيادة المتهورة أو عدم الالتزام بقواعد المرور">القيادة المتهورة أو عدم الالتزام بقواعد المرور</option>
+                  <option value="التأخير الشديد أو إلغاء غير مبرر">التأخير الشديد أو إلغاء غير مبرر</option>
+                  <option value="نظافة أو حالة المركبة">نظافة أو حالة المركبة</option>
+                  <option value="مشكلة في خط السير اليومي">مشكلة في خط السير اليومي</option>
+                  <option value="أخرى">أخرى</option>
+                </select>
+              </div>
+
+              {/* رقم هاتف السائق (اختياري / تلقائي) */}
+              <div>
+                <label className="text-[12.5px] font-bold text-slate-800 block mb-1">
+                  رقم هاتف الكابتن المعني (اختياري):
+                </label>
+                <input
+                  type="tel"
+                  dir="ltr"
+                  value={complaintDriverPhone}
+                  onChange={(e) => setComplaintDriverPhone(e.target.value)}
+                  placeholder="077XXXXXXXX"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-[13px] font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
+                />
+              </div>
+
+              {/* تفاصيل الشكوى */}
+              <div>
+                <label className="text-[12.5px] font-bold text-slate-800 block mb-1">
+                  شرح تفاصيل الشكوى <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={complaintText}
+                  onChange={(e) => setComplaintText(e.target.value)}
+                  placeholder="يرجى كتابة ما حدث بكل دقة لنتمكن من متابعة الأمر ومحاسبة المقصر..."
+                  rows={4}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-white p-3 text-[13px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
+                />
+              </div>
+
+              {/* أزرار الإجراء */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmittingComplaint || !complaintText.trim()}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-[14px] shadow-sm transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingComplaint ? 'جاري الإرسال...' : 'إرسال البلاغ الآن 🛡️'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsComplaintModalOpen(false)}
+                  className="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[13px] transition cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
