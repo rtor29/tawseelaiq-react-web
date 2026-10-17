@@ -479,7 +479,7 @@ export default function CustomerHomePage() {
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
 
     if (!cleaned) {
-      setSearchResults(NAJAF_LOCAL_PLACES.map(p => ({ name: p.name, lat: p.lat, lng: p.lon })) as unknown as PlaceResult[]);
+      setSearchResults(NAJAF_LOCAL_PLACES);
       return;
     }
 
@@ -496,19 +496,75 @@ export default function CustomerHomePage() {
   }
 
   // اختيار مكان من نتائج البحث وتحديث كاش الأماكن الأخيرة
-  function handleSelectPlace(place: { name: string; lat: number; lng: number; address?: string }) {
-    if (stage === 'pickup') {
-      setPickup({ lat: place.lat, lng: place.lng });
-      setPickupName(place.name);
-    } else {
-      setDropoff({ lat: place.lat, lng: place.lng });
-      setDropoffName(place.name);
+  function handleSelectPlace(rawItem: any) {
+    if (!rawItem) return;
+
+    let lng: number | undefined;
+    let lat: number | undefined;
+
+    // 1. استخراج الإحداثيات من هيكل Mapbox Geocoding (geometry.coordinates = [lng, lat] أو center = [lng, lat])
+    if (Array.isArray(rawItem.geometry?.coordinates) && rawItem.geometry.coordinates.length >= 2) {
+      lng = Number(rawItem.geometry.coordinates[0]);
+      lat = Number(rawItem.geometry.coordinates[1]);
+    } else if (Array.isArray(rawItem.center) && rawItem.center.length >= 2) {
+      lng = Number(rawItem.center[0]);
+      lat = Number(rawItem.center[1]);
+    } else if (Array.isArray(rawItem.coordinates) && rawItem.coordinates.length >= 2) {
+      lng = Number(rawItem.coordinates[0]);
+      lat = Number(rawItem.coordinates[1]);
+    } else if (rawItem.coordinates && typeof rawItem.coordinates === 'object') {
+      lat = Number(rawItem.coordinates.lat ?? rawItem.coordinates.latitude);
+      lng = Number(rawItem.coordinates.lng ?? rawItem.coordinates.lon ?? rawItem.coordinates.longitude);
     }
-    // حفظ الموقع في كاش الأماكن الأخيرة
-    addRecentPlace({ name: place.name, address: place.address, lat: place.lat, lng: place.lng });
+
+    // 2. استخراج مباشر إذا كانت الخصائص lat / lon أو lat / lng
+    if (lat === undefined || isNaN(lat)) {
+      lat = Number(rawItem.lat ?? rawItem.latitude);
+    }
+    if (lng === undefined || isNaN(lng)) {
+      lng = Number(rawItem.lng ?? rawItem.lon ?? rawItem.longitude);
+    }
+
+    if (lat === undefined || isNaN(lat) || lng === undefined || isNaN(lng)) {
+      console.error('[Search] Invalid coordinates extracted:', rawItem);
+      return;
+    }
+
+    // استخراج اسم المكان والعنوان
+    const placeName =
+      rawItem.name ||
+      rawItem.text_ar ||
+      rawItem.text ||
+      rawItem.place_name_ar ||
+      rawItem.place_name ||
+      'موقع محدد';
+
+    const address =
+      rawItem.address ||
+      (rawItem.place_name && rawItem.place_name !== placeName ? rawItem.place_name : undefined);
+
+    // تحديث الـ State حسب مرحلة الاختيار (نقطة الانطلاق Pickup أو الوجهة Dropoff)
+    if (stage === 'pickup') {
+      setPickup({ lat, lng });
+      setPickupName(placeName);
+    } else {
+      setDropoff({ lat, lng });
+      setDropoffName(placeName);
+    }
+
+    // تحريك كاميرا الخريطة بسلاسة وتحديث موقع الدبوس (Marker)
+    mapRef.current?.flyTo({
+      center: [lng, lat],
+      zoom: 15,
+      essential: true,
+      duration: 700,
+    });
+
+    // حفظ الموقع في كاش الأماكن الأخيرة (LocalStorage Cache)
+    addRecentPlace({ name: placeName, address, lat, lng });
     setRecentPlacesList(getRecentPlaces());
 
-    mapRef.current?.flyTo({ center: [place.lng, place.lat], zoom: 15.5, duration: 700 });
+    // إغلاق نافذة البحث وتصفير حقولها
     setIsSearchOpen(false);
     setSearchQuery('');
     setSearchResults([]);
@@ -1091,7 +1147,7 @@ export default function CustomerHomePage() {
             </div>
 
             <div
-              onClick={() => { setIsSearchOpen(true); setSearchResults(NAJAF_LOCAL_PLACES.map(p => ({ name: p.name, lat: p.lat, lng: p.lon })) as unknown as PlaceResult[]); }}
+              onClick={() => { setIsSearchOpen(true); setSearchResults(NAJAF_LOCAL_PLACES); }}
               className="mb-4 flex items-center justify-between rounded-xl bg-slate-100/90 border border-slate-200/60 p-3.5 cursor-pointer transition active:scale-[0.99] hover:bg-slate-200/70"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1810,7 +1866,11 @@ export default function CustomerHomePage() {
             {QUICK_CHIPS.map((chip) => (
               <div
                 key={chip.name}
-                onClick={() => handleSelectPlace(chip)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectPlace(chip);
+                }}
                 className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 px-3.5 py-2 cursor-pointer transition-all duration-200 active:scale-95 shadow-card shrink-0"
               >
                 <span className="text-[13px] font-bold text-[#1A1A1A]">{chip.name}</span>
@@ -1824,7 +1884,10 @@ export default function CustomerHomePage() {
           </div>
 
           {/* قائمة الأماكن */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 bg-[#F8F9FA]/40">
+          <div
+            onMouseDown={(e) => e.preventDefault()}
+            className="flex-1 overflow-y-auto px-4 py-3 bg-[#F8F9FA]/40"
+          >
             {isSearchingPlaces && (
               <div className="flex items-center justify-center py-8 text-[#6C757D]">
                 <Spinner className="h-5 w-5 ml-2 text-[#1B4965]" />
@@ -1839,8 +1902,12 @@ export default function CustomerHomePage() {
                 </p>
                 {searchResults.map((place, idx) => (
                   <div
-                    key={`${place.lat}-${place.lon}-${idx}`}
-                    onClick={() => handleSelectPlace({ name: place.name, lat: place.lat, lng: place.lon })}
+                    key={`${place.lat}-${(place as any).lon ?? (place as any).lng ?? idx}-${idx}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectPlace(place);
+                    }}
                     className="group flex items-center justify-between p-3 rounded-xl border border-transparent bg-white hover:border-slate-200/80 hover:shadow-card transition-all duration-200 cursor-pointer"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -1862,13 +1929,18 @@ export default function CustomerHomePage() {
 
                     <button
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={(e) => {
                         e.stopPropagation();
-                        addFavoritePlace({ name: place.name, lat: place.lat, lng: place.lon });
+                        addFavoritePlace({
+                          name: place.name,
+                          lat: place.lat,
+                          lng: (place as any).lon ?? (place as any).lng ?? place.lat,
+                        });
                         setFavoritePlaces(getFavoritePlaces());
                         show(`تمت إضافة ${place.name} إلى المفضلة ⭐`, 'success');
                       }}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
                       title="إضافة للمفضلة"
                     >
                       <svg
@@ -1893,7 +1965,11 @@ export default function CustomerHomePage() {
                   {recentPlacesList.map((item) => (
                     <div
                       key={`${item.name}-${item.lat}-${item.lng}`}
-                      onClick={() => handleSelectPlace(item)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectPlace(item);
+                      }}
                       className="group flex items-center justify-between p-3 rounded-xl border border-transparent bg-white hover:border-slate-200/80 hover:shadow-card transition-all duration-200 cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -1925,13 +2001,14 @@ export default function CustomerHomePage() {
 
                       <button
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={(e) => {
                           e.stopPropagation();
                           addFavoritePlace({ name: item.name, address: item.address, lat: item.lat, lng: item.lng });
                           setFavoritePlaces(getFavoritePlaces());
                           show(`تمت إضافة ${item.name} إلى المفضلة ⭐`, 'success');
                         }}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
                         title="إضافة للمفضلة"
                       >
                         <svg

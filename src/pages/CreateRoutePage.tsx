@@ -319,13 +319,20 @@ export default function CreateRoutePage() {
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-brand-amber"
               />
               {searchResults.length > 0 && (
-                <div className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-100">
+                <div
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-100"
+                >
                   {searchResults.map((p, i) => (
                     <button
                       key={`${p.lat}-${p.lon}-${i}`}
                       type="button"
-                      onClick={() => selectPlace(p)}
-                      className="flex w-full items-center gap-2 border-b border-slate-50 px-3 py-2.5 text-right text-sm hover:bg-amber-50"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectPlace(p);
+                      }}
+                      className="flex w-full items-center gap-2 border-b border-slate-50 px-3 py-2.5 text-right text-sm hover:bg-amber-50 cursor-pointer"
                     >
                       <span className="text-brand-amber">📍</span>
                       <span className="truncate">{p.name}</span>
