@@ -59,17 +59,42 @@ export class PollingRealtimeAdapter implements RealtimeAdapter {
     if (!this.connected || this.polling || !this.trips.size) return;
     this.polling = true;
     try {
+      // 1. Direct status poll for joined ride requests
+      for (const tripId of Array.from(this.trips)) {
+        if (!this.connected) break;
+        try {
+          const { data } = await http.get<{
+            success: boolean;
+            request?: { status: string; assignedDriverId?: string; acceptedDriverId?: string };
+          }>(`/ride/status/${tripId}`);
+          if (data?.success && data.request?.status) {
+            this.statuses.forEach((cb) => cb({ tripId, status: data.request!.status }));
+            const drvId = data.request.acceptedDriverId || data.request.assignedDriverId;
+            if (drvId) {
+              try {
+                const { data: location } = await http.get<DriverLocationEvent>(endpoints.driverLive(drvId));
+                if (Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude)) {
+                  this.locations.forEach((cb) => cb({ ...location, heading: location.heading ?? 0 }));
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 2. Scheduled seat bookings poll
       const { data } = await http.get<Array<{ bookingId?: string; id?: string; driverId?: string; status?: string }>>(endpoints.bookings);
-      if (!Array.isArray(data)) return;
-      for (const booking of data) {
-        const tripId = booking.bookingId ?? booking.id ?? '';
-        if (!this.connected || !this.trips.has(tripId)) continue;
-        if (booking.status) this.statuses.forEach(cb => cb({ tripId, status: booking.status! }));
-        if (!booking.driverId) continue;
-        const { data: location } = await http.get<DriverLocationEvent>(endpoints.driverLive(booking.driverId));
-        if (!this.connected || !this.trips.has(tripId)) continue;
-        if (Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
-          this.locations.forEach(cb => cb({ ...location, heading: location.heading ?? 0 }));
+      if (Array.isArray(data)) {
+        for (const booking of data) {
+          const tripId = booking.bookingId ?? booking.id ?? '';
+          if (!this.connected || !this.trips.has(tripId)) continue;
+          if (booking.status) this.statuses.forEach(cb => cb({ tripId, status: booking.status! }));
+          if (!booking.driverId) continue;
+          const { data: location } = await http.get<DriverLocationEvent>(endpoints.driverLive(booking.driverId));
+          if (!this.connected || !this.trips.has(tripId)) continue;
+          if (Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
+            this.locations.forEach(cb => cb({ ...location, heading: location.heading ?? 0 }));
+          }
         }
       }
     } catch { /* إعادة المحاولة في الدورة التالية */ }

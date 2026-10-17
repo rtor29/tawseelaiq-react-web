@@ -12,6 +12,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
+import { realtime } from '../lib/realtime';
 import { distanceKm } from '../lib/geo';
 import { searchPlaces, reverseGeocode, getDirections, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import {
@@ -182,6 +183,13 @@ export default function CustomerHomePage() {
   const mapRef = useRef<MapRef>(null);
 
   const session = authStore.getSession();
+  const rawRole = session?.role || storage.getUserRole() || 'Customer';
+  const isCaptain = rawRole.toLowerCase() === 'driver' || rawRole.toLowerCase() === 'captain';
+  const isPassenger = !isCaptain;
+
+  // حالة الرحلة اللحظية: Pending | Accepted | Arrived | InProgress | Completed | Cancelled
+  const [rideStatus, setRideStatus] = useState<string>('Pending');
+
   const customerName = session?.fullName || storage.getFullName() || 'المستخدم';
   const rawPhone = storage.getPhone() || '';
   const formattedPhone = rawPhone
@@ -281,6 +289,7 @@ export default function CustomerHomePage() {
           savedReqId = saved.rideRequestId;
           setRideRequestId(saved.rideRequestId);
           setStage(saved.stage);
+          if (saved.rideStatus) setRideStatus(saved.rideStatus);
           if (saved.pickup) setPickup(saved.pickup);
           if (saved.pickupName) setPickupName(saved.pickupName);
           if (saved.dropoff) setDropoff(saved.dropoff);
@@ -310,10 +319,12 @@ export default function CustomerHomePage() {
             .then((res) => {
               if (res.data?.success && res.data.request) {
                 const req = res.data.request;
-                if (req.status === 'Accepted' || req.status === 'Arrived') {
+                if (req.status === 'Accepted' || req.status === 'Arrived' || req.status === 'InProgress' || req.status === 'in_progress') {
                   setStage('driver_arriving');
+                  setRideStatus(req.status);
                 } else if (req.status === 'Pending') {
                   setStage('searching');
+                  setRideStatus('Pending');
                 } else if (
                   req.status === 'Completed' ||
                   req.status === 'Cancelled' ||
@@ -354,8 +365,9 @@ export default function CustomerHomePage() {
             if (res.data?.success && res.data.activeRide) {
               const r = res.data.activeRide;
               setRideRequestId(r.id);
-              const curStage = (r.status === 'Accepted' || r.status === 'Arrived') ? 'driver_arriving' : 'searching';
+              const curStage = (r.status === 'Accepted' || r.status === 'Arrived' || r.status === 'InProgress' || r.status === 'in_progress') ? 'driver_arriving' : 'searching';
               setStage(curStage);
+              setRideStatus(r.status);
               if (r.pickupLat && r.pickupLon) {
                 setPickup({ lat: parseFloat(r.pickupLat), lng: parseFloat(r.pickupLon) });
               }
@@ -385,6 +397,7 @@ export default function CustomerHomePage() {
       const dataToSave = {
         rideRequestId,
         stage,
+        rideStatus,
         pickup,
         pickupName,
         dropoff,
@@ -395,7 +408,7 @@ export default function CustomerHomePage() {
       };
       localStorage.setItem('TAWSEELA_ACTIVE_TAXI_RIDE', JSON.stringify(dataToSave));
     }
-  }, [rideRequestId, stage, pickup, pickupName, dropoff, dropoffName, selectedTierId, assignedDriverInfo, routeCoordinates]);
+  }, [rideRequestId, stage, rideStatus, pickup, pickupName, dropoff, dropoffName, selectedTierId, assignedDriverInfo, routeCoordinates]);
 
 
 
@@ -738,6 +751,7 @@ export default function CustomerHomePage() {
       if (data.success && data.request) {
         hasNotifiedArrivalRef.current = false;
         setRideRequestId(data.request.id);
+        setRideStatus('Pending');
         let assignedDriverData = null;
         if (data.assignedDriver) {
           assignedDriverData = {
@@ -757,6 +771,7 @@ export default function CustomerHomePage() {
           localStorage.setItem('TAWSEELA_ACTIVE_TAXI_RIDE', JSON.stringify({
             rideRequestId: data.request.id,
             stage: 'searching',
+            rideStatus: 'Pending',
             pickup,
             pickupName,
             dropoff,
@@ -800,15 +815,25 @@ export default function CustomerHomePage() {
         if (data.success && data.request) {
           const req = data.request;
           if (req.status === 'Accepted') {
+            setRideStatus('Accepted');
             if (stage !== 'driver_arriving') {
               setStage('driver_arriving');
               show('تم قبول رحلتك من قبل الكابتن! 🚖 الكابتن في طريقه إليك', 'success');
               mapRef.current?.flyTo({ center: [pickup.lng, pickup.lat], zoom: 15.5, duration: 700 });
             }
           } else if (req.status === 'Arrived') {
+            setRideStatus('Arrived');
             if (!hasNotifiedArrivalRef.current) {
               hasNotifiedArrivalRef.current = true;
               show('الكابتن وصل إلى موقعك الآن! 🚗', 'success', 5000);
+            }
+          } else if (req.status === 'InProgress' || req.status === 'in_progress') {
+            if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
+              setRideStatus('InProgress');
+              show('انطلقت الرحلة الآن! الكابتن في الطريق إلى الوجهة 🚗💨', 'success', 5000);
+              if (dropoff.lat && dropoff.lng) {
+                mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
+              }
             }
           } else if (req.status === 'Completed') {
             hasNotifiedArrivalRef.current = false;
@@ -839,10 +864,62 @@ export default function CustomerHomePage() {
           }
         }
       } catch (_) {}
-    }, 2500);
+    }, 1800);
 
     return () => clearInterval(interval);
-  }, [rideRequestId, stage, pickup]);
+  }, [rideRequestId, stage, pickup, dropoff, rideStatus]);
+
+  // اشتراك لحظي في أحداث الرحلة عبر SignalR / Realtime
+  useEffect(() => {
+    if (!rideRequestId) return;
+    void realtime.joinTrip(rideRequestId);
+    const unsub = realtime.onTripStatus((e) => {
+      if (e.tripId === rideRequestId) {
+        if (e.status === 'Accepted') {
+          setRideStatus('Accepted');
+          if (stage !== 'driver_arriving') {
+            setStage('driver_arriving');
+            show('تم قبول رحلتك من قبل الكابتن! 🚖', 'success');
+          }
+        } else if (e.status === 'Arrived') {
+          setRideStatus('Arrived');
+          if (!hasNotifiedArrivalRef.current) {
+            hasNotifiedArrivalRef.current = true;
+            show('الكابتن وصل إلى موقعك الآن! 🚗', 'success', 5000);
+          }
+        } else if (e.status === 'InProgress' || e.status === 'in_progress') {
+          if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
+            setRideStatus('InProgress');
+            show('انطلقت الرحلة الآن! الكابتن في الطريق إلى الوجهة 🚗💨', 'success', 5000);
+            if (dropoff.lat && dropoff.lng) {
+              mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
+            }
+          }
+        } else if (e.status === 'Completed') {
+          hasNotifiedArrivalRef.current = false;
+          localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+          show('تم إكمال الرحلة بنجاح. شكراً لاستخدامك توصيلة! ✨', 'success');
+          setStage('pickup');
+          setRideRequestId(null);
+          setAssignedDriverInfo(null);
+          setLiveDriverPosition(null);
+        } else if (e.status === 'Cancelled') {
+          hasNotifiedArrivalRef.current = false;
+          localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+          show('تم إلغاء الرحلة', 'warning');
+          setStage('ride_options');
+          setRideRequestId(null);
+          setAssignedDriverInfo(null);
+          setLiveDriverPosition(null);
+        }
+      }
+    });
+
+    return () => {
+      unsub();
+      void realtime.leaveTrip(rideRequestId);
+    };
+  }, [rideRequestId, dropoff, rideStatus, stage]);
 
   // تتبع موقع السائق الحي على الخريطة
   useEffect(() => {
@@ -1505,19 +1582,56 @@ export default function CustomerHomePage() {
               <svg className="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             </div>
 
-            {/* زر "السائق وصل — انطلق!" يفتح Waze/Google Maps وزر إلغاء الرحلة */}
+            {/* حالة الرحلة للراكب أو زر انطلاق للكابتن */}
             <div className="px-5 flex flex-col gap-2">
-              <button type="button" onClick={handleOpenNavigation}
-                className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition active:scale-[0.98] hover:bg-orange-600 cursor-pointer">
-                🚗 السائق وصل — انطلاق إلى الوجهة
-              </button>
-              <button
-                type="button"
-                onClick={() => { setIsCancelTripOpen(true); setCancelReason(null); }}
-                className="w-full py-2 text-center text-[14px] font-bold text-red-500 hover:text-red-700 transition cursor-pointer"
-              >
-                إلغاء الرحلة
-              </button>
+              {isCaptain ? (
+                <button type="button" onClick={handleOpenNavigation}
+                  className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[16px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition active:scale-[0.98] hover:bg-orange-600 cursor-pointer">
+                  🚗 السائق وصل — انطلاق إلى الوجهة
+                </button>
+              ) : isPassenger ? (
+                /* شريط حالة نصي غير تفاعلي للراكب */
+                <div className={`w-full rounded-2xl py-3 px-4 text-center select-none border transition-all ${
+                  rideStatus === 'InProgress' || rideStatus === 'in_progress'
+                    ? 'bg-emerald-50 border-emerald-200/80 text-emerald-800'
+                    : rideStatus === 'Arrived'
+                    ? 'bg-amber-50 border-amber-200/80 text-amber-900'
+                    : 'bg-slate-100 border-slate-200 text-[#1B4965]'
+                }`}>
+                  <div className="flex items-center justify-center gap-2">
+                    {rideStatus === 'InProgress' || rideStatus === 'in_progress' ? (
+                      <span className="text-[15px] font-black">في الطريق إلى الوجهة 🚗💨</span>
+                    ) : rideStatus === 'Arrived' ? (
+                      <>
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-ping mr-1" />
+                        <span className="text-[14.5px] font-bold">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="inline-block h-2 w-2 rounded-full bg-[#1B4965] animate-pulse mr-1" />
+                        <span className="text-[14.5px] font-bold">الكابتن في طريقه إليك 🚗</span>
+                      </>
+                    )}
+                  </div>
+                  {rideStatus === 'Arrived' && (
+                    <p className="text-[12px] text-amber-700/90 mt-1 font-medium">بانتظار تأكيد السائق لبدء الرحلة ⏳</p>
+                  )}
+                  {(rideStatus === 'InProgress' || rideStatus === 'in_progress') && (
+                    <p className="text-[12px] text-emerald-700/90 mt-1 font-medium">الرحلة جارية الآن نحو وجهتك المحددة ✨</p>
+                  )}
+                </div>
+              ) : null}
+
+              {/* زر إلغاء الرحلة متاح للراكب لحين بدء الرحلة فعلياً */}
+              {(!rideStatus || (rideStatus !== 'InProgress' && rideStatus !== 'in_progress' && rideStatus !== 'Completed')) && (
+                <button
+                  type="button"
+                  onClick={() => { setIsCancelTripOpen(true); setCancelReason(null); }}
+                  className="w-full py-2.5 text-center text-[14px] font-bold text-red-500 hover:text-red-700 transition cursor-pointer"
+                >
+                  إلغاء الرحلة
+                </button>
+              )}
             </div>
           </div>
         )}

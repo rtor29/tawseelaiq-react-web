@@ -379,6 +379,37 @@ export default function DriverHomePage() {
     } catch (_) {}
   }
 
+  // السائق انطلق إلى الوجهة بعد صعود الراكب
+  async function handleDriverStartRide() {
+    if (!activeRide || !driverId) return;
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string; status?: string }>('/ride/start', {
+        requestId: activeRide.id,
+        driverId,
+      });
+      if (data?.success) {
+        show('تم بدء الرحلة والانطلاق إلى الوجهة 🚗💨', 'success');
+        setActiveRide((prev: any) => ({ ...prev, status: 'InProgress' }));
+
+        // تشغيل الملاحة تلقائياً نحو وجهة الوصول
+        const destLat = activeRide.dropoffLat || activeRide.dropoff_lat;
+        const destLon = activeRide.dropoffLon || activeRide.dropoff_lon;
+        if (destLat && destLon) {
+          const wazeUrl = `waze://ul?ll=${destLat},${destLon}&navigate=yes`;
+          const googleUrl = `https://maps.google.com/?daddr=${destLat},${destLon}`;
+          const a = document.createElement('a');
+          a.href = wazeUrl;
+          a.click();
+          setTimeout(() => { window.open(googleUrl, '_blank'); }, 1200);
+        }
+      } else {
+        show(data?.message || 'تعذر بدء الرحلة', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ في بدء الرحلة', 'error');
+    }
+  }
+
   // السائق أنهى المشوار
   async function handleDriverComplete() {
     if (!activeRide || !driverId) return;
@@ -732,11 +763,15 @@ export default function DriverHomePage() {
             </div>
 
             {/* بطاقة المشوار النشط إن وُجد وكان مقبولاً */}
-            {activeRide && (activeRide.status === 'Accepted' || activeRide.status === 'Arrived' || activeRide.status === 'InProgress') ? (
+            {activeRide && (activeRide.status === 'Accepted' || activeRide.status === 'Arrived' || activeRide.status === 'InProgress' || activeRide.status === 'in_progress') ? (
               <div className="rounded-xl border border-emerald-500/80 bg-white p-4 shadow-subtle animate-fade-in">
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                   <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 border border-emerald-200/60">
-                    {activeRide.status === 'Arrived' ? 'وصلت إلى الراكب 📍' : 'مشوار نشط 🚖'}
+                    {activeRide.status === 'Arrived'
+                      ? 'وصلت إلى الراكب 📍'
+                      : (activeRide.status === 'InProgress' || activeRide.status === 'in_progress')
+                      ? 'في الطريق إلى الوجهة 🚗'
+                      : 'مشوار نشط 🚖'}
                   </span>
                   <span className="text-[15px] font-bold text-[#1A1A1A]">
                     {activeRide.fare} د.ع
@@ -761,21 +796,29 @@ export default function DriverHomePage() {
                 </div>
 
                 <div className="space-y-2">
-                  {activeRide.status !== 'Arrived' ? (
+                  {activeRide.status === 'Accepted' ? (
                     <button
                       type="button"
                       onClick={handleDriverArrived}
-                      className="w-full rounded-xl bg-emerald-600 py-3 text-center text-[14.5px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
+                      className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
                     >
-                      وصلت إلى موقع الانطلاق 📍
+                      📍 وصلت إلى موقع الانطلاق
+                    </button>
+                  ) : activeRide.status === 'Arrived' ? (
+                    <button
+                      type="button"
+                      onClick={handleDriverStartRide}
+                      className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[15.5px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition-all duration-200 active:scale-[0.98] cursor-pointer hover:bg-orange-600"
+                    >
+                      🚗 السائق وصل — انطلاق إلى الوجهة
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleDriverComplete}
-                      className="w-full rounded-xl bg-[#1B4965] py-3 text-center text-[14.5px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-[#14364A]"
+                      className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-[#14364A]"
                     >
-                      إنهاء المشوار واستلام الأجرة 🏁
+                      🏁 إنهاء المشوار واستلام الأجرة
                     </button>
                   )}
 
@@ -809,9 +852,12 @@ export default function DriverHomePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const destLat = activeRide.status === 'Arrived' ? activeRide.dropoffLat : activeRide.pickupLat;
-                      const destLon = activeRide.status === 'Arrived' ? activeRide.dropoffLon : activeRide.pickupLon;
-                      window.open(`https://maps.google.com/?daddr=${destLat},${destLon}`, '_blank');
+                      const isHeadToDropoff = activeRide.status === 'Arrived' || activeRide.status === 'InProgress' || activeRide.status === 'in_progress';
+                      const destLat = isHeadToDropoff ? (activeRide.dropoffLat || activeRide.dropoff_lat) : (activeRide.pickupLat || activeRide.pickup_lat);
+                      const destLon = isHeadToDropoff ? (activeRide.dropoffLon || activeRide.dropoff_lon) : (activeRide.pickupLon || activeRide.pickup_lon);
+                      if (destLat && destLon) {
+                        window.open(`https://maps.google.com/?daddr=${destLat},${destLon}`, '_blank');
+                      }
                     }}
                     className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-center text-[13.5px] font-bold text-[#1A1A1A] transition hover:bg-slate-50 cursor-pointer"
                   >
