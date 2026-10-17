@@ -156,6 +156,10 @@ export default function DriverHomePage() {
   }, [workStatus, driverId, driverName, rawPhone]);
 
   // دالة تحديث قائمة المشتركين المؤكدين في الخط الدائمي مع إزالة التكرار الصارم
+  // تتبع معرفات طلبات الإلغاء لتنبيه السائق فوراً عند وصول طلب جديد
+  const prevCancelIdsRef = useRef<Set<string>>(new Set());
+
+  // جلب ركاب الخط الدائمي المشتركين في خط الكابتن مع فحص طلبات الإلغاء
   const fetchSubscribers = useCallback(async () => {
     if (!driverId && !rawPhone) return;
     const targetId = driverId || rawPhone;
@@ -169,11 +173,33 @@ export default function DriverHomePage() {
         (b: any) =>
           b.status === 'Confirmed' ||
           b.status === 'cancellation_pending' ||
-          b.cancellationPending === true ||
+          Boolean(b.cancellationPending) ||
+          Boolean(b.cancellation_requested) ||
+          b.cancellation_status === 'pending' ||
+          Boolean(b.cancellationReason || b.cancellation_reason) ||
           (!b.status && b.bookingConfirmed !== false && b.status !== 'Cancelled')
       );
 
-      // تطبيق إزالة التكرار الصارم بحيث يظهر كل راكب مرة واحدة فقط
+      // ترتيب الحجوزات بحيث تظهر الحجوزات التي بها طلب إلغاء معلق أولاً لضمان عدم ضياعها في الفلترة
+      confirmed.sort((a: any, b: any) => {
+        const aPending =
+          a.status === 'cancellation_pending' ||
+          Boolean(a.cancellationPending) ||
+          Boolean(a.cancellation_requested) ||
+          a.cancellation_status === 'pending' ||
+          Boolean(a.cancellationReason || a.cancellation_reason);
+        const bPending =
+          b.status === 'cancellation_pending' ||
+          Boolean(b.cancellationPending) ||
+          Boolean(b.cancellation_requested) ||
+          b.cancellation_status === 'pending' ||
+          Boolean(b.cancellationReason || b.cancellation_reason);
+        if (aPending && !bPending) return -1;
+        if (!aPending && bPending) return 1;
+        return 0;
+      });
+
+      // تطبيق إزالة التكرار الصارم بحيث يظهر كل راكب مرة واحدة فقط مع حفظ حالة الإلغاء
       const seen = new Set<string>();
       const uniqueConfirmed: any[] = [];
       for (const b of confirmed) {
@@ -186,24 +212,64 @@ export default function DriverHomePage() {
         }
       }
 
+      // فحص وصول طلب إلغاء جديد لتنبيه السائق صوتياً وإشعاراً فورياً
+      const currentCancelSubs = uniqueConfirmed.filter(
+        (b: any) =>
+          b.status === 'cancellation_pending' ||
+          Boolean(b.cancellationPending) ||
+          Boolean(b.cancellation_requested) ||
+          b.cancellation_status === 'pending' ||
+          Boolean(b.cancellationReason || b.cancellation_reason)
+      );
+
+      const newCancels = currentCancelSubs.filter((b: any) => {
+        const id = b.id || b.bookingId;
+        return id && !prevCancelIdsRef.current.has(id);
+      });
+
+      if (newCancels.length > 0 && prevCancelIdsRef.current.size > 0) {
+        show(`تنبيه عاجل: وصلك طلب إلغاء اشتراك من الراكب (${newCancels[0].customerName || 'مشترك'}) ⚠️`, 'warning', 7000);
+      }
+
+      const nextSet = new Set<string>();
+      currentCancelSubs.forEach((b: any) => {
+        const id = b.id || b.bookingId;
+        if (id) nextSet.add(id);
+      });
+      prevCancelIdsRef.current = nextSet;
+
       setSubscribers(
-        uniqueConfirmed.map((b: any, idx: number) => ({
-          id: b.id || b.bookingId || String(idx),
-          name: b.customerName || b.passengerName || 'مشترك خط دائمي',
-          from: b.pickupLocation || b.pickupAddress || b.from || 'نقطة الانطلاق',
-          to: b.dropoffLocation || b.dropoffAddress || b.to || 'الوجهة',
-          phone: b.customerPhone || b.phone || '',
-          status: b.status,
-          cancellationPending: b.status === 'cancellation_pending' || Boolean(b.cancellationPending),
-          cancellationReason: b.cancellationReason || b.passengerReason || '',
-          cancellationDetails: b.cancellationDetails || b.passengerDetails || '',
-        }))
+        uniqueConfirmed.map((b: any, idx: number) => {
+          const isCancelPending =
+            b.status === 'cancellation_pending' ||
+            Boolean(b.cancellationPending) ||
+            Boolean(b.cancellation_requested) ||
+            b.cancellation_status === 'pending' ||
+            Boolean(b.cancellationReason || b.cancellation_reason);
+
+          return {
+            id: b.id || b.bookingId || String(idx),
+            name: b.customerName || b.passengerName || 'مشترك خط دائمي',
+            from: b.pickupLocation || b.pickupAddress || b.from || 'نقطة الانطلاق',
+            to: b.dropoffLocation || b.dropoffAddress || b.to || 'الوجهة',
+            phone: b.customerPhone || b.phone || '',
+            status: b.status,
+            cancellationPending: isCancelPending,
+            cancellationReason: b.cancellationReason || b.cancellation_reason || b.passengerReason || b.passenger_reason || '',
+            cancellationDetails: b.cancellationDetails || b.cancellation_details || b.passengerDetails || b.passenger_details || '',
+          };
+        })
       );
     } catch (_) {}
-  }, [driverId, rawPhone]);
+  }, [driverId, rawPhone, show]);
 
   useEffect(() => {
     void fetchSubscribers();
+    // استطلاع سريع كل 5 ثوانٍ لجلب أي تحديثات لحظية على حجوزات وإلغاءات ركاب الخط الدائمي
+    const interval = setInterval(() => {
+      void fetchSubscribers();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [fetchSubscribers]);
 
   // استطلاع طلبات حجز المقاعد الواردة في الخط الدائمي وتنبيه السائق فوراً

@@ -30,6 +30,7 @@ interface DriverItem {
   seats: number;
   takenSeats: number;
   phone: string;
+  routeId?: string;
 }
 
 function getDriverColor(distKm: number): { bg: string; text: string; label: string } {
@@ -115,7 +116,11 @@ export default function DailyRoutePage() {
 
   const isCancellationPending = Boolean(
     matchingBooking &&
-      (matchingBooking.status === 'cancellation_pending' || matchingBooking.cancellationPending)
+      (matchingBooking.status === 'cancellation_pending' ||
+        Boolean(matchingBooking.cancellationPending) ||
+        Boolean(matchingBooking.cancellation_requested) ||
+        matchingBooking.cancellation_status === 'pending' ||
+        Boolean(matchingBooking.cancellationReason || matchingBooking.cancellation_reason))
   );
 
   // جلب موقع المستخدم الحقيقي عبر GPS المتوافق مع iOS Safari
@@ -268,12 +273,15 @@ export default function DailyRoutePage() {
       const customerId = session?.userId || storage.getUserId() || '';
       const customerPhone = storage.getPhone() || '';
       const bookingId = matchingBooking?.id || matchingBooking?.bookingId;
+      const targetDriverId = String(selectedDriver.driverId || selectedDriver.id || selectedDriver.phone || '');
 
-      const { data } = await http.post<{ success: boolean; message?: string }>('/customer/request-route-cancellation', {
-        bookingId,
+      const { data } = await http.post<{ success: boolean; message?: string; request?: any }>('/customer/request-route-cancellation', {
+        bookingId: bookingId || undefined,
         customerId,
         customerPhone,
-        driverId: String(selectedDriver.driverId || selectedDriver.id),
+        driverId: targetDriverId,
+        routeId: selectedDriver.routeId || matchingBooking?.routeId || undefined,
+        route: selectedDriver.from && selectedDriver.to ? `${selectedDriver.from} ➔ ${selectedDriver.to}` : undefined,
         reason: cancelReason,
         details: cancelDetails.trim(),
       });
@@ -281,16 +289,22 @@ export default function DailyRoutePage() {
       if (data?.success) {
         show('تم إرسال طلب الإلغاء للسائق للمراجعة ✅', 'success', 5000);
         setIsCancelModalOpen(false);
+        const resolvedBookingId = bookingId || data?.request?.bookingId || 'bk-cancel-pending';
         setCustomerBookings((prev) => [
-          ...prev.filter((b) => b.id !== bookingId),
+          ...prev.filter((b) => b.id !== resolvedBookingId && b.bookingId !== resolvedBookingId),
           {
             ...(matchingBooking || {}),
-            id: bookingId,
-            driverId: String(selectedDriver.driverId || selectedDriver.id),
+            id: resolvedBookingId,
+            bookingId: resolvedBookingId,
+            driverId: targetDriverId,
             status: 'cancellation_pending',
             cancellationPending: true,
+            cancellation_requested: true,
+            cancellation_status: 'pending',
             cancellationReason: cancelReason,
+            cancellation_reason: cancelReason,
             cancellationDetails: cancelDetails.trim(),
+            cancellation_details: cancelDetails.trim(),
           },
         ]);
       } else {
