@@ -25,6 +25,9 @@ currentSession = readSession();
 
 export const authStore = {
   getSession(): Session | null {
+    if (!storage.getToken()) {
+      currentSession = null;
+    }
     return currentSession;
   },
 
