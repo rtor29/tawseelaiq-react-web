@@ -118,13 +118,12 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
               type="button"
               onClick={() => setIsDrawerOpen(true)}
               className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
-              aria-label="القائمة والحساب"
+              aria-label="الحساب والإعدادات"
               title="الحساب والإعدادات"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="18" x2="21" y2="18" />
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
             </button>
             <div>
@@ -353,17 +352,18 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
             أيقونتان فقط: الرئيسية (مفعلة) والحساب (تفتح القائمة)
             ==================================================================== */}
         <nav
-          className="fixed bottom-0 inset-x-0 z-30 max-w-[480px] mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-8 py-2 flex items-center justify-around shadow-subtle"
+          className="fixed bottom-0 inset-x-0 z-30 max-w-[480px] mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-8 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0.5rem))] flex items-center justify-around shadow-subtle"
           aria-label="شريط التنقل الرئيسي"
         >
           {/* زر الرئيسية (نشط دائماً في شاشة الهب) */}
           <button
             type="button"
-            className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-amber-500/10 text-amber-700 font-bold text-[13px] transition-all cursor-default select-none"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500/10 text-amber-700 font-bold text-[13.5px] transition-all cursor-default select-none"
             aria-current="page"
           >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
             <span>الرئيسية</span>
           </button>
@@ -372,10 +372,10 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-2xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 font-medium text-[13px] transition-all cursor-pointer select-none active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-bold text-[13.5px] transition-all cursor-pointer select-none active:scale-95"
             aria-label="الحساب والإعدادات"
           >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>

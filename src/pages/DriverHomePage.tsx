@@ -6,6 +6,9 @@ import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
 import { useToast } from '../components/Toast';
 import { normalizePhoneLoose } from '../lib/phone';
+import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { config } from '../lib/config';
 
 const ChatModal = lazy(() => import('../components/ChatModal'));
 
@@ -160,6 +163,49 @@ export default function DriverHomePage() {
   const [cancellingSub, setCancellingSub] = useState<Subscriber | null>(null);
   const [driverApprovalReason, setDriverApprovalReason] = useState('تم التراضي مع الراكب');
   const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
+
+  // مرجع الخريطة وموقع السائق وتوسيط الخريطة
+  const mapRef = useRef<MapRef | null>(null);
+  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number }>({ lat: 31.9961, lng: 44.3168 });
+  const [isLocating, setIsLocating] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setDriverLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        },
+        () => {},
+        { enableHighAccuracy: false, timeout: 5000 }
+      );
+    }
+  }, []);
+
+  function handleRecenterDriverMap() {
+    setIsLocating(true);
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setIsLocating(false);
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setDriverLoc({ lat, lng });
+          mapRef.current?.flyTo({ center: [lng, lat], zoom: 15.5, duration: 1000 });
+          sendDriverStatusUpdate(workStatus);
+          show('تم تحديد موقعك وتوسيط الخريطة بنجاح 📍', 'success', 2000);
+        },
+        () => {
+          setIsLocating(false);
+          mapRef.current?.flyTo({ center: [driverLoc.lng, driverLoc.lat], zoom: 15, duration: 1000 });
+          show('تعذر جلب موقع GPS، تم التوسيط على آخر موقع مسجل', 'info', 2000);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      setIsLocating(false);
+      mapRef.current?.flyTo({ center: [driverLoc.lng, driverLoc.lat], zoom: 15, duration: 1000 });
+    }
+  }
 
   useEffect(() => {
     void realtime.connect(storage.getToken());
@@ -1083,35 +1129,45 @@ export default function DriverHomePage() {
         {workStatus === 'taxi' && (
           <section className="mb-6 space-y-4">
             {/* عنوان القسم */}
-            <h3 className="text-[15px] font-bold text-[#1A1A1A] text-right">تفعيل الموقع وتلقي طلبات الركاب</h3>
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                تتبع الـ GPS نشط 🟢
+              </span>
+              <h3 className="text-[15px] font-bold text-[#1A1A1A] text-right">خريطة الكابتن وتحديد الموقع</h3>
+            </div>
 
-            {/* كارت تفعيل الموقع */}
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-card">
-              <div className="flex items-start gap-3 mb-3.5" dir="rtl">
-                {/* أيقونة الخريطة */}
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965]">
-                  <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                </div>
-                <div className="text-right">
-                  <p className="text-[15px] font-bold text-[#1A1A1A]">تفعيل الموقع على الخريطة</p>
-                  <p className="text-[12.5px] font-semibold text-[#1B4965] mt-0.5">جاهز لتلقي طلبات المشاوير</p>
-                  <p className="text-[12px] font-medium text-[#6C757D] mt-1 leading-relaxed">
-                    شغّل تتبع الحركة لتصلك إشعارات وطلبات الركاب القريبين منك فوراً
-                  </p>
-                </div>
-              </div>
+            {/* خريطة تتبع الموقع التفاعلية للكابتن مع زر تحديد الموقع العائم */}
+            <div className="relative w-full h-[320px] rounded-2xl overflow-hidden shadow-card border border-slate-200">
+              <MapGL
+                ref={mapRef}
+                mapboxAccessToken={config.mapboxToken}
+                mapStyle={config.mapStyle}
+                initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <Marker longitude={driverLoc.lng} latitude={driverLoc.lat} anchor="center">
+                  <div className="relative flex items-center justify-center">
+                    <div className="animate-ping absolute h-8 w-8 rounded-full bg-amber-500/30" />
+                    <div className="h-7 w-7 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center text-white text-xs">
+                      🚕
+                    </div>
+                  </div>
+                </Marker>
+              </MapGL>
 
-              {/* زر الذهاب للخريطة */}
+              {/* زر تحديد موقعي الحالي العائم على الخريطة */}
               <button
                 type="button"
-                onClick={() => show('تم تفعيل تتبع الموقع على الخريطة', 'success')}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1B4965] hover:bg-[#14364A] py-3 text-white font-bold text-[14.5px] shadow-subtle transition-all duration-200 active:scale-95 cursor-pointer"
+                onClick={handleRecenterDriverMap}
+                disabled={isLocating}
+                className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 z-30 bg-white p-3 rounded-full shadow-lg border border-slate-200 active:scale-95 transition-all text-amber-500 cursor-pointer hover:bg-slate-50 disabled:opacity-70"
+                title="تحديد موقعي وتوسيط الخريطة"
+                aria-label="تحديد موقعي"
               >
-                <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" /></svg>
-                <span>الذهاب للخريطة وتشغيل التتبع</span>
+                <svg className={`h-6 w-6 ${isLocating ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+                </svg>
               </button>
             </div>
 
