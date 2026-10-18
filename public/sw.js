@@ -4,10 +4,11 @@
 // - استراتيجية Network-First مع السقوط على الكاش للتنقل عند انقطاع أو ضعف الاتصال
 // - استثناء استعلامات الـ API و Mapbox الحية من الكاش للحفاظ على دقة التتبع اللحظي
 
-const CACHE_NAME = 'tawseela-static-v17';
+const CACHE_NAME = 'tawseela-static-v18';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
+  '/fonts/arial-unicode-ms.woff2',
   '/manifest.webmanifest',
   '/manifest.json',
   '/app-icon.png',

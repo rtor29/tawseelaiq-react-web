@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Arial Unicode MS Regular';
+  src: url('/fonts/arial-unicode-ms.woff2') format('woff2'),
+       local('Arial Unicode MS Regular'),
+       local('Arial Unicode MS');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Arial Unicode MS';
+  src: url('/fonts/arial-unicode-ms.woff2') format('woff2'),
+       local('Arial Unicode MS Regular'),
+       local('Arial Unicode MS');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --primary-color: #1B4965;
   --primary-hover: #14364A;
@@ -9,7 +29,7 @@
   --bg-color: #F8FAFC;
   --card-bg: #FFFFFF;
   --text-color: #0F172A;
-  --font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Cairo', system-ui, -apple-system, sans-serif;
+  --font-family: 'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', system-ui, -apple-system, sans-serif;
   --app-font-size: 14px;
 }
 
@@ -239,20 +259,20 @@ body {
 }
 
 /* ==========================================================================
-   خط البحث في الخريطة والأماكن (Arial Unicode MS Regular)
+   خط البحث في الخريطة والأماكن (Map Search & Places Typography)
    ========================================================================== */
 .font-map-search,
 .font-map-search input,
 .font-map-search button,
 .font-map-search span,
 .font-map-search p {
-  font-family: 'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', Arial, sans-serif !important;
+  font-family: var(--font-family) !important;
   letter-spacing: 0.01em;
   line-height: 1.2;
 }
 
 .map-search-input {
-  font-family: 'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', Arial, sans-serif !important;
+  font-family: var(--font-family) !important;
   letter-spacing: 0.01em;
 }
 

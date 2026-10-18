@@ -70,9 +70,22 @@ export function applyTheme(theme: Partial<ThemeConfig>): ThemeConfig {
     const chosenFont = merged.fontFamily || 'Arial Unicode MS Regular';
     const fontStack = chosenFont.includes('Arial Unicode MS')
       ? `'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif`
-      : `"${chosenFont}", 'Tajawal', 'Cairo', system-ui, -apple-system, sans-serif`;
+      : `"${chosenFont}", 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif`;
     root.style.setProperty('--font-family', fontStack);
     document.body.style.fontFamily = fontStack;
+
+    let dynamicStyle = document.getElementById('tawseela-dynamic-theme-font');
+    if (!dynamicStyle) {
+      dynamicStyle = document.createElement('style');
+      dynamicStyle.id = 'tawseela-dynamic-theme-font';
+      document.head.appendChild(dynamicStyle);
+    }
+    dynamicStyle.textContent = `
+      body, html, input, button, select, textarea, p, h1, h2, h3, h4, h5, h6, table, th, td, label, div, span,
+      .font-cairo, .font-sans, .font-map-search, .map-search-input {
+        font-family: ${fontStack} !important;
+      }
+    `;
 
     // تطبيق حجم الخط
     const fontSize = merged.fontSize || '14px';

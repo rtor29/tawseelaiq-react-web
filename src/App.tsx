@@ -47,9 +47,28 @@ export default function App() {
   const session = useSession();
   const [ready, setReady] = useState(false);
 
-  // جلب وتطبيق المظهر المعتمد من لوحة التحكم والخادم
+  // جلب وتطبيق المظهر المعتمد من لوحة التحكم والخادم مع المزامنة اللحظية
   useEffect(() => {
     void fetchAndApplyTheme();
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'tawseela_theme' || e.key === 'tawseela_web_theme') {
+        void fetchAndApplyTheme();
+      }
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchAndApplyTheme();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // معالجة login_token من رابط العودة (OAuth/تليجرام) عند أول تحميل — بديل main.dart
