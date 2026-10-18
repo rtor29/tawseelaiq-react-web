@@ -818,10 +818,10 @@ export default function DriverHomePage() {
       dir="rtl"
     >
       {/* 1. الترويسة العلوية */}
-      <header className="shrink-0 sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 px-6 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-4 bg-white/95 backdrop-blur-sm shadow-sm">
+      <header className="shrink-0 sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 px-6 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-4 bg-white/95 backdrop-blur-sm shadow-sm" dir="rtl">
         {/* اليمين: معلومات السائق والصورة */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/80 shadow-subtle">
+        <div className="flex items-center gap-3.5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/80 shadow-subtle">
             <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
             </svg>
@@ -834,7 +834,7 @@ export default function DriverHomePage() {
 
         {/* اليسار: رقم الهاتف والرصيد ونقاط الكابتن */}
         <div className="text-left font-sans">
-          <p className="text-[13.5px] font-bold text-[#1A1A1A]" dir="ltr">{formattedPhone}</p>
+          <p className="text-[13.5px] font-bold text-[#1A1A1A] text-left" dir="ltr">{formattedPhone}</p>
           <div className="flex items-center justify-end gap-2 mt-0.5" dir="rtl">
             <p className="text-[12px] font-medium text-[#6C757D]">
               الرصيد: <span className="font-bold text-[#1A1A1A]">{driverBalance}</span> د.ع
@@ -850,26 +850,20 @@ export default function DriverHomePage() {
       </header>
 
       {/* المحتوى الرئيسي */}
-      <main className="flex-1 px-5 py-4 bg-[#F8F9FA]/40 pb-12">
+      <main className="flex-1 px-5 py-4 bg-[#F8F9FA]/40 pb-12" dir="rtl">
         {/* تنبيه وصول رسالة من الراكب */}
         {latestPassengerMsg && activeRide && (
           <div
             onClick={() => setIsChatOpen(true)}
             className="mb-4 flex items-center justify-between rounded-xl bg-[#1B4965] p-3.5 text-white shadow-subtle cursor-pointer transition active:scale-[0.99] hover:bg-[#14364A] animate-fade-in"
+            dir="rtl"
           >
-            <div className="flex items-center gap-2">
-              <span className="rounded-lg bg-white/15 px-3 py-1.5 text-[12px] font-bold text-white flex items-center gap-1.5">
-                <span>فتح المحادثة</span>
-                <span className="text-[14px]">💬</span>
-              </span>
-              {unreadCount > 0 && (
-                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white animate-pulse">
-                  {unreadCount} جديدة
-                </span>
-              )}
-            </div>
+            {/* اليمين: الأيقونة والنص */}
             <div className="flex items-center gap-3 text-right">
-              <div>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white text-[18px]">
+                💬
+              </div>
+              <div className="text-right">
                 <p className="text-[12px] font-medium text-white/80">
                   محادثة مع الراكب ({activeRide.customerName || 'الراكب'}):
                 </p>
@@ -877,9 +871,19 @@ export default function DriverHomePage() {
                   {latestPassengerMsg.text}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 text-white text-[16px]">
-                💬
-              </div>
+            </div>
+
+            {/* اليسار: زر فتح المحادثة وشارة الرسائل الجديدة */}
+            <div className="flex items-center gap-2 shrink-0">
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-bold text-white animate-pulse">
+                  {unreadCount} جديدة
+                </span>
+              )}
+              <span className="rounded-lg bg-white/15 px-3 py-1.5 text-[12px] font-bold text-white flex items-center gap-1.5">
+                <span>فتح المحادثة</span>
+                <span className="text-[13px]">➔</span>
+              </span>
             </div>
           </div>
         )}
@@ -889,11 +893,8 @@ export default function DriverHomePage() {
           <div
             onClick={() => handleSwitchWorkStatus('permanent')}
             className="mb-4 flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-[#1A1A1A] shadow-card cursor-pointer transition active:scale-[0.99] hover:bg-amber-100/60 animate-fade-in"
+            dir="rtl"
           >
-            <span className="rounded-lg bg-[#D97706] px-3 py-1.5 text-[12px] font-bold text-white shadow-xs flex items-center gap-1">
-              <span>معاينة وقبول/رفض</span>
-              <span className="text-[13px]">➔</span>
-            </span>
             <div className="text-right">
               <p className="text-[14px] font-bold text-[#1A1A1A]">
                 لديك {pendingSeatRequests.length} طلب حجز مقعد جديد في الخط الدائمي!
@@ -902,20 +903,24 @@ export default function DriverHomePage() {
                 اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار فوراً
               </p>
             </div>
+            <span className="rounded-lg bg-[#D97706] px-3 py-1.5 text-[12px] font-bold text-white shadow-xs flex items-center gap-1 shrink-0">
+              <span>معاينة وقبول/رفض</span>
+              <span className="text-[13px]">➔</span>
+            </span>
           </div>
         )}
 
         {/* 2. حالة العمل الحالية */}
-        <section className="mb-6">
+        <section className="mb-6 text-right" dir="rtl">
           <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-2.5 text-right">حالة العمل الحالية</h2>
           
           {/* أزرار التبديل الثلاثية (Segmented Control احترافي) */}
-          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/60" dir="rtl">
+          <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-100 rounded-xl border border-slate-200/60" dir="rtl">
             {/* خمول */}
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('idle')}
-              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
+              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center ${
                 workStatus === 'idle'
                   ? 'bg-white text-[#1A1A1A] font-bold shadow-card'
                   : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
@@ -928,7 +933,7 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('permanent')}
-              className={`relative flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
+              className={`relative flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] ${
                 workStatus === 'permanent'
                   ? 'bg-[#1B4965] text-white font-bold shadow-card'
                   : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
@@ -937,7 +942,7 @@ export default function DriverHomePage() {
               {workStatus === 'permanent' && <span>✓</span>}
               <span>خط دائمي</span>
               {pendingSeatRequests.length > 0 && (
-                <span className="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10.5px] font-bold text-white shadow-card animate-bounce">
+                <span className="absolute -top-1 -start-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10.5px] font-bold text-white shadow-card animate-bounce">
                   {pendingSeatRequests.length}
                 </span>
               )}
@@ -947,7 +952,7 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('taxi')}
-              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 ${
+              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center ${
                 workStatus === 'taxi'
                   ? 'bg-emerald-600 text-white font-bold shadow-card'
                   : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
@@ -1416,7 +1421,7 @@ export default function DriverHomePage() {
         )}
 
         {/* 4. القائمة السفلية */}
-        <section className="pt-2 border-t border-slate-100">
+        <section className="pt-2 border-t border-slate-100" dir="rtl">
           <div className="space-y-1">
             {/* تبويب محادثة مع الراكب */}
             <button
@@ -1428,23 +1433,18 @@ export default function DriverHomePage() {
                   show('لا يوجد مشوار نشط حالياً مع راكب لمحادثته', 'info');
                 }
               }}
-              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 border border-transparent hover:border-slate-200/80 cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 border border-transparent hover:border-slate-200/80 cursor-pointer min-h-[54px]"
             >
-              <div className="flex items-center gap-2">
-                {unreadCount > 0 ? (
-                  <span className="flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-bold text-white animate-pulse">
-                    <span>{unreadCount}</span>
-                    <span>رسالة جديدة</span>
-                  </span>
-                ) : activeRide ? (
-                  <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
-                    نشط 🚖
-                  </span>
-                ) : (
-                  <span className="text-[12px] font-medium text-[#6C757D]">غير متوفر</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
+              {/* اليمين: الأيقونة في أقصى اليمين، والنص بجانبها مباشرة إلى اليمين */}
+              <div className="flex items-center gap-3.5">
+                <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/60 shadow-2xs">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -start-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-white" />
+                  )}
+                </div>
                 <div className="text-right">
                   <span className="text-[15px] font-bold text-[#1A1A1A] block">محادثة مع الراكب</span>
                   {activeRide?.customerName ? (
@@ -1457,14 +1457,27 @@ export default function DriverHomePage() {
                     </span>
                   )}
                 </div>
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/60">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-white" />
-                  )}
-                </div>
+              </div>
+
+              {/* اليسار: الشارة وسهم التوجيه في أقصى اليسار */}
+              <div className="flex items-center gap-2 shrink-0">
+                {unreadCount > 0 ? (
+                  <span className="flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-bold text-white animate-pulse">
+                    <span>{unreadCount}</span>
+                    <span>رسالة جديدة</span>
+                  </span>
+                ) : activeRide ? (
+                  <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
+                    نشط 🚖
+                  </span>
+                ) : (
+                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11.5px] font-medium text-[#6C757D]">
+                    غير متوفر
+                  </span>
+                )}
+                <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
               </div>
             </button>
 
@@ -1472,57 +1485,102 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => show('سجل رحلات الخط الدائمي', 'info')}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-slate-50 cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 cursor-pointer min-h-[52px] border border-transparent hover:border-slate-200/60"
             >
-              <span className="text-[15px] font-bold text-[#1A1A1A]">الرحلات</span>
-              <svg className="h-5 w-5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
-                <circle cx="7" cy="17" r="2" />
-                <path d="M9 17h6" />
-                <circle cx="17" cy="17" r="2" />
-              </svg>
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#6C757D] border border-slate-200/60 shadow-2xs">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+                    <circle cx="7" cy="17" r="2" />
+                    <path d="M9 17h6" />
+                    <circle cx="17" cy="17" r="2" />
+                  </svg>
+                </div>
+                <div className="text-right">
+                  <span className="text-[15px] font-bold text-[#1A1A1A] block">الرحلات</span>
+                  <span className="text-[11.5px] font-medium text-[#6C757D]">سجل الرحلات والمشاوير المكتملة</span>
+                </div>
+              </div>
+              <div className="text-slate-400 shrink-0">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </div>
             </button>
 
             {/* العناوين المفضلة */}
             <button
               type="button"
               onClick={() => show('العناوين المفضلة للكابتن', 'info')}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-slate-50 cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 cursor-pointer min-h-[52px] border border-transparent hover:border-slate-200/60"
             >
-              <span className="text-[15px] font-bold text-[#1A1A1A]">العناوين المفضلة</span>
-              <svg className="h-5 w-5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 21s-6-5.33-6-10a6 6 0 0 1 12 0c0 4.67-6 10-6 10z" />
-                <circle cx="12" cy="11" r="2.5" />
-              </svg>
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#6C757D] border border-slate-200/60 shadow-2xs">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 21s-6-5.33-6-10a6 6 0 0 1 12 0c0 4.67-6 10-6 10z" />
+                    <circle cx="12" cy="11" r="2.5" />
+                  </svg>
+                </div>
+                <div className="text-right">
+                  <span className="text-[15px] font-bold text-[#1A1A1A] block">العناوين المفضلة</span>
+                  <span className="text-[11.5px] font-medium text-[#6C757D]">نقاط الانطلاق والمحطات المحفوظة</span>
+                </div>
+              </div>
+              <div className="text-slate-400 shrink-0">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </div>
             </button>
 
             {/* قسائم الخصومات والجوائز */}
             <button
               type="button"
               onClick={() => show('قسائم الخصومات والجوائز للكابتن', 'info')}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-slate-50 cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 cursor-pointer min-h-[52px] border border-transparent hover:border-slate-200/60"
             >
-              <span className="text-[15px] font-bold text-[#1A1A1A]">قسائم الخصومات والجوائز</span>
-              <svg className="h-5 w-5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-                <circle cx="9.5" cy="14.5" r="1.5" fill="currentColor" />
-                <circle cx="14.5" cy="9.5" r="1.5" fill="currentColor" />
-              </svg>
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#6C757D] border border-slate-200/60 shadow-2xs">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                    <circle cx="9.5" cy="14.5" r="1.5" fill="currentColor" />
+                    <circle cx="14.5" cy="9.5" r="1.5" fill="currentColor" />
+                  </svg>
+                </div>
+                <div className="text-right">
+                  <span className="text-[15px] font-bold text-[#1A1A1A] block">قسائم الخصومات والجوائز</span>
+                  <span className="text-[11.5px] font-medium text-[#6C757D]">مكافآت وحوافز كباتن توصيلة</span>
+                </div>
+              </div>
+              <div className="text-slate-400 shrink-0">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </div>
             </button>
 
             {/* تسجيل الخروج */}
             <button
               type="button"
               onClick={() => { authStore.clear(); navigate('/login', { replace: true }); }}
-              className="flex w-full items-center justify-end gap-3 rounded-xl p-3 text-right transition hover:bg-red-50 text-red-600 cursor-pointer"
+              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-red-50 text-red-600 cursor-pointer min-h-[52px] border border-transparent hover:border-red-100"
             >
-              <span className="text-[15px] font-bold">تسجيل الخروج</span>
-              <svg className="h-5 w-5 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 border border-red-100/80 shadow-2xs">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                </div>
+                <span className="text-[15px] font-bold">تسجيل الخروج</span>
+              </div>
+              <div className="text-red-400 shrink-0">
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </div>
             </button>
           </div>
         </section>
