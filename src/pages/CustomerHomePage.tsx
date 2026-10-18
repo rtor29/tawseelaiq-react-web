@@ -26,14 +26,10 @@ import {
 import {
   getFavoritePlaces,
   addFavoritePlace,
-  removeFavoritePlace,
   getRecentPlaces,
   addRecentPlace,
-  getUserSettings,
-  saveUserSettings,
   type FavoritePlace,
   type RecentPlaceItem,
-  type UserSettings,
 } from '../lib/cache';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { storage } from '../lib/storage';
@@ -42,6 +38,7 @@ import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { AppDrawer } from '../components/AppDrawer';
 
 // التحميل الكسول لنافذة الدردشة لتقليل الحزمة الأولية
 const ChatModal = lazy(() => import('../components/ChatModal'));
@@ -242,7 +239,7 @@ export default function CustomerHomePage() {
 
   // حالة النوافذ والدرج
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCitySelectorOpen, setIsCitySelectorOpen] = useState(false);
   const [isDriverSheetExpanded, setIsDriverSheetExpanded] = useState(false);
   const [isCancelTripOpen, setIsCancelTripOpen] = useState(false);
@@ -253,11 +250,6 @@ export default function CustomerHomePage() {
   const [selectedCity, setSelectedCity] = useState('المدينة الحالية');
   const [citySearchQuery, setCitySearchQuery] = useState('');
 
-  // النوافذ الفرعية لدرج الزبون
-  const [activeDrawerSubModal, setActiveDrawerSubModal] = useState<
-    'none' | 'wallet' | 'trips' | 'favorites' | 'coupons' | 'referral' | 'settings' | 'about' | 'support'
-  >('none');
-  const [walletBalance] = useState('0');
 
   // بيانات المشوار الحقيقي والاتصال بالسائق
   const [rideRequestId, setRideRequestId] = useState<string | null>(null);
@@ -412,10 +404,9 @@ export default function CustomerHomePage() {
     }, 6000);
   }, []);
 
-  // كاش المتصفح: الأماكن المفضلة، الأماكن الأخيرة، وإعدادات المستخدم
-  const [favoritePlaces, setFavoritePlaces] = useState<FavoritePlace[]>(() => getFavoritePlaces());
+  // كاش المتصفح: الأماكن المفضلة والأماكن الأخيرة
+  const [, setFavoritePlaces] = useState<FavoritePlace[]>(() => getFavoritePlaces());
   const [recentPlacesList, setRecentPlacesList] = useState<RecentPlaceItem[]>(() => getRecentPlaces());
-  const [userSettings, setUserSettings] = useState<UserSettings>(() => getUserSettings());
 
   // استعادة الطلب المحفوظ تلقائياً عند تحديث الصفحة أو الخروج منها والعودة
   useEffect(() => {
@@ -1427,20 +1418,7 @@ export default function CustomerHomePage() {
     setRouteCoordinates(null);
   }
 
-  // تسجيل الخروج
-  function handleLogout() {
-    try {
-      authStore.clear();
-      storage.clearSession();
-      storage.clearAll();
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      // ignore
-    }
-    setIsProfileOpen(false);
-    navigate('/login', { replace: true });
-  }
+
 
   // تصفية المدن
   const filteredCities = IRAQI_CITIES.filter(
@@ -1458,46 +1436,13 @@ export default function CustomerHomePage() {
           الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
           ==================================================================== */}
       <header className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-        {/* أزرار الحساب وترحيب المستخدم */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setIsProfileOpen(true)}
-            className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
-            aria-label="الملف الشخصي للزبون"
-            title="معلومات الزبون"
-          >
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
-          <div>
-            <div className="text-[11px] font-medium text-slate-500">مرحباً بك 👋</div>
-            <div className="text-[14px] font-bold text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
-          </div>
-        </div>
-
-        {/* شعار توصيله وزر الرجوع / الرئيسية */}
+        {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
         <div className="flex items-center gap-2.5">
-          <span
-            className="tawseela-dynamic-logo w-24 sm:w-28 h-7 sm:h-8 block"
-            role="img"
-            aria-label="شعار توصيله"
-          />
           {stage === 'pickup' ? (
             <button
               type="button"
               onClick={() => navigate('/login')}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-[#1B4965] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95 cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
               title="الرجوع لصفحة اختيار الخدمة"
               aria-label="الرئيسية"
             >
@@ -1518,7 +1463,7 @@ export default function CustomerHomePage() {
             <button
               type="button"
               onClick={handleBackNav}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-[#1B4965] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95 cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
               title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
               aria-label="رجوع"
             >
@@ -1527,7 +1472,7 @@ export default function CustomerHomePage() {
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2.4"
+                strokeWidth="2.2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -1535,6 +1480,39 @@ export default function CustomerHomePage() {
               </svg>
             </button>
           )}
+          <span
+            className="tawseela-dynamic-logo w-24 sm:w-28 h-7 sm:h-8 block"
+            role="img"
+            aria-label="شعار توصيله"
+          />
+        </div>
+
+        {/* اليسار: ترحيب المستخدم وزر الحساب الموحد الذي يفتح AppDrawer */}
+        <div className="flex items-center gap-2.5">
+          <div className="text-left hidden sm:block">
+            <div className="text-[11px] font-medium text-slate-500">مرحباً بك 👋</div>
+            <div className="text-[14px] font-bold text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen(true)}
+            className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+            aria-label="الحساب والإعدادات"
+            title="الحساب والإعدادات"
+          >
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -2953,559 +2931,8 @@ export default function CustomerHomePage() {
         </div>
       )}
 
-      {/* 11. درج الزبون الكامل مع "حول توصيلة" */}
-      {isProfileOpen && (
-        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white overflow-hidden" role="dialog" aria-modal="true">
-          <div className="flex items-center px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-2">
-            <button
-              type="button"
-              onClick={() => setIsProfileOpen(false)}
-              className="p-1 text-gray-600 hover:text-black cursor-pointer transition active:scale-95"
-              aria-label="إغلاق الدرج"
-            >
-              <svg
-                className="h-6 w-6"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-
-          <div
-            onClick={() => setActiveDrawerSubModal('settings')}
-            className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition border-b border-gray-100"
-          >
-            <div className="text-gray-400">
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <h3 className="text-[22px] font-black text-gray-900 leading-tight">{customerName}</h3>
-                <p dir="ltr" className="text-[14px] font-bold text-gray-500 mt-1 font-sans tracking-wide">
-                  {formattedPhone}
-                </p>
-              </div>
-
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-gray-100 to-gray-200 border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] overflow-hidden">
-                <svg className="h-12 w-12 text-gray-400 mt-2" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-            <div
-              onClick={() => setActiveDrawerSubModal('wallet')}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition"
-            >
-              <div className="text-gray-400">
-                <svg
-                  className="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-[17px] font-black text-gray-900">وسائل الدفع</p>
-                  <p className="text-[13px] font-bold text-gray-500 mt-0.5">الرصيد: {walletBalance} دينار</p>
-                </div>
-                <div className="text-gray-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="2" y="5" width="20" height="14" rx="2" />
-                    <line x1="2" y1="10" x2="22" y2="10" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setActiveDrawerSubModal('trips')}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition"
-            >
-              <div />
-              <div className="flex items-center gap-4">
-                <p className="text-[17px] font-black text-gray-900">الرحلات</p>
-                <div className="text-gray-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setActiveDrawerSubModal('favorites')}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition"
-            >
-              <div />
-              <div className="flex items-center gap-4">
-                <p className="text-[17px] font-black text-gray-900">العناوين المفضلة</p>
-                <div className="text-gray-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setActiveDrawerSubModal('coupons')}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition"
-            >
-              <div />
-              <div className="flex items-center gap-4">
-                <p className="text-[17px] font-black text-gray-900">قسائم الخصومات والجوائز</p>
-                <div className="text-gray-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-                    <line x1="7" y1="7" x2="7.01" y2="7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setActiveDrawerSubModal('referral')}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition"
-            >
-              <div />
-              <div className="flex items-center gap-4">
-                <p className="text-[17px] font-black text-gray-900">إرسال دعوة لأصدقائك</p>
-                <div className="text-gray-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="20 12 20 22 4 22 4 12" />
-                    <rect x="2" y="7" width="20" height="5" />
-                    <line x1="12" y1="22" x2="12" y2="7" />
-                    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
-                    <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setActiveDrawerSubModal('settings')}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition"
-            >
-              <div />
-              <div className="flex items-center gap-4">
-                <p className="text-[17px] font-black text-gray-900">الإعدادات</p>
-                <div className="text-gray-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setActiveDrawerSubModal('about')}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50 transition"
-            >
-              <div />
-              <div className="flex items-center gap-4">
-                <p className="text-[17px] font-black text-gray-900">حول توصيلة</p>
-                <div className="text-gray-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="16" x2="12" y2="12" />
-                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => {
-                setIsProfileOpen(false);
-                setIsComplaintModalOpen(true);
-              }}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-red-50/60 transition border-t border-red-100 bg-red-50/20"
-            >
-              <div className="text-red-400">
-                <svg
-                  className="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="text-[17px] font-black text-red-700">تقديم شكوى أو بلاغ 🛡️</p>
-                  <p className="text-[12px] font-medium text-red-500 mt-0.5">بلاغ فوري عن الكابتن أو الرحلة</p>
-                </div>
-                <div className="text-red-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* زر تسجيل الخروج */}
-            <div
-              onClick={handleLogout}
-              className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-rose-50/60 transition border-t border-b border-slate-100 active:scale-[0.99]"
-            >
-              <div />
-              <div className="flex items-center gap-4">
-                <p className="text-[17px] font-black text-rose-600">تسجيل الخروج</p>
-                <div className="text-rose-600">
-                  <svg
-                    className="h-6 w-6"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            onClick={() => setActiveDrawerSubModal('support')}
-            className="flex items-center justify-between bg-slate-50 px-6 py-4 cursor-pointer hover:bg-slate-100/70 transition border-t border-slate-100"
-          >
-            <div />
-            <div className="flex items-center gap-3.5">
-              <div className="text-right">
-                <h4 className="text-[15px] font-bold text-[#1A1A1A]">التواصل مع الدعم</h4>
-                <p className="text-[12.5px] font-medium text-[#6C757D] mt-0.5">
-                  لأي مشاكل أو استفسارات، فريقنا بخدمتكم.
-                </p>
-              </div>
-              <div className="text-[#1B4965]">
-                <svg
-                  className="h-6 w-6"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                  <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* نوافذ فرعية لدرج الزبون */}
-      {activeDrawerSubModal !== 'none' && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sheet animate-fade-in text-right border border-slate-100">
-            {activeDrawerSubModal === 'wallet' && (
-              <div>
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">💳 وسائل الدفع والرصيد</h3>
-                <div className="my-4 rounded-xl bg-slate-50 border border-slate-100 p-4 text-center">
-                  <p className="text-xs font-semibold text-[#6C757D]">الرصيد المتاح</p>
-                  <p className="text-2xl font-bold text-[#1B4965] mt-1">{walletBalance} د.ع</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    show('لشحن الرصيد، يرجى التوجه إلى مركز الدعم المعتمد أو استخدام بطاقة الشحن', 'info');
-                    setActiveDrawerSubModal('none');
-                  }}
-                  className="w-full rounded-xl bg-[#1B4965] py-2.5 text-center text-sm font-bold text-white shadow-subtle hover:bg-[#14364A] transition-colors cursor-pointer"
-                >
-                  شحن الرصيد
-                </button>
-              </div>
-            )}
-
-            {activeDrawerSubModal === 'trips' && (
-              <div>
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-3">🕒 سجل الرحلات السابقة</h3>
-                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-[#6C757D] bg-slate-50/50">
-                  <span className="text-3xl block mb-2">🚗</span>
-                  <p className="text-sm font-bold text-[#1A1A1A]">لا توجد رحلات سابقة بعد</p>
-                  <p className="text-xs text-[#6C757D] mt-1">عند إكمال أول مشوار ستظهر تفاصيل وسجل رحلاتك هنا تلقائياً</p>
-                </div>
-              </div>
-            )}
-
-            {activeDrawerSubModal === 'favorites' && (
-              <div>
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-3">⭐ العناوين المفضلة</h3>
-                {favoritePlaces.length === 0 ? (
-                  <p className="text-xs font-medium text-[#6C757D] text-center py-6">
-                    لا توجد عناوين مفضلة بعد. يمكنك إضافة أي موقع إلى المفضلة بالنقر على النجمة ⭐ في البحث.
-                  </p>
-                ) : (
-                  <div className="space-y-2 mb-4 max-h-[300px] overflow-y-auto">
-                    {favoritePlaces.map((fav) => (
-                      <div
-                        key={fav.id}
-                        className="flex items-center justify-between rounded-xl border border-slate-100 p-3 bg-slate-50 hover:bg-slate-100/70 transition cursor-pointer"
-                        onClick={() => {
-                          handleSelectPlace({ name: fav.name, lat: fav.lat, lng: fav.lng, address: fav.address });
-                          setActiveDrawerSubModal('none');
-                          setIsProfileOpen(false);
-                          show(`تم تحديد ${fav.name} بنجاح 📍`, 'success');
-                        }}
-                      >
-                        <div>
-                          <p className="text-sm font-bold text-[#1A1A1A]">{fav.name}</p>
-                          <p className="text-xs font-medium text-[#6C757D]">{fav.address || 'النجف الأشرف'}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const updated = removeFavoritePlace(fav.id);
-                            setFavoritePlaces(updated);
-                            show('تم حذف العنوان من المفضلة', 'info');
-                          }}
-                          className="p-1.5 text-[#6C757D] hover:text-red-500 transition text-sm"
-                          title="حذف من المفضلة"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeDrawerSubModal === 'coupons' && (
-              <div>
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-3">🏷️ قسائم الخصومات والجوائز</h3>
-                <p className="text-xs font-medium text-[#6C757D] mb-3">أدخل كود الخصم لتطبيقه على رحلتك القادمة.</p>
-              </div>
-            )}
-
-            {activeDrawerSubModal === 'referral' && (
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">🎁 دعوة الأصدقاء</h3>
-                <p className="text-xs font-medium text-[#6C757D] mb-4">
-                  شارك كود الدعوة مع أصدقائك واحصل على خصم 20%!
-                </p>
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-3 mb-4">
-                  <span className="font-mono text-xl font-bold text-[#1B4965] tracking-widest">
-                    TAXI-IQ-2026
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {activeDrawerSubModal === 'settings' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">⚙️ إعدادات الحساب والتطبيق</h3>
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1A1A1A]">التنبيهات الصوتية 🔔</span>
-                    <input
-                      type="checkbox"
-                      checked={userSettings.soundEnabled}
-                      onChange={(e) => {
-                        const upd = saveUserSettings({ soundEnabled: e.target.checked });
-                        setUserSettings(upd);
-                      }}
-                      className="h-4 w-4 accent-[#1B4965] rounded cursor-pointer"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1A1A1A]">إشعارات الرسائل والوصول 💬</span>
-                    <input
-                      type="checkbox"
-                      checked={userSettings.notificationsEnabled}
-                      onChange={(e) => {
-                        const upd = saveUserSettings({ notificationsEnabled: e.target.checked });
-                        setUserSettings(upd);
-                      }}
-                      className="h-4 w-4 accent-[#1B4965] rounded cursor-pointer"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1A1A1A]">توسيط الخريطة التلقائي 🗺️</span>
-                    <input
-                      type="checkbox"
-                      checked={userSettings.autoCenterMap}
-                      onChange={(e) => {
-                        const upd = saveUserSettings({ autoCenterMap: e.target.checked });
-                        setUserSettings(upd);
-                      }}
-                      className="h-4 w-4 accent-[#1B4965] rounded cursor-pointer"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full rounded-xl bg-red-50 py-2.5 text-center text-xs font-bold text-red-600 hover:bg-red-100 transition cursor-pointer"
-                >
-                  تسجيل الخروج 🚪
-                </button>
-              </div>
-            )}
-
-            {activeDrawerSubModal === 'about' && (
-              <div className="text-center">
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">ℹ️ حول منصة توصيلة</h3>
-                <p className="text-xs font-medium text-[#6C757D] leading-relaxed mb-4">
-                  تطبيق النقل الذكي الأول المخصص لمحافظة النجف الأشرف وجمهورية العراق.
-                  <br />
-                  الإصدار 1.0.0 (Release)
-                </p>
-              </div>
-            )}
-
-            {activeDrawerSubModal === 'support' && (
-              <div>
-                <h3 className="text-lg font-bold text-[#1A1A1A] mb-2">🎧 التواصل مع الدعم</h3>
-                <div className="space-y-2 mb-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveDrawerSubModal('none');
-                      setIsProfileOpen(false);
-                      setIsComplaintModalOpen(true);
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
-                  >
-                    <span>🛡️</span>
-                    <span>تقديم شكوى أو بلاغ رسمي</span>
-                  </button>
-                  <a
-                    href="https://wa.me/9647706204066"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
-                  >
-                    <span>💬</span>
-                    <span>مراسلة الدعم عبر واتساب</span>
-                  </a>
-                  <a
-                    href="tel:07706204066"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1B4965] py-2.5 text-xs font-bold text-white hover:bg-[#14364A] transition-colors"
-                  >
-                    <span>📞</span>
-                    <span>اتصال مباشر بفريق الدعم</span>
-                  </a>
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setActiveDrawerSubModal('none')}
-              className="mt-2 w-full rounded-xl bg-gray-100 py-2 text-center text-xs font-bold text-gray-700 hover:bg-gray-200 transition cursor-pointer"
-            >
-              إغلاق
-            </button>
-          </div>
-        </div>
-      )}
+      {/* 11. القائمة الجانبية الموحدة للراكب (AppDrawer) */}
+      <AppDrawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
 
 
       {/* نافذة المحادثة المباشرة بين الراكب والسائق */}

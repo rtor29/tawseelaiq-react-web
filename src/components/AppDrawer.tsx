@@ -75,8 +75,6 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
     window.location.replace('/login');
   }
 
-  if (!open) return null;
-
   const navItems = [
     {
       key: 'home',
@@ -141,12 +139,42 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[120]" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity" onClick={onClose} />
-      <aside className="absolute inset-y-0 right-0 flex w-[86%] max-w-xs animate-fade-up flex-col bg-white shadow-2xl">
-        {/* الترويسة */}
-        <header className="bg-gradient-to-b from-[#1B4965] to-[#14364A] p-5 text-white">
-          <div className="flex items-center gap-3.5">
+    <div
+      className={`fixed inset-0 z-[120] transition-opacity duration-300 ${
+        open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* خلفية معتمة قابلة للنقر للإغلاق */}
+      <div
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+
+      {/* الحاوية المنزلقة من اليسار بالكامل وفق المتطلبات */}
+      <aside
+        className={`fixed inset-y-0 left-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl flex flex-col font-cairo transform transition-transform duration-300 ease-out ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        dir="rtl"
+      >
+        {/* الترويسة مع زر الإغلاق الأنيق في أعلى اليسار */}
+        <header className="relative bg-gradient-to-b from-[#1B4965] to-[#14364A] p-5 text-white">
+          {/* زر الإغلاق (✕) */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition-all active:scale-95 cursor-pointer"
+            aria-label="إغلاق القائمة"
+            title="إغلاق"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+
+          <div className="flex items-center gap-3.5 pt-1">
             <button
               type="button"
               onClick={() => fileRef.current?.click()}

@@ -329,7 +329,7 @@ export default function DailyRoutePage() {
           <button
             type="button"
             onClick={() => navigate('/login')}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-md transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+            className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
             title="الرئيسية"
             aria-label="الرئيسية"
           >
@@ -361,7 +361,7 @@ export default function DailyRoutePage() {
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-md transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+            className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
             title="الحساب والإعدادات"
             aria-label="الحساب"
           >

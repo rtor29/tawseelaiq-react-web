@@ -113,33 +113,32 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
             1. الترويسة العلوية (Top Header & Branding)
             ==================================================================== */}
         <header className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsDrawerOpen(true)}
-              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
-              aria-label="الحساب والإعدادات"
-              title="الحساب والإعدادات"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </button>
-            <div>
-              <div className="text-[12px] font-medium text-slate-500">مرحباً بك 👋</div>
-              <div className="text-[15px] font-bold text-slate-900 truncate max-w-[170px]">{firstName}</div>
-            </div>
-          </div>
-
-          {/* شعار توصيله الديناميكي المتزامن مع لون الهوية */}
-          <div className="flex items-center gap-2">
+          {/* اليمين: الشعار والترحيب بالراكب */}
+          <div className="flex items-center gap-2.5">
             <span
               className="tawseela-dynamic-logo w-28 h-8 block"
               role="img"
               aria-label="شعار توصيله"
             />
+            <div className="mr-1">
+              <div className="text-[11px] font-medium text-slate-500">مرحباً بك 👋</div>
+              <div className="text-[14px] font-bold text-slate-900 truncate max-w-[150px]">{firstName}</div>
+            </div>
           </div>
+
+          {/* اليسار: زر الحساب والقائمة الجانبية الموحدة */}
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen(true)}
+            className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+            aria-label="الحساب والإعدادات"
+            title="الحساب والإعدادات"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
         </header>
 
         {/* ====================================================================
