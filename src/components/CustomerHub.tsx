@@ -107,17 +107,17 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
   return (
     <div className="min-h-dvh bg-[#F8FAFC] text-[#0F172A] font-cairo flex flex-col justify-between selection:bg-amber-100 selection:text-amber-900" dir="rtl">
       {/* Container مقيد العرض لتجربة هاتف مثالية وتجاوب ممتاز للشاشات الكبيرة */}
-      <div className="w-full max-w-[480px] mx-auto min-h-dvh flex flex-col justify-between pb-24 relative px-4 pt-4 sm:pt-6">
+      <div className="w-full max-w-[480px] mx-auto min-h-dvh flex flex-col justify-between pb-24 relative">
         
         {/* ====================================================================
             1. الترويسة العلوية (Top Header & Branding)
             ==================================================================== */}
-        <header className="flex items-center justify-between pb-4 border-b border-slate-200/60">
+        <header className="px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setIsDrawerOpen(true)}
-              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95"
+              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
               aria-label="القائمة والحساب"
               title="الحساب والإعدادات"
             >
@@ -146,7 +146,7 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
         {/* ====================================================================
             2. المحتوى الرئيسي (Hero Banner + Services Grid + Captain Recruitment)
             ==================================================================== */}
-        <main className="flex-1 flex flex-col gap-5 pt-4">
+        <main className="flex-1 flex flex-col gap-5 pt-4 px-4">
           
           {/* سؤال الوجهة الهادئ */}
           <div className="px-1">

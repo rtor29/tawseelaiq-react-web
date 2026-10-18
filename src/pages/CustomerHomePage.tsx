@@ -199,6 +199,7 @@ export default function CustomerHomePage() {
   const [rideStatus, setRideStatus] = useState<string | null>(null);
 
   const customerName = session?.fullName || storage.getFullName() || 'المستخدم';
+  const customerFirstName = customerName.split(' ')[0] || 'المستخدم';
   const rawPhone = storage.getPhone() || '';
   const formattedPhone = rawPhone
     ? rawPhone.startsWith('+')
@@ -1452,90 +1453,110 @@ export default function CustomerHomePage() {
     : [];
 
   return (
-    <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-slate-100 select-none font-cairo" dir="rtl">
-      {/* 1. زر التحكم أعلى اليمين */}
-      {stage === 'pickup' ? (
-        <button
-          type="button"
-          onClick={() => navigate('/login')}
-          className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
-          title="الرجوع لصفحة اختيار الخدمة"
-          aria-label="الرئيسية"
-        >
-          <svg
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+    <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-slate-100 select-none font-cairo flex flex-col" dir="rtl">
+      {/* ====================================================================
+          الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
+          ==================================================================== */}
+      <header className="px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+        {/* أزرار الحساب وترحيب المستخدم */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsProfileOpen(true)}
+            className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+            aria-label="الملف الشخصي للزبون"
+            title="معلومات الزبون"
           >
-            <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={handleBackNav}
-          className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
-          title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
-          aria-label="رجوع"
-        >
-          <svg
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      )}
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+          <div>
+            <div className="text-[11px] font-medium text-slate-500">مرحباً بك 👋</div>
+            <div className="text-[14px] font-bold text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
+          </div>
+        </div>
 
-      {/* 2. زر معلومات الزبون (أعلى اليسار) */}
-      <button
-        type="button"
-        onClick={() => setIsProfileOpen(true)}
-        className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
-        title="معلومات الزبون"
-        aria-label="الملف الشخصي للزبون"
-      >
-        <svg
-          className="h-5 w-5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-      </button>
-
-      {/* زر الأمان العائم — يظهر فقط في مرحلة السائق قادم */}
-      {stage === 'driver_arriving' && (
-        <button type="button" onClick={() => show('ميزة الأمان قريباً 🛡️','info')}
-          className="absolute top-[calc(4.5rem+env(safe-area-inset-top))] left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50">
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </button>
-      )}
+        {/* شعار توصيله وزر الرجوع / الرئيسية */}
+        <div className="flex items-center gap-2.5">
+          <span
+            className="tawseela-dynamic-logo w-24 sm:w-28 h-7 sm:h-8 block"
+            role="img"
+            aria-label="شعار توصيله"
+          />
+          {stage === 'pickup' ? (
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-[#1B4965] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95 cursor-pointer"
+              title="الرجوع لصفحة اختيار الخدمة"
+              aria-label="الرئيسية"
+            >
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleBackNav}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-[#1B4965] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95 cursor-pointer"
+              title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
+              aria-label="رجوع"
+            >
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </header>
 
       {/* 3. الخريطة الرئيسية Mapbox */}
       <div
-        className="relative h-full w-full"
+        className="relative flex-1 w-full h-full"
         onClick={() => {
           if (stage === 'driver_arriving' && rideSheetState === 'expanded') {
             setRideSheetState('collapsed');
           }
         }}
       >
+        {/* زر الأمان العائم — يظهر فقط في مرحلة السائق قادم */}
+        {stage === 'driver_arriving' && (
+          <button
+            type="button"
+            onClick={() => show('ميزة الأمان قريباً 🛡️','info')}
+            className="absolute top-4 left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </button>
+        )}
         <MapGL
           ref={mapRef}
           mapboxAccessToken={config.mapboxToken}
@@ -1670,7 +1691,7 @@ export default function CustomerHomePage() {
 
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
         {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(7rem+env(safe-area-inset-top))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
+          <div className="pointer-events-auto absolute top-3.5 inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
             <div className="flex items-center gap-2 rounded-full bg-white/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-[#1B4965] shadow-lg border border-amber-300">
               <span>يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍</span>
               <button
