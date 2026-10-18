@@ -112,7 +112,7 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
         {/* ====================================================================
             1. الترويسة العلوية (Top Header & Branding)
             ==================================================================== */}
-        <header className="px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+        <header className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
           <div className="flex items-center gap-3">
             <button
               type="button"

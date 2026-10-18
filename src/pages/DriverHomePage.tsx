@@ -720,7 +720,7 @@ export default function DriverHomePage() {
 
   return (
     <div
-      className="flex min-h-[100dvh] flex-col bg-white font-cairo overflow-y-auto pb-32"
+      className="flex h-full w-full flex-col bg-white font-cairo overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]"
       style={{
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',
@@ -728,7 +728,7 @@ export default function DriverHomePage() {
       dir="rtl"
     >
       {/* 1. الترويسة العلوية */}
-      <header className="shrink-0 sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 px-6 pt-5 pb-4 bg-white/95 backdrop-blur-sm shadow-sm">
+      <header className="shrink-0 sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 px-6 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-4 bg-white/95 backdrop-blur-sm shadow-sm">
         {/* اليمين: معلومات السائق والصورة */}
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/80 shadow-subtle">

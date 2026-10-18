@@ -14,6 +14,7 @@ import { distanceKm, getCurrentPositionWithFallback, isIosDevice, isStandalonePw
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
+import { AppDrawer } from '../components/AppDrawer';
 
 const USER_LOC = { lat: 32.0298, lng: 44.3285 };
 
@@ -69,6 +70,7 @@ export default function DailyRoutePage() {
   const [cancelReason, setCancelReason] = useState('تغير أوقات الدوام');
   const [cancelDetails, setCancelDetails] = useState('');
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // جلب حجوزات واشتراكات الراكب الحالية في الخطوط الدائمة لمنع تكرار الحجز
   useEffect(() => {
@@ -320,11 +322,64 @@ export default function DailyRoutePage() {
   return (
     <div className="relative h-dvh w-full overflow-hidden font-cairo select-none" dir="rtl">
 
-      {/* زر الرجوع */}
-      <button type="button" onClick={() => navigate('/login')}
-        className="absolute top-4 right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-[0_4px_16px_rgba(0,0,0,0.15)] text-gray-700 cursor-pointer hover:bg-gray-50 active:scale-95">
-        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
+      {/* الترويسة العلوية العائمة مع حماية كاملة لهوامش الأمان على iOS */}
+      <div className="fixed top-0 inset-x-0 max-w-md mx-auto z-40 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 flex items-center justify-between pointer-events-none">
+        {/* زر الرئيسية / الرجوع */}
+        <div className="pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-md transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+            title="الرئيسية"
+            aria-label="الرئيسية"
+          >
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+          </button>
+        </div>
+
+        {/* عنوان التبويب */}
+        <div className="pointer-events-auto">
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-sm text-slate-800 text-[13px] font-bold">
+            <span>حجز خط دائمي</span>
+            <span>🚌</span>
+          </div>
+        </div>
+
+        {/* زر الحساب والقائمة */}
+        <div className="pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setIsDrawerOpen(true)}
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-md transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+            title="الحساب والإعدادات"
+            aria-label="الحساب"
+          >
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {/* الخريطة */}
       <MapGL
@@ -652,6 +707,8 @@ export default function DailyRoutePage() {
         </div>
       )}
 
+      {/* القائمة الجانبية ومعلومات الحساب للراكب */}
+      <AppDrawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
     </div>
   );
 }
