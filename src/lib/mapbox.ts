@@ -215,3 +215,65 @@ export function isStrictlyNajaf(name: string, lat: number, lon: number): boolean
     (gov) => lower.includes(gov) && !lower.includes('النجف') && !lower.includes('الكوفة'),
   );
 }
+
+/**
+ * تعريب وتكبير خطوط خريطة Mapbox وتوضيحها بنمط احترافي (Waze / Tawseela Design):
+ * 1. تعريب أسماء الشوارع والأماكن والمعالم عبر ['coalesce', ['get', 'name_ar'], ['get', 'name']]
+ * 2. تكبير حجم الخطوط بنسبة 25%: ['interpolate', ['linear'], ['zoom'], 10, 13, 14, 16.5, 18, 20.5]
+ * 3. إضافة هالة بيضاء واضحة (White Halo): text-halo-color: '#ffffff', text-halo-width: 2
+ */
+export function applyArabicAndEnhancedLabels(rawMap: any) {
+  if (!rawMap) return;
+  const map = typeof rawMap.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map) return;
+
+  const updateLayers = () => {
+    try {
+      if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) return;
+      const style = map.getStyle?.();
+      if (!style || !Array.isArray(style.layers)) return;
+
+      for (const layer of style.layers) {
+        if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+          // 1. تعريب نصوص الشوارع والمعالم
+          try {
+            map.setLayoutProperty(layer.id, 'text-field', [
+              'coalesce',
+              ['get', 'name_ar'],
+              ['get', 'name'],
+            ]);
+          } catch {}
+
+          // 2. تكبير حجم خطوط الخريطة بنسبة 25% مع التدرج حسب مستوى الزوم
+          try {
+            map.setLayoutProperty(layer.id, 'text-size', [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              10,
+              13,
+              14,
+              16.5,
+              18,
+              20.5,
+            ]);
+          } catch {}
+
+          // 3. إضافة إطار وهالة بيضاء ناصعة ومريحة لسهولة القراءة
+          try {
+            map.setPaintProperty(layer.id, 'text-halo-color', '#ffffff');
+            map.setPaintProperty(layer.id, 'text-halo-width', 2);
+          } catch {}
+        }
+      }
+    } catch {}
+  };
+
+  if (typeof map.isStyleLoaded === 'function' && map.isStyleLoaded()) {
+    updateLayers();
+  }
+
+  if (typeof map.on === 'function') {
+    map.on('style.load', updateLayers);
+  }
+}

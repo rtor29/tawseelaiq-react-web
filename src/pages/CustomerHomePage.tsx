@@ -13,7 +13,7 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { realtime } from '../lib/realtime';
-import { searchPlaces, reverseGeocode, getDirections, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { searchPlaces, reverseGeocode, getDirections, applyArabicAndEnhancedLabels, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import {
   calculateBearing,
   distanceMeters,
@@ -1032,6 +1032,8 @@ export default function CustomerHomePage() {
         if (map.getLayer('route-line')) map.removeLayer('route-line');
         if (map.getSource('route-source')) map.removeSource('route-source');
         if (map.getLayer('line-layer-route-line')) map.removeLayer('line-layer-route-line');
+        if (map.getLayer('route-inner')) map.removeLayer('route-inner');
+        if (map.getLayer('route-casing')) map.removeLayer('route-casing');
         if (map.getSource('line-route-line')) map.removeSource('line-route-line');
       } catch (_) {}
     }
@@ -1425,9 +1427,9 @@ export default function CustomerHomePage() {
     (c) => c.name.includes(citySearchQuery.trim()) || c.sub.includes(citySearchQuery.trim())
   );
 
-  // إعداد طبقة خط المسار
+  // إعداد طبقة خط المسار بنمط ويز
   const routeLines: RouteLineData[] = routeCoordinates && routeCoordinates.length
-    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#1B4965', width: 5.5 }]
+    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#3b82f6', width: 5.5 }]
     : [];
 
   return (
@@ -1547,6 +1549,7 @@ export default function CustomerHomePage() {
           style={{ width: '100%', height: '100%' }}
           onMoveEnd={handleMapMoveEnd}
           onClick={handleMapClick}
+          onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
         >
           {/* خط المسار بين النقطتين */}
           <RouteLines lines={routeLines} />

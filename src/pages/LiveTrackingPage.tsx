@@ -11,6 +11,7 @@ import { storage } from '../lib/storage';
 import type { LngLat, RouteBroadcastEvent } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, type RouteLineData } from '../components/map/MapPins';
+import { applyArabicAndEnhancedLabels } from '../lib/mapbox';
 import { Button } from '../components/ui';
 import { coordinatesLabel } from '../lib/format';
 
@@ -95,6 +96,7 @@ export default function LiveTrackingPage() {
           mapStyle={config.navigationStyle}
           initialViewState={{ longitude: driverPos.lng, latitude: driverPos.lat, zoom: 15.5 }}
           style={{ width: '100%', height: '100%' }}
+          onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
         >
           <NavigationControl position="bottom-left" showCompass={false} />
           <RouteLines lines={lines} />

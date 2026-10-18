@@ -3,7 +3,7 @@
 // - أخضر < 500م | بنفسجي 500م-2كم | أحمر > 2كم
 // - عند الضغط على سائق تظهر ورقة تفاصيله
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Map as MapGL, Marker, type MapRef, type MapMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -15,6 +15,9 @@ import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { AppDrawer } from '../components/AppDrawer';
+import { RouteLines } from '../components/map/MapPins';
+import { applyArabicAndEnhancedLabels, getDirections } from '../lib/mapbox';
+import { realtime } from '../lib/realtime';
 
 const USER_LOC = { lat: 32.0298, lng: 44.3285 };
 
@@ -64,6 +67,8 @@ export default function DailyRoutePage() {
   const [isBooking, setIsBooking] = useState(false);
   const [subscribedDriverIds, setSubscribedDriverIds] = useState<Set<string>>(new Set());
   const [customerBookings, setCustomerBookings] = useState<any[]>([]);
+  const [selectedDriverRoute, setSelectedDriverRoute] = useState<[number, number][] | null>(null);
+  const notifiedRejectedBookingIdsRef = useRef<Set<string>>(new Set());
 
   // نافذة طلب إلغاء الاشتراك للراكب
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -72,7 +77,45 @@ export default function DailyRoutePage() {
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // جلب حجوزات واشتراكات الراكب الحالية في الخطوط الدائمة لمنع تكرار الحجز
+  // معالجة وتحديث حجوزات الراكب ومراقبة رفض الكابتن للحجز فورياً
+  const processBookings = useCallback(
+    (bookings: any[]) => {
+      setCustomerBookings(bookings);
+      const activeSet = new Set<string>();
+      let newlyRejectedDetected = false;
+
+      for (const b of bookings) {
+        const status = String(b.status || '').toLowerCase();
+        const bId = String(b.id || b._id || b.bookingId || `${b.driverId || b.driver_id}-${b.createdAt || ''}`);
+        const isRejected = ['rejected', 'declined', 'cancelled_by_driver'].includes(status);
+
+        if (isRejected) {
+          if (!notifiedRejectedBookingIdsRef.current.has(bId)) {
+            notifiedRejectedBookingIdsRef.current.add(bId);
+            newlyRejectedDetected = true;
+          }
+        } else if (['pending', 'confirmed', 'active', 'cancellation_pending'].includes(status) || !b.status) {
+          if (b.driverId) activeSet.add(String(b.driverId));
+          if (b.driver_id) activeSet.add(String(b.driver_id));
+          if (b.driverPhone) activeSet.add(normalizePhoneLoose(b.driverPhone));
+        }
+      }
+
+      setSubscribedDriverIds(activeSet);
+
+      if (newlyRejectedDetected) {
+        show(
+          'عذراً، تم الاعتذار عن قبول حجز الخط من قبل الكابتن. بإمكانك اختيار خط بديل أو إعادة المحاولة.',
+          'warning',
+          8000
+        );
+        setIsBooking(false);
+      }
+    },
+    [show]
+  );
+
+  // جلب ومراقبة حجوزات الراكب عبر Polling والاتصال اللحظي Realtime
   useEffect(() => {
     const session = authStore.getSession();
     const customerId = session?.userId || storage.getUserId();
@@ -80,24 +123,63 @@ export default function DailyRoutePage() {
     const target = customerId || phone;
     if (!target) return;
 
-    http
-      .get<{ success?: boolean; bookings?: any[] }>(`/customer/${encodeURIComponent(target)}/bookings`)
+    let mounted = true;
+
+    const fetchBookings = () => {
+      http
+        .get<{ success?: boolean; bookings?: any[] }>(`/customer/${encodeURIComponent(target)}/bookings`)
+        .then((res) => {
+          if (!mounted) return;
+          const bookings = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
+          processBookings(bookings);
+        })
+        .catch(() => {});
+    };
+
+    fetchBookings();
+    const pollInterval = setInterval(fetchBookings, 4000);
+
+    // الاستماع الفوري لأي تحديث لحالة الحجز عبر Realtime
+    const unsubStatus = realtime.onTripStatus((e) => {
+      const status = String(e.status || '').toLowerCase();
+      if (['rejected', 'declined', 'cancelled_by_driver'].includes(status)) {
+        fetchBookings();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      clearInterval(pollInterval);
+      unsubStatus();
+    };
+  }, [processBookings]);
+
+  // رسم مسار الملاحة بنمط ويز عند اختيار كابتن خط دائمي
+  useEffect(() => {
+    if (!selectedDriver) {
+      setSelectedDriverRoute(null);
+      return;
+    }
+    let cancelled = false;
+    getDirections(userLoc, { lat: selectedDriver.lat, lng: selectedDriver.lng })
       .then((res) => {
-        const bookings = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
-        setCustomerBookings(bookings);
-        const activeSet = new Set<string>();
-        for (const b of bookings) {
-          const status = String(b.status || '').toLowerCase();
-          if (['pending', 'confirmed', 'active', 'cancellation_pending'].includes(status) || !b.status) {
-            if (b.driverId) activeSet.add(String(b.driverId));
-            if (b.driver_id) activeSet.add(String(b.driver_id));
-            if (b.driverPhone) activeSet.add(normalizePhoneLoose(b.driverPhone));
-          }
+        if (!cancelled && res?.coordinates) {
+          setSelectedDriverRoute(res.coordinates.map((c) => [c.lng, c.lat]));
         }
-        setSubscribedDriverIds(activeSet);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedDriverRoute([
+            [userLoc.lng, userLoc.lat],
+            [selectedDriver.lng, selectedDriver.lat],
+          ]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDriver, userLoc]);
 
   const isAlreadySubscribed = Boolean(
     selectedDriver &&
@@ -112,7 +194,10 @@ export default function DailyRoutePage() {
         const sPhone = normalizePhoneLoose(selectedDriver.phone || '');
         const bDriverId = String(b.driverId || b.driver_id || '');
         const bPhone = normalizePhoneLoose(b.driverPhone || '');
-        return (bDriverId && bDriverId === sDriverId) || (sPhone && bPhone && sPhone === bPhone);
+        const matches = (bDriverId && bDriverId === sDriverId) || (sPhone && bPhone && sPhone === bPhone);
+        if (!matches) return false;
+        const status = String(b.status || '').toLowerCase();
+        return !['rejected', 'declined', 'cancelled_by_driver'].includes(status);
       })
     : null;
 
@@ -388,8 +473,22 @@ export default function DailyRoutePage() {
         mapStyle={config.mapStyle}
         initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
         onClick={handleMapClick}
+        onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
         style={{ width: '100%', height: '100%' }}
       >
+        {/* مسار الملاحة بنمط ويز بين الراكب وسائق الخط الدائمي */}
+        {selectedDriverRoute && selectedDriverRoute.length > 0 && (
+          <RouteLines
+            lines={[
+              {
+                id: 'daily-route-line',
+                coordinates: selectedDriverRoute,
+                color: '#3b82f6',
+              },
+            ]}
+          />
+        )}
+
         {/* موقع الراكب */}
         <Marker longitude={userLoc.lng} latitude={userLoc.lat} anchor="center">
           <div className="flex flex-col items-center">

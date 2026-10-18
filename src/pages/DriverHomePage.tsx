@@ -9,6 +9,8 @@ import { normalizePhoneLoose } from '../lib/phone';
 import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { config } from '../lib/config';
+import { RouteLines } from '../components/map/MapPins';
+import { applyArabicAndEnhancedLabels, getDirections } from '../lib/mapbox';
 
 const ChatModal = lazy(() => import('../components/ChatModal'));
 
@@ -180,6 +182,48 @@ export default function DriverHomePage() {
       );
     }
   }, []);
+
+  const [driverRouteCoordinates, setDriverRouteCoordinates] = useState<[number, number][] | null>(null);
+
+  // حساب وتحديث مسار المشوار الحالي بنمط ويز لخريطة الكابتن
+  useEffect(() => {
+    if (!activeRide) {
+      setDriverRouteCoordinates(null);
+      return;
+    }
+    const isPickupStage = activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay';
+    const targetLat = isPickupStage
+      ? (activeRide.pickupLat ?? activeRide.pickup_lat ?? activeRide.pickup?.lat)
+      : (activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat);
+    const targetLon = isPickupStage
+      ? (activeRide.pickupLon ?? activeRide.pickup_lon ?? activeRide.pickup?.lng ?? activeRide.pickup?.lon)
+      : (activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon);
+
+    if (!targetLat || !targetLon) {
+      setDriverRouteCoordinates(null);
+      return;
+    }
+
+    let cancelled = false;
+    getDirections(driverLoc, { lat: targetLat, lng: targetLon })
+      .then((res) => {
+        if (!cancelled && res?.coordinates) {
+          setDriverRouteCoordinates(res.coordinates.map((c) => [c.lng, c.lat]));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDriverRouteCoordinates([
+            [driverLoc.lng, driverLoc.lat],
+            [targetLon, targetLat],
+          ]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRide, driverLoc]);
 
   function handleRecenterDriverMap() {
     setIsLocating(true);
@@ -1143,8 +1187,22 @@ export default function DriverHomePage() {
                 mapboxAccessToken={config.mapboxToken}
                 mapStyle={config.mapStyle}
                 initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
+                onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
                 style={{ width: '100%', height: '100%' }}
               >
+                {/* مسار الملاحة بنمط ويز لخريطة الكابتن */}
+                {driverRouteCoordinates && driverRouteCoordinates.length > 0 && (
+                  <RouteLines
+                    lines={[
+                      {
+                        id: 'driver-route-line',
+                        coordinates: driverRouteCoordinates,
+                        color: '#3b82f6',
+                      },
+                    ]}
+                  />
+                )}
+
                 <Marker longitude={driverLoc.lng} latitude={driverLoc.lat} anchor="center">
                   <div className="relative flex items-center justify-center">
                     <div className="animate-ping absolute h-8 w-8 rounded-full bg-amber-500/30" />

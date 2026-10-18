@@ -62,27 +62,78 @@ export function DriverTagPin({
 export interface RouteLineData {
   id: string;
   coordinates: [number, number][];
-  color: string;
+  color?: string;
   width?: number;
+  casingColor?: string;
 }
 
-// طبقة الخطوط المجمعة — مسار الراكب الأسود، خطوط الكباتن الملونة، وخط التتبع الأخضر
+// طبقة مسارات الملاحة بنمط ويز (Waze-Style Double Layer Polyline):
+// 1. طبقة الغلاف الخارجي (Casing / Border): بلون أزرق داكن لإبراز المسار وفصله عن خلفية الخريطة
+// 2. طبقة القلب الداخلي الساطع (Inner Core / Waze Blue): بلون أزرق ويز ساطع
 export function RouteLines({ lines }: { lines: RouteLineData[] }) {
   return (
     <>
-      {lines.map((line) => (
-        <Source key={line.id} id={`line-${line.id}`} type="geojson" data={{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: line.coordinates } }}>
-          <Layer
-            id={`line-layer-${line.id}`}
-            type="line"
-            layout={{ 'line-join': 'round', 'line-cap': 'round' }}
-            paint={{
-              'line-color': line.color,
-              'line-width': line.width ?? 4.5,
+      {lines.map((line) => {
+        const casingId = line.id === 'route-line' ? 'route-casing' : `route-casing-${line.id}`;
+        const innerId = line.id === 'route-line' ? 'route-inner' : `route-inner-${line.id}`;
+        const innerColor = line.color || '#3b82f6';
+        const casingColor = line.casingColor || '#1d4ed8';
+
+        return (
+          <Source
+            key={line.id}
+            id={`line-${line.id}`}
+            type="geojson"
+            data={{
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'LineString', coordinates: line.coordinates },
             }}
-          />
-        </Source>
-      ))}
+          >
+            {/* 1. الغلاف الخارجي للمسار بنمط ويز (Route Casing) */}
+            <Layer
+              id={casingId}
+              type="line"
+              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              paint={{
+                'line-color': casingColor,
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  11,
+                  7,
+                  15,
+                  12,
+                  18,
+                  18,
+                ],
+                'line-opacity': 0.85,
+              }}
+            />
+            {/* 2. القلب الداخلي الساطع للمسار بنمط ويز (Route Inner Core) */}
+            <Layer
+              id={innerId}
+              type="line"
+              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              paint={{
+                'line-color': innerColor,
+                'line-width': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  11,
+                  4,
+                  15,
+                  8,
+                  18,
+                  13,
+                ],
+              }}
+            />
+          </Source>
+        );
+      })}
     </>
   );
 }

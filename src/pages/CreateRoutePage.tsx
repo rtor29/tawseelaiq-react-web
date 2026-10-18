@@ -3,12 +3,13 @@
 // بحث جغرافي، وGPS مع عكس العنوان العربي
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Map, { NavigationControl, Marker, Source, Layer, type MapMouseEvent, type MapRef } from 'react-map-gl';
+import Map, { NavigationControl, Marker, type MapMouseEvent, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { endpoints, http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config, NAJAF_CENTER } from '../lib/config';
-import { getDirections, reverseGeocode, searchPlaces, type PlaceResult, type RouteResult } from '../lib/mapbox';
+import { getDirections, reverseGeocode, searchPlaces, applyArabicAndEnhancedLabels, type PlaceResult, type RouteResult } from '../lib/mapbox';
+import { RouteLines } from '../components/map/MapPins';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import type { LngLat } from '../types';
 import { TopBar } from '../components/TopBar';
@@ -294,12 +295,21 @@ export default function CreateRoutePage() {
             initialViewState={{ longitude: startPoint.lng, latitude: startPoint.lat, zoom: 13 }}
             style={{ width: '100%', height: '100%' }}
             onClick={handleMapClick}
+            onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
           >
             <NavigationControl position="bottom-left" showCompass={false} />
 
-            {/* خط المسار الأزرق */}
+            {/* خط المسار بنمط ويز */}
             {route && route.coordinates.length > 1 && (
-              <SourceLine coordinates={route.coordinates.map((p) => [p.lng, p.lat])} />
+              <RouteLines
+                lines={[
+                  {
+                    id: 'create-route-line',
+                    coordinates: route.coordinates.map((p) => [p.lng, p.lat]),
+                    color: '#3b82f6',
+                  },
+                ]}
+              />
             )}
 
             <Marker longitude={startPoint.lng} latitude={startPoint.lat} anchor="center">
@@ -363,16 +373,4 @@ export default function CreateRoutePage() {
   );
 }
 
-// طبقة خط المسار (Source + Layer)
-function SourceLine({ coordinates }: { coordinates: [number, number][] }) {
-  return (
-    <Source id="driver-route" type="geojson" data={{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } }}>
-      <Layer
-        id="driver-route-line"
-        type="line"
-        layout={{ 'line-join': 'round', 'line-cap': 'round' }}
-        paint={{ 'line-color': '#2563EB', 'line-width': 5.5 }}
-      />
-    </Source>
-  );
-}
+
