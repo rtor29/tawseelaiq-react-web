@@ -19,9 +19,37 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// تسجيل عامل الخدمة (Service Worker) في الإنتاج فقط — جاهزية PWA
+// تسجيل عامل الخدمة (Service Worker) في الإنتاج مع فرض التحديث الفوري عند توفر نسخة جديدة
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        // فحص التحديثات من السيرفر فوراً
+        void registration.update();
+
+        // الاستماع لاكتشاف إصدار جديد
+        registration.addEventListener('updatefound', () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.addEventListener('statechange', () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // إصدار جديد تم تثبيته — إرسال أمر التخطي للعمل فوراً
+                installingWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          }
+        });
+      })
+      .catch(() => undefined);
+
+    // إعادة تحميل فورية وسلسة لمرة واحدة عند استلام التحكم بالنسخة الجديدة
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   });
 }

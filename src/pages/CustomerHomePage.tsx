@@ -2290,7 +2290,7 @@ export default function CustomerHomePage() {
 
       {/* 8. نافذة "خيارات الرحلة" (الصورة الثانية بالكامل) */}
       {isTripOptionsOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-y-auto animate-fade-in" dir="rtl">
+        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white overflow-y-auto animate-fade-in" dir="rtl">
           {/* الترويسة العلوية: سهم الرجوع وعنوان خيارات الرحلة */}
           <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-gray-100">
             <button
@@ -2546,7 +2546,7 @@ export default function CustomerHomePage() {
 
       {/* 9. نافذة البحث عن الأماكن */}
       {isSearchOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
+        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white">
           <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100">
             <h2 className="text-[18px] font-bold text-[#1A1A1A]">
               {stage === 'pickup' ? 'حدد نقطة الانطلاق' : 'حدد وجهة الوصول'}
@@ -2934,7 +2934,7 @@ export default function CustomerHomePage() {
 
       {/* 11. درج الزبون الكامل مع "حول توصيلة" */}
       {isProfileOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white overflow-hidden" role="dialog" aria-modal="true">
           <div className="flex items-center px-5 pt-4 pb-2">
             <button
               type="button"

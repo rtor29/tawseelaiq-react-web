@@ -4,7 +4,7 @@
 // - استراتيجية Network-First مع السقوط على الكاش للتنقل عند انقطاع أو ضعف الاتصال
 // - استثناء استعلامات الـ API و Mapbox الحية من الكاش للحفاظ على دقة التتبع اللحظي
 
-const CACHE_NAME = 'tawseela-static-v3';
+const CACHE_NAME = 'tawseela-static-v5';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -13,6 +13,13 @@ const PRECACHE_URLS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
+
+// استقبال أوامر التحديث الفوري
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // تثبيت عامل الخدمة وتحميل الأصول الأساسية
 self.addEventListener('install', (event) => {

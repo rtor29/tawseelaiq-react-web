@@ -26,7 +26,7 @@ const CustomerHub = lazy(() => import('./components/CustomerHub').then((m) => ({
 
 function PageLoader() {
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-gray-50">
+    <div className="mx-auto w-full max-w-md min-h-[100dvh] h-[100dvh] flex items-center justify-center bg-gray-50 md:shadow-2xl md:border-x md:border-slate-200">
       <div className="flex flex-col items-center gap-3">
         <Spinner className="h-8 w-8 text-[#1B4965]" />
         <span className="text-xs font-bold text-gray-500">جاري التحميل...</span>
@@ -80,91 +80,93 @@ export default function App() {
   if (!ready) return null;
 
   return (
-    <Suspense fallback={<PageLoader />}>
-      <main className="min-h-[100dvh] h-[100dvh]">
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<Navigate to="/login" replace />} />
-          <Route path="/otp" element={<Navigate to="/login" replace />} />
-          <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
-          <Route path="/hub" element={<RequireAuth>{session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHub />}</RequireAuth>} />
+    <div className="min-h-[100dvh] w-full bg-slate-100 flex justify-center">
+      <Suspense fallback={<PageLoader />}>
+        <main className="mx-auto w-full max-w-md h-[100dvh] min-h-[100dvh] relative bg-white md:shadow-2xl md:border-x md:border-slate-200 overflow-hidden">
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<Navigate to="/login" replace />} />
+            <Route path="/otp" element={<Navigate to="/login" replace />} />
+            <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
+            <Route path="/hub" element={<RequireAuth>{session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHub />}</RequireAuth>} />
 
-          <Route
-            path="/"
-            element={
-              <RequireAuth>
-                {session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHomePage />}
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/track/:bookingId"
-            element={
-              <RequireAuth>
-                <LiveTrackingPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/driver"
-            element={
-              <RequireAuth role="Driver">
-                <DriverHomePage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/driver/routes/new"
-            element={
-              <RequireAuth role="Driver">
-                <CreateRoutePage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/driver/requests"
-            element={
-              <RequireAuth role="Driver">
-                <DriverRequestsPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/driver/documents"
-            element={
-              <RequireAuth role="Driver">
-                <DocumentUploadPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/ads"
-            element={
-              <RequireAuth>
-                <VacancyAdsPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/ads/new"
-            element={
-              <RequireAuth role="Driver">
-                <CreateVacancyAdPage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/support"
-            element={
-              <RequireAuth>
-                <SupportPage />
-              </RequireAuth>
-            }
-          />
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  {session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHomePage />}
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/track/:bookingId"
+              element={
+                <RequireAuth>
+                  <LiveTrackingPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/driver"
+              element={
+                <RequireAuth role="Driver">
+                  <DriverHomePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/driver/routes/new"
+              element={
+                <RequireAuth role="Driver">
+                  <CreateRoutePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/driver/requests"
+              element={
+                <RequireAuth role="Driver">
+                  <DriverRequestsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/driver/documents"
+              element={
+                <RequireAuth role="Driver">
+                  <DocumentUploadPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/ads"
+              element={
+                <RequireAuth>
+                  <VacancyAdsPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/ads/new"
+              element={
+                <RequireAuth role="Driver">
+                  <CreateVacancyAdPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/support"
+              element={
+                <RequireAuth>
+                  <SupportPage />
+                </RequireAuth>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-    </Suspense>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </Suspense>
+    </div>
   );
 }
