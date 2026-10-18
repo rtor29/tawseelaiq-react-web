@@ -70,88 +70,90 @@ export default function App() {
 
   return (
     <Suspense fallback={<PageLoader />}>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<Navigate to="/login" replace />} />
-        <Route path="/otp" element={<Navigate to="/login" replace />} />
-        <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
-        <Route path="/hub" element={<RequireAuth>{session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHub />}</RequireAuth>} />
+      <main className="min-h-screen">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<Navigate to="/login" replace />} />
+          <Route path="/otp" element={<Navigate to="/login" replace />} />
+          <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
+          <Route path="/hub" element={<RequireAuth>{session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHub />}</RequireAuth>} />
 
-        <Route
-          path="/"
-          element={
-            <RequireAuth>
-              {session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHomePage />}
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/track/:bookingId"
-          element={
-            <RequireAuth>
-              <LiveTrackingPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/driver"
-          element={
-            <RequireAuth role="Driver">
-              <DriverHomePage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/driver/routes/new"
-          element={
-            <RequireAuth role="Driver">
-              <CreateRoutePage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/driver/requests"
-          element={
-            <RequireAuth role="Driver">
-              <DriverRequestsPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/driver/documents"
-          element={
-            <RequireAuth role="Driver">
-              <DocumentUploadPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/ads"
-          element={
-            <RequireAuth>
-              <VacancyAdsPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/ads/new"
-          element={
-            <RequireAuth role="Driver">
-              <CreateVacancyAdPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/support"
-          element={
-            <RequireAuth>
-              <SupportPage />
-            </RequireAuth>
-          }
-        />
+          <Route
+            path="/"
+            element={
+              <RequireAuth>
+                {session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHomePage />}
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/track/:bookingId"
+            element={
+              <RequireAuth>
+                <LiveTrackingPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/driver"
+            element={
+              <RequireAuth role="Driver">
+                <DriverHomePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/driver/routes/new"
+            element={
+              <RequireAuth role="Driver">
+                <CreateRoutePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/driver/requests"
+            element={
+              <RequireAuth role="Driver">
+                <DriverRequestsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/driver/documents"
+            element={
+              <RequireAuth role="Driver">
+                <DocumentUploadPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/ads"
+            element={
+              <RequireAuth>
+                <VacancyAdsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/ads/new"
+            element={
+              <RequireAuth role="Driver">
+                <CreateVacancyAdPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/support"
+            element={
+              <RequireAuth>
+                <SupportPage />
+              </RequireAuth>
+            }
+          />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </Suspense>
   );
 }

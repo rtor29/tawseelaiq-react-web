@@ -364,7 +364,10 @@ export default function LoginPage() {
           <div className="mb-10 text-center flex justify-center">
             <img
               src="/logo.png"
-              alt="توصيلة"
+              alt="شعار منصة توصيلة"
+              width="250"
+              height="136"
+              fetchPriority="high"
               className="w-[250px] max-w-[85%] h-auto object-contain animate-drive-in"
             />
           </div>
@@ -389,6 +392,7 @@ export default function LoginPage() {
             <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-7 transition-all focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
               <input
                 type="tel"
+                aria-label="رقم الهاتف"
                 dir="ltr"
                 value={phone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
@@ -414,7 +418,7 @@ export default function LoginPage() {
             onClick={handleSubmitPhone}
             disabled={isLoading}
             className="fixed bottom-14 left-6 md:absolute md:bottom-16 md:left-8 w-14 h-14 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white flex items-center justify-center shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 disabled:opacity-60 z-40 animate-fade-in-text"
-            aria-label="متابعة"
+            aria-label="تسجيل الدخول"
           >
             {isLoading ? (
               <Spinner className="w-6 h-6 text-white" />
@@ -539,7 +543,9 @@ export default function LoginPage() {
           <div className="mb-10 text-center flex justify-center">
             <img
               src="/logo.png"
-              alt="توصيلة"
+              alt="شعار منصة توصيلة"
+              width="220"
+              height="120"
               className="w-[220px] max-w-[80%] h-auto object-contain animate-drive-in"
             />
           </div>
