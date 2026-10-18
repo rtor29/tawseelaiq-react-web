@@ -5,12 +5,13 @@ import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useSession } from './lib/auth';
 import { consumeLoginTokenFromUrl } from './lib/googleAuth';
-import { realtime } from './lib/realtime';
 import { fetchAndApplyTheme } from './lib/theme';
 import { Spinner } from './components/ui';
 
-// Lazy loading all pages for optimal bundle splitting
-const LoginPage = lazy(() => import('./pages/LoginPage'));
+// Standard import for instant initial render of login screen
+import LoginPage from './pages/LoginPage';
+
+// Lazy loading all heavy secondary pages for optimal bundle splitting
 const CustomerHomePage = lazy(() => import('./pages/CustomerHomePage'));
 const LiveTrackingPage = lazy(() => import('./pages/LiveTrackingPage'));
 const DriverHomePage = lazy(() => import('./pages/DriverHomePage'));
@@ -56,14 +57,24 @@ export default function App() {
     setReady(true);
   }, []);
 
-  // الاتصال اللحظي يتبع الجلسة عند تغيير المسار (اتصال واحد لكل التطبيق)
+  // الاتصال اللحظي يتبع الجلسة عند تغيير المسار (يتم تحميله ديناميكياً فقط عند وجود جلسة نشطة)
   useEffect(() => {
     if (ready && session?.role === 'Admin') {
       window.location.replace('/dashboard/');
       return;
     }
-    if (ready && session) void realtime.connect(session.token);
-    return () => { void realtime.disconnect(); };
+    if (ready && session) {
+      let active = true;
+      void import('./lib/realtime').then(({ realtime }) => {
+        if (active) void realtime.connect(session.token);
+      });
+      return () => {
+        active = false;
+        void import('./lib/realtime').then(({ realtime }) => {
+          void realtime.disconnect();
+        });
+      };
+    }
   }, [ready, session]);
 
   if (!ready) return null;

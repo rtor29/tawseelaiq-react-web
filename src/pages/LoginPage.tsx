@@ -1,5 +1,4 @@
-// شاشة تسجيل الدخول الموحدة (ياهلا) واختيار الخدمة — إدخال رقم الهاتف والتحقق عبر الواتساب واختيار الخدمة
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore, useSession } from '../lib/auth';
@@ -7,7 +6,8 @@ import { consumeLoginTokenFromUrl } from '../lib/googleAuth';
 import type { Session } from '../types';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import { CustomerHub } from '../components/CustomerHub';
+
+const CustomerHub = lazy(() => import('../components/CustomerHub').then((m) => ({ default: m.CustomerHub })));
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -352,7 +352,11 @@ export default function LoginPage() {
 
   // في حال الوصول لخطوة اختيار الخدمة، عرض هب خدمات الزبون الحديث (Baly Style)
   if (step === 'service_select') {
-    return <CustomerHub onSelectService={handleSelectService} />;
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50"><Spinner className="w-8 h-8 text-[#1B4965]" /></div>}>
+        <CustomerHub onSelectService={handleSelectService} />
+      </Suspense>
+    );
   }
 
   return (
@@ -388,8 +392,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* حقل إدخال رقم الهاتف */}
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-7 transition-all focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
+            {/* حقل إدخال رقم الهاتف — إزالة transition-all لمنع Non-composited animations */}
+            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-7 focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
               <input
                 type="tel"
                 aria-label="رقم الهاتف"
