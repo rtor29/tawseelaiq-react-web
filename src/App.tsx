@@ -10,6 +10,7 @@ import { Spinner } from './components/ui';
 
 // Standard import for instant initial render of login screen
 import LoginPage from './pages/LoginPage';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 
 // Lazy loading all heavy secondary pages for optimal bundle splitting
 const CustomerHomePage = lazy(() => import('./pages/CustomerHomePage'));
@@ -165,6 +166,7 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <PwaInstallPrompt />
         </main>
       </Suspense>
     </div>
