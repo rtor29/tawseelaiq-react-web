@@ -237,3 +237,22 @@ body {
   mask-position: center;
   transition: background-color 0.25s ease-out;
 }
+
+/* ==========================================================================
+   خط البحث في الخريطة والأماكن (Arial Unicode MS Regular)
+   ========================================================================== */
+.font-map-search,
+.font-map-search input,
+.font-map-search button,
+.font-map-search span,
+.font-map-search p {
+  font-family: 'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', Arial, sans-serif !important;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.map-search-input {
+  font-family: 'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', Arial, sans-serif !important;
+  letter-spacing: 0.01em;
+}
+

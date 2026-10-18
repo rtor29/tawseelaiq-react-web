@@ -327,9 +327,9 @@ export default function CreateRoutePage() {
 
           {/* نافذة البحث */}
           {searchOpenFor && (
-            <div className="absolute inset-x-4 top-4 z-20 rounded-2xl bg-white p-4 shadow-float">
+            <div className="absolute inset-x-4 top-4 z-20 rounded-2xl bg-white p-4 shadow-float font-map-search">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-extrabold text-brand-slate">
+                <p className="text-sm font-extrabold text-brand-slate font-map-search">
                   بحث عن {searchOpenFor === 'start' ? 'نقطة الانطلاق' : 'نقطة الوصول'}
                 </p>
                 <button type="button" onClick={() => setSearchOpenFor(null)} className="text-slate-400" aria-label="إغلاق">
@@ -341,12 +341,12 @@ export default function CreateRoutePage() {
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="اكتب اسم منطقة في النجف..."
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-brand-amber"
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-brand-amber font-map-search"
               />
               {searchResults.length > 0 && (
                 <div
                   onMouseDown={(e) => e.preventDefault()}
-                  className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-100"
+                  className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-100 font-map-search"
                 >
                   {searchResults.map((p, i) => (
                     <button
@@ -357,10 +357,10 @@ export default function CreateRoutePage() {
                         e.stopPropagation();
                         selectPlace(p);
                       }}
-                      className="flex w-full items-center gap-2.5 border-b border-slate-50 px-3 py-2.5 text-right text-sm hover:bg-amber-50 cursor-pointer"
+                      className="flex w-full items-center gap-2.5 border-b border-slate-50 px-3 py-2.5 text-right text-sm hover:bg-amber-50 cursor-pointer font-map-search"
                     >
                       <span className="text-brand-amber shrink-0">📍</span>
-                      <div className="flex flex-col text-right truncate">
+                      <div className="flex flex-col text-right truncate font-map-search">
                         <span className="truncate font-bold text-slate-800">{p.name}</span>
                         <span className="truncate text-[11px] text-slate-500">{p.subName || 'النجف الأشرف'}</span>
                       </div>

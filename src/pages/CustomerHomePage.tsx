@@ -2620,7 +2620,7 @@ export default function CustomerHomePage() {
                 placeholder={
                   stage === 'pickup' ? 'ابحث عن موقع الانطلاق...' : 'ابحث عن وجهة الوصول...'
                 }
-                className="flex-1 bg-transparent text-[14px] font-medium text-[#1A1A1A] outline-none placeholder-[#6C757D]"
+                className="flex-1 bg-transparent text-[14px] font-medium text-[#1A1A1A] outline-none placeholder-[#6C757D] font-map-search"
               />
 
               <button
@@ -2704,7 +2704,7 @@ export default function CustomerHomePage() {
                           <circle cx="12" cy="10" r="3" />
                         </svg>
                       </div>
-                      <div className="truncate">
+                      <div className="truncate font-map-search">
                         <p className="text-[14.5px] font-bold text-[#1A1A1A] group-hover:text-[#1B4965] transition-colors truncate">
                           {place.name}
                         </p>

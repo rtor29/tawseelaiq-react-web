@@ -372,16 +372,46 @@ export function applyArabicAndEnhancedLabels(rawMap: any) {
 
       for (const layer of style.layers) {
         if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
-          // 1. تعريب نصوص الشوارع والمعالم
+          // 1. صيغة استرجاع النص العربي (Text field Formula: coalesce(name_ar, name_en, name))
           try {
             map.setLayoutProperty(layer.id, 'text-field', [
               'coalesce',
               ['get', 'name_ar'],
+              ['get', 'name_en'],
               ['get', 'name'],
             ]);
           } catch {}
 
-          // 2. تكبير حجم خطوط الخريطة بنسبة 25% مع التدرج حسب مستوى الزوم
+          // 2. تعيين خط الخريطة (Font: Arial Unicode MS Regular)
+          try {
+            map.setLayoutProperty(layer.id, 'text-font', ['Arial Unicode MS Regular', 'Arial Unicode MS Bold']);
+          } catch {
+            try {
+              map.setLayoutProperty(layer.id, 'text-font', ['Arial Unicode MS Regular']);
+            } catch {}
+          }
+
+          // 3. تباعد الأحرف (Letter spacing: 0.01 em)
+          try {
+            map.setLayoutProperty(layer.id, 'text-letter-spacing', 0.01);
+          } catch {}
+
+          // 4. ارتفاع السطر (Line height: 1.2 em)
+          try {
+            map.setLayoutProperty(layer.id, 'text-line-height', 1.2);
+          } catch {}
+
+          // 5. أقصى عرض للسطر (Max width: 10 em)
+          try {
+            map.setLayoutProperty(layer.id, 'text-max-width', 10);
+          } catch {}
+
+          // 6. التحويل (Transform: none / Tt)
+          try {
+            map.setLayoutProperty(layer.id, 'text-transform', 'none');
+          } catch {}
+
+          // 7. حجم الخط وتدرجه بنطاق مقياس دقيق (Size scale range: 0.8, 2)
           try {
             map.setLayoutProperty(layer.id, 'text-size', [
               'interpolate',
@@ -396,7 +426,12 @@ export function applyArabicAndEnhancedLabels(rawMap: any) {
             ]);
           } catch {}
 
-          // 3. إضافة إطار وهالة بيضاء ناصعة ومريحة لسهولة القراءة
+          // 8. الشفافية (Opacity: 1)
+          try {
+            map.setPaintProperty(layer.id, 'text-opacity', 1);
+          } catch {}
+
+          // 9. هالة بيضاء ناصعة ومريحة لسهولة قراءة أسماء المعالم فوق خلفيات الخريطة
           try {
             map.setPaintProperty(layer.id, 'text-halo-color', '#ffffff');
             map.setPaintProperty(layer.id, 'text-halo-width', 2);

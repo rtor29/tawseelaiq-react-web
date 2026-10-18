@@ -506,7 +506,7 @@ export default function DailyRoutePage() {
       </div>
 
       {/* شريط البحث الجغرافي السريع عن الأحياء والمعالم بالنجف */}
-      <div className="absolute top-[calc(4.5rem+env(safe-area-inset-top,0.75rem))] inset-x-4 z-20 pointer-events-auto max-w-md mx-auto">
+      <div className="absolute top-[calc(4.5rem+env(safe-area-inset-top,0.75rem))] inset-x-4 z-20 pointer-events-auto max-w-md mx-auto font-map-search">
         <div
           onClick={() => {
             setIsSearchOpen(true);
@@ -515,7 +515,7 @@ export default function DailyRoutePage() {
           className="flex items-center gap-2.5 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-md border border-slate-200/80 cursor-pointer active:scale-[0.99] transition hover:border-amber-400"
         >
           <span className="text-amber-500">🔍</span>
-          <span className="text-[13px] text-slate-500 font-medium truncate flex-1">
+          <span className="text-[13px] text-slate-500 font-medium truncate flex-1 font-map-search">
             {searchQuery ? searchQuery : 'ابحث عن حي، معلم، فندق أو شارع بالنجف...'}
           </span>
           {isSearchOpen && (
@@ -534,17 +534,17 @@ export default function DailyRoutePage() {
 
         {/* نافذة وقائمة نتائج البحث المنبثقة */}
         {isSearchOpen && (
-          <div className="mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 max-h-72 overflow-y-auto space-y-1">
+          <div className="mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 max-h-72 overflow-y-auto space-y-1 font-map-search">
             <input
               autoFocus
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="اكتب اسم الحي أو المعلم (مثل: حي الأنصار، قصر الدر)..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-500 mb-2"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-500 mb-2 font-map-search"
             />
             {isSearching && (
-              <div className="text-center py-2 text-xs text-slate-500 font-semibold">
+              <div className="text-center py-2 text-xs text-slate-500 font-semibold font-map-search">
                 جاري البحث في معالم النجف...
               </div>
             )}
@@ -552,7 +552,7 @@ export default function DailyRoutePage() {
               <div
                 key={`${p.lat}-${p.lon}-${idx}`}
                 onClick={() => handleSelectPlace(p)}
-                className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-50/70 cursor-pointer transition border-b border-slate-50 last:border-none"
+                className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-50/70 cursor-pointer transition border-b border-slate-50 last:border-none font-map-search"
               >
                 <span className="text-amber-500 shrink-0">📍</span>
                 <div className="flex flex-col text-right truncate">
