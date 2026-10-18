@@ -22,7 +22,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   primaryHover: '#14364A',
   accentColor: '#D97706',
   brandLogoColor: '#EBB812',
-  fontFamily: 'IBM Plex Sans Arabic',
+  fontFamily: 'Arial Unicode MS Regular',
   fontSize: '14px',
   bgColor: '#F8FAFC',
   cardBg: '#FFFFFF',
@@ -67,8 +67,10 @@ export function applyTheme(theme: Partial<ThemeConfig>): ThemeConfig {
     root.style.setProperty('--text-color', merged.textColor || '#0F172A');
 
     // تطبيق الخط
-    const chosenFont = merged.fontFamily || 'IBM Plex Sans Arabic';
-    const fontStack = `"${chosenFont}", 'Tajawal', 'Cairo', system-ui, -apple-system, sans-serif`;
+    const chosenFont = merged.fontFamily || 'Arial Unicode MS Regular';
+    const fontStack = chosenFont.includes('Arial Unicode MS')
+      ? `'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif`
+      : `"${chosenFont}", 'Tajawal', 'Cairo', system-ui, -apple-system, sans-serif`;
     root.style.setProperty('--font-family', fontStack);
     document.body.style.fontFamily = fontStack;
 
