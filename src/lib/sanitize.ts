@@ -37,3 +37,28 @@ export function sanitizeGeneralText(text: unknown, maxLength = 500): string {
     .trim()
     .slice(0, maxLength);
 }
+
+/**
+ * تطبيع النصوص العربية لتسهيل البحث الجغرافي ومطابقة الكلمات المختلفة إملائياً
+ * (توحيد الهمزات والألفات: أ/إ/آ/ٱ -> ا، التاء المربوطة: ة -> ه، والألف المقصورة: ى -> ي، وإزالة التشكيل والتطويل)
+ */
+export function normalizeArabicText(text: unknown): string {
+  if (typeof text !== 'string') return '';
+  return text
+    // إزالة التشكيل (الحركات والتنوين والشدة)
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    // إزالة التطويل (الكشيدة)
+    .replace(/\u0640/g, '')
+    // توحيد الألفات
+    .replace(/[أإآٱ]/g, 'ا')
+    // توحيد التاء المربوطة
+    .replace(/ة/g, 'ه')
+    // توحيد الألف المقصورة
+    .replace(/ى/g, 'ي')
+    // توحيد الهمزات
+    .replace(/[ؤ]/g, 'و')
+    .replace(/[ئ]/g, 'ي')
+    // إزالة المسافات الزائدة
+    .replace(/\s+/g, ' ')
+    .trim();
+}

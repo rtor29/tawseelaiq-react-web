@@ -16,7 +16,8 @@ import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { AppDrawer } from '../components/AppDrawer';
 import { RouteLines } from '../components/map/MapPins';
-import { applyArabicAndEnhancedLabels, getDirections } from '../lib/mapbox';
+import { applyArabicAndEnhancedLabels, getDirections, searchPlaces, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
 
 const USER_LOC = { lat: 32.0298, lng: 44.3285 };
@@ -76,6 +77,44 @@ export default function DailyRoutePage() {
   const [cancelDetails, setCancelDetails] = useState('');
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // حالة البحث الجغرافي الذكي للأحياء والمعالم في النجف
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PlaceResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimer = useRef<number | null>(null);
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+
+    const cleaned = sanitizeSearchQuery(val);
+    if (!cleaned) {
+      setSearchResults(NAJAF_LOCAL_PLACES);
+      return;
+    }
+
+    searchTimer.current = window.setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchPlaces(cleaned, userLoc);
+        setSearchResults(results);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 350);
+  };
+
+  const handleSelectPlace = (place: PlaceResult) => {
+    const newLoc = { lat: place.lat, lng: place.lon };
+    setUserLoc(newLoc);
+    mapRef.current?.flyTo({ center: [place.lon, place.lat], zoom: 14.5, duration: 800 });
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    show(`تم تحديد موقعك في: ${place.name} 📍`, 'success');
+  };
 
   // معالجة وتحديث حجوزات الراكب ومراقبة رفض الكابتن للحجز فورياً
   const processBookings = useCallback(
@@ -464,6 +503,66 @@ export default function DailyRoutePage() {
             </svg>
           </button>
         </div>
+      </div>
+
+      {/* شريط البحث الجغرافي السريع عن الأحياء والمعالم بالنجف */}
+      <div className="absolute top-[calc(4.5rem+env(safe-area-inset-top,0.75rem))] inset-x-4 z-20 pointer-events-auto max-w-md mx-auto">
+        <div
+          onClick={() => {
+            setIsSearchOpen(true);
+            if (!searchQuery) setSearchResults(NAJAF_LOCAL_PLACES);
+          }}
+          className="flex items-center gap-2.5 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-md border border-slate-200/80 cursor-pointer active:scale-[0.99] transition hover:border-amber-400"
+        >
+          <span className="text-amber-500">🔍</span>
+          <span className="text-[13px] text-slate-500 font-medium truncate flex-1">
+            {searchQuery ? searchQuery : 'ابحث عن حي، معلم، فندق أو شارع بالنجف...'}
+          </span>
+          {isSearchOpen && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSearchOpen(false);
+              }}
+              className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* نافذة وقائمة نتائج البحث المنبثقة */}
+        {isSearchOpen && (
+          <div className="mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 max-h-72 overflow-y-auto space-y-1">
+            <input
+              autoFocus
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="اكتب اسم الحي أو المعلم (مثل: حي الأنصار، قصر الدر)..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-500 mb-2"
+            />
+            {isSearching && (
+              <div className="text-center py-2 text-xs text-slate-500 font-semibold">
+                جاري البحث في معالم النجف...
+              </div>
+            )}
+            {searchResults.map((p, idx) => (
+              <div
+                key={`${p.lat}-${p.lon}-${idx}`}
+                onClick={() => handleSelectPlace(p)}
+                className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-50/70 cursor-pointer transition border-b border-slate-50 last:border-none"
+              >
+                <span className="text-amber-500 shrink-0">📍</span>
+                <div className="flex flex-col text-right truncate">
+                  <span className="text-[13.5px] font-bold text-slate-800 truncate">{p.name}</span>
+                  <span className="text-[11px] text-slate-500 truncate">{p.subName || 'النجف الأشرف'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* الخريطة */}

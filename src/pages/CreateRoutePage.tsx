@@ -357,10 +357,13 @@ export default function CreateRoutePage() {
                         e.stopPropagation();
                         selectPlace(p);
                       }}
-                      className="flex w-full items-center gap-2 border-b border-slate-50 px-3 py-2.5 text-right text-sm hover:bg-amber-50 cursor-pointer"
+                      className="flex w-full items-center gap-2.5 border-b border-slate-50 px-3 py-2.5 text-right text-sm hover:bg-amber-50 cursor-pointer"
                     >
-                      <span className="text-brand-amber">📍</span>
-                      <span className="truncate">{p.name}</span>
+                      <span className="text-brand-amber shrink-0">📍</span>
+                      <div className="flex flex-col text-right truncate">
+                        <span className="truncate font-bold text-slate-800">{p.name}</span>
+                        <span className="truncate text-[11px] text-slate-500">{p.subName || 'النجف الأشرف'}</span>
+                      </div>
                     </button>
                   ))}
                 </div>

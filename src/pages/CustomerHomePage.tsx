@@ -2709,7 +2709,7 @@ export default function CustomerHomePage() {
                           {place.name}
                         </p>
                         <p className="text-[12px] font-medium text-[#6C757D] mt-0.5 truncate">
-                          النجف الأشرف
+                          {place.subName || 'النجف الأشرف'}
                         </p>
                       </div>
                     </div>
