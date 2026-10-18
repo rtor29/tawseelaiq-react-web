@@ -33,6 +33,11 @@ export default defineConfig(({ mode }) => {
     outDir: 'dist',
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
+    modulePreload: {
+      resolveDependencies: (filename, deps) => {
+        return deps.filter((dep) => !dep.includes('mapbox') && !dep.includes('realtime'));
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
