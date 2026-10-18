@@ -98,21 +98,21 @@ const RIDE_TIERS: RideTier[] = [
     id: 'super',
     name: 'سوبر',
     subtitle: 'الخيار الأفضل',
-    basePrice: 2000,
+    basePrice: 3000,
     badge: 'super',
   },
   {
     id: 'saving',
     name: 'توفير',
     subtitle: 'التكسي الأوفر',
-    basePrice: 1750,
+    basePrice: 3000,
     badge: 'saving',
   },
   {
     id: 'plus',
     name: 'بلَس',
     subtitle: 'خدمة أكثر راحة',
-    basePrice: 2250,
+    basePrice: 3500,
     badge: 'plus',
   },
 ];
@@ -902,17 +902,17 @@ export default function CustomerHomePage() {
         if (isCancelled || !res.data || !res.data.success) return;
 
         const mainData = res.data;
-        const mainFare = mainData.fare || 2500;
+        const mainFare = mainData.fare || 3000;
 
-        // Calculate proportionate rates for other tiers
+        // Calculate proportionate rates for other tiers (Strict upward ceil rounding to 250 IQD)
         let superFare = mainFare;
         if (selectedTierId === 'saving') {
-          superFare = Math.round((mainFare / 0.90) / 250) * 250;
+          superFare = Math.max(3000, Math.ceil((mainFare / 0.90) / 250) * 250);
         } else if (selectedTierId === 'plus') {
-          superFare = Math.round((mainFare / 1.20) / 250) * 250;
+          superFare = Math.max(3000, Math.ceil((mainFare / 1.20) / 250) * 250);
         }
-        const savingFare = Math.round((superFare * 0.90) / 250) * 250;
-        const plusFare = Math.round((superFare * 1.20) / 250) * 250;
+        const savingFare = Math.max(3000, Math.ceil((superFare * 0.90) / 250) * 250);
+        const plusFare = Math.max(3500, Math.ceil((superFare * 1.20) / 250) * 250);
 
         setDynamicPricingData({
           superFare,
@@ -935,11 +935,11 @@ export default function CustomerHomePage() {
   const currentTier = RIDE_TIERS.find((t) => t.id === selectedTierId) || RIDE_TIERS[0];
   let calculatedPrice = dynamicPricingData.selectedFare || currentTier.basePrice;
   if (!dynamicPricingData.selectedFare) {
-    if (isRoundTrip) calculatedPrice *= 2;
+    if (isRoundTrip) calculatedPrice *= 1.85;
     if (secondDestination.trim()) calculatedPrice += 1000;
     if (stopDuration) calculatedPrice += 500;
     if (appliedPromo) calculatedPrice = Math.max(1000, Math.round(calculatedPrice * 0.8));
-    calculatedPrice = Math.round(calculatedPrice / 250) * 250;
+    calculatedPrice = Math.max(3000, Math.ceil(calculatedPrice / 250) * 250);
   }
 
   // طلب التكسي النهائي — إرسال حقيقي للخادم

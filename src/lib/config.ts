@@ -18,6 +18,9 @@ export interface AppConfig {
   googleClientId: string;
   fareBaseIqd: number;
   farePerKmIqd: number;
+  farePerMinuteIqd: number;
+  fareMinIqd: number;
+  fareCancellationIqd: number;
 }
 
 export const config: AppConfig = {
@@ -35,9 +38,12 @@ export const config: AppConfig = {
 
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
 
-  // تسعيرة افتراضية (دينار عراقي) — أجرة الافتتاح + للأفقي كيلومتر
-  fareBaseIqd: 3000,
-  farePerKmIqd: 450,
+  // تسعيرة بلي القياسية في العراق (الوضع الافتراضي نظامياً)
+  fareBaseIqd: 1000,
+  farePerKmIqd: 500,
+  farePerMinuteIqd: 100,
+  fareMinIqd: 3000,
+  fareCancellationIqd: 1500,
 };
 
 // تحميل المفاتيح والتوكنات العامة بأمان من بيئة السيرفر عند غيابها
