@@ -57,7 +57,7 @@ export default function DocumentUploadPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-brand-surface">
+    <div className="flex h-dvh flex-col bg-brand-surface text-right font-cairo" dir="rtl">
       <TopBar title="رفع المستمسكات والوثائق" />
       <main className="mx-auto w-full max-w-xl flex-1 space-y-5 overflow-y-auto p-5">
         <input

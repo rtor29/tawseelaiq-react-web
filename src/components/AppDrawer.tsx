@@ -91,7 +91,7 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
 
       {/* الحاوية المنزلقة من اليمين بالكامل وفق المتطلبات وتطابق الصورة */}
       <aside
-        className={`fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl flex flex-col font-cairo transform transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl flex flex-col font-cairo text-right transform transition-transform duration-300 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
         dir="rtl"

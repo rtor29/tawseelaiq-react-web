@@ -73,7 +73,7 @@ export default function LiveTrackingPage() {
     : [];
 
   return (
-    <div className="flex h-dvh flex-col bg-brand-surface">
+    <div className="flex h-dvh flex-col bg-brand-surface text-right font-cairo" dir="rtl">
       <header className="flex h-14 items-center gap-2 bg-brand-slate px-3 text-white">
         <button
           type="button"

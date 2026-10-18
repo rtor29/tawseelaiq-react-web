@@ -45,12 +45,13 @@ type FieldProps = InputHTMLAttributes<HTMLInputElement> & { label?: string; icon
 
 export function Field({ label, icon, error, className = '', ...rest }: FieldProps) {
   return (
-    <label className="block">
-      {label && <span className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</span>}
+    <label className="block text-right" dir="rtl">
+      {label && <span className="mb-1.5 block text-xs font-bold text-slate-700">{label}</span>}
       <span className="relative block">
-        {icon && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">{icon}</span>}
+        {icon && <span className="pointer-events-none absolute inset-y-0 start-3 flex items-center text-slate-400">{icon}</span>}
         <input
-          className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${icon ? 'pr-10' : ''} ${className}`}
+          dir="rtl"
+          className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 text-right outline-none transition placeholder:text-slate-400 placeholder:text-right focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${icon ? 'ps-10' : ''} ${className}`}
           {...rest}
         />
       </span>
@@ -66,10 +67,11 @@ export function SelectField({
   ...rest
 }: SelectHTMLAttributes<HTMLSelectElement> & { label?: string }) {
   return (
-    <label className="block">
-      {label && <span className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</span>}
+    <label className="block text-right" dir="rtl">
+      {label && <span className="mb-1.5 block text-xs font-bold text-slate-700">{label}</span>}
       <select
-        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${className}`}
+        dir="rtl"
+        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 text-right outline-none transition focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${className}`}
         {...rest}
       >
         {children}

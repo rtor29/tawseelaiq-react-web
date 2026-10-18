@@ -47,7 +47,7 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-brand-surface">
+    <div className="flex h-dvh flex-col bg-brand-surface text-right font-cairo" dir="rtl">
       <header className="flex h-14 items-center gap-2 bg-brand-slate px-3 text-white">
         <button
           type="button"
@@ -83,14 +83,15 @@ export default function SupportPage() {
 
         <Field label="موضوع الشكوى *" placeholder="عنوان مختصر للمشكلة" value={subject} onChange={(e) => setSubject(e.target.value)} />
 
-        <label className="block">
+        <label className="block text-right" dir="rtl">
           <span className="mb-1.5 block text-sm font-bold text-brand-slate">التفاصيل *</span>
           <textarea
+            dir="rtl"
             value={details}
             onChange={(e) => setDetails(e.target.value)}
             rows={5}
             placeholder="اشرح المشكلة بالتفصيل (الوقت، المكان، رقم الرحلة إن وجد)..."
-            className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-brand-slate outline-none focus:border-brand-amber"
+            className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-brand-slate text-right outline-none placeholder:text-right focus:border-brand-amber"
           />
         </label>
 

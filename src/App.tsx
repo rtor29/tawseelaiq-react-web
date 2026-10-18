@@ -100,9 +100,9 @@ export default function App() {
   if (!ready) return null;
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-100 flex justify-center">
+    <div className="min-h-[100dvh] w-full bg-slate-100 flex justify-center" dir="rtl">
       <Suspense fallback={<PageLoader />}>
-        <main className="mx-auto w-full max-w-md h-[100dvh] min-h-[100dvh] relative bg-white md:shadow-2xl md:border-x md:border-slate-200 overflow-hidden">
+        <main className="mx-auto w-full max-w-md h-[100dvh] min-h-[100dvh] relative bg-white md:shadow-2xl md:border-x md:border-slate-200 overflow-hidden text-right font-cairo" dir="rtl">
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<Navigate to="/login" replace />} />

@@ -206,7 +206,7 @@ export default function CreateRoutePage() {
   const navigateBack = () => window.history.back();
 
   return (
-    <div className="flex h-dvh flex-col bg-white">
+    <div className="flex h-dvh flex-col bg-white text-right font-cairo" dir="rtl">
       <TopBar
         title="تخطيط وإنشاء خط السير (Mapbox)"
         actions={
@@ -223,7 +223,7 @@ export default function CreateRoutePage() {
 
       <div className="flex flex-1 flex-col-reverse overflow-hidden lg:flex-row">
         {/* نموذج الإدخال */}
-        <aside className="w-full space-y-3.5 overflow-y-auto border-slate-200 p-5 lg:w-[420px] lg:border-l">
+        <aside className="w-full space-y-3.5 overflow-y-auto border-slate-200 p-5 lg:w-[420px] lg:border-s">
           <Field label="اسم الخط *" value={routeName} onChange={(e) => setRouteName(e.target.value)} />
           <Field label="نقطة الانطلاق *" value={startName} onChange={(e) => setStartName(e.target.value)} />
           <Field label="نقطة الوصول *" value={endName} onChange={(e) => setEndName(e.target.value)} />
@@ -242,7 +242,7 @@ export default function CreateRoutePage() {
           {/* مبدّل نمط النقر */}
           <div>
             <p className="mb-1.5 text-sm font-bold text-brand-slate">نمط النقر على الخريطة:</p>
-            <div className="flex gap-2">
+            <div className="flex gap-2" dir="rtl">
               {(
                 [
                   ['start', '🟢 الانطلاق'],

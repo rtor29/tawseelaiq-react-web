@@ -360,7 +360,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-white flex flex-col justify-between max-w-[480px] mx-auto px-6 py-6 relative">
+    <div className="min-h-dvh bg-white flex flex-col justify-between max-w-[480px] mx-auto px-6 py-6 relative text-right font-cairo" dir="rtl">
       {/* 1. الخطوة الأولى: واجهة ياهلا ورقم الهاتف (مع موشن دخول الشعار من اليمين) */}
       {step === 'phone' && (
         <div className="flex-1 flex flex-col pt-4 overflow-hidden">
@@ -580,7 +580,7 @@ export default function LoginPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleCompleteProfile()}
                 placeholder="مثال: علي الموسوي"
                 autoFocus
-                className="w-full border-none outline-none text-[17px] font-medium text-[#1A1A1A] text-right bg-transparent placeholder-slate-400"
+                className="w-full border-none outline-none text-[17px] font-medium text-[#1A1A1A] text-right bg-transparent placeholder-slate-400 placeholder:text-right"
               />
             </div>
           </div>

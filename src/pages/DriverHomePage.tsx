@@ -810,7 +810,7 @@ export default function DriverHomePage() {
 
   return (
     <div
-      className="flex h-full w-full flex-col bg-white font-cairo overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]"
+      className="flex h-full w-full flex-col bg-white font-cairo text-right overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]"
       style={{
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',
@@ -910,7 +910,7 @@ export default function DriverHomePage() {
           <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-2.5 text-right">حالة العمل الحالية</h2>
           
           {/* أزرار التبديل الثلاثية (Segmented Control احترافي) */}
-          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/60">
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/60" dir="rtl">
             {/* خمول */}
             <button
               type="button"

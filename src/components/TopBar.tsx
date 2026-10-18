@@ -13,11 +13,11 @@ export function TopBar({ title, actions }: TopBarProps) {
 
   return (
     <>
-      <header className="relative z-20 flex h-14 items-center gap-2 bg-brand-slate px-3 text-white shadow-md">
+      <header className="relative z-20 flex h-14 items-center gap-2 bg-brand-slate px-3 text-white shadow-md text-right font-cairo" dir="rtl">
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10"
+          className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10 transition active:scale-95 cursor-pointer"
           aria-label="فتح القائمة"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

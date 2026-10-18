@@ -1810,7 +1810,7 @@ export default function CustomerHomePage() {
         {stage === 'ride_options' && (
           <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-white pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-sheet border-t border-slate-100 animate-fade-in">
             {/* التبويبات العلوية: تكسي و بوكس */}
-            <div className="flex border-b border-slate-100 px-4">
+            <div className="flex border-b border-slate-100 px-4" dir="rtl">
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('taxi')}

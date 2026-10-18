@@ -447,7 +447,7 @@ export default function DailyRoutePage() {
   }
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden font-cairo select-none" dir="rtl">
+    <div className="relative h-dvh w-full overflow-hidden font-cairo text-right select-none" dir="rtl">
 
       {/* الترويسة العلوية العائمة مع حماية كاملة لهوامش الأمان على iOS */}
       <div className="fixed top-0 inset-x-0 max-w-md mx-auto z-40 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 flex items-center justify-between pointer-events-none">

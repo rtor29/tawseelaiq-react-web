@@ -59,7 +59,7 @@ export default function VacancyAdsPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-brand-surface">
+    <div className="flex h-dvh flex-col bg-brand-surface text-right font-cairo" dir="rtl">
       <TopBar
         title="إعلانات الرحلات الشاغرة"
         actions={
