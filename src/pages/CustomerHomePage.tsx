@@ -2383,6 +2383,12 @@ export default function CustomerHomePage() {
                 <div className="py-2 animate-fade-in">
                   <input
                     type="text"
+                    inputMode="text"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    data-form-type="other"
                     value={secondDestination}
                     onChange={(e) => setSecondDestination(e.target.value)}
                     placeholder="حدد اسم الوجهة الإضافية..."
@@ -2592,6 +2598,12 @@ export default function CustomerHomePage() {
 
               <input
                 type="text"
+                inputMode="text"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
+                data-form-type="other"
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
@@ -2842,6 +2854,12 @@ export default function CustomerHomePage() {
                 </svg>
                 <input
                   type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  data-form-type="other"
                   value={citySearchQuery}
                   onChange={(e) => setCitySearchQuery(e.target.value)}
                   placeholder="البحث في المدن..."
