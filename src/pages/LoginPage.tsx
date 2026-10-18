@@ -363,7 +363,7 @@ export default function LoginPage() {
           {/* الشعار بالأعلى مع حركة الدخول من اليمين */}
           <div className="mb-10 text-center flex justify-center">
             <img
-              src="/logo.png"
+              src="/logo-v2.png"
               alt="شعار منصة توصيلة"
               width="250"
               height="136"
@@ -542,7 +542,7 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col pt-4">
           <div className="mb-10 text-center flex justify-center">
             <img
-              src="/logo.png"
+              src="/logo-v2.png"
               alt="شعار منصة توصيلة"
               width="220"
               height="120"
