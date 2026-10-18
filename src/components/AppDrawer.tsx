@@ -1,5 +1,5 @@
-// القائمة الجانبية — بديل CustomSideDrawer.dart
-// تتضمن: ترويسة البروفايل مع تغيير الصورة، التحقق من حالة الحساب، وتنقل حسب الدور
+// القائمة الجانبية الموحدة لتطبيق توصيله — مطابقة للصورة المعتمدة
+// تتضمن: ترويسة البروفايل، وسائل الدفع، الرحلات، المفضلة، الإعدادات، الشكاوى، وتسجيل الخروج والدعم
 
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -30,7 +30,7 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
     setAvatar(storage.getAvatar());
   }, [session, open]);
 
-  // التحقق من أن الحساب غير محظور (كما في _verifyAccountActiveStatus)
+  // التحقق من أن الحساب غير محظور
   useEffect(() => {
     if (!open) return;
     const userId = storage.getUserId();
@@ -75,69 +75,6 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
     window.location.replace('/login');
   }
 
-  const navItems = [
-    {
-      key: 'home',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-      ),
-      label: 'الرئيسية (الخريطة)',
-      action: () => go(isDriver ? '/driver' : '/'),
-    },
-    {
-      key: 'ads',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m3 11 18-5v12L3 14v-3z" />
-          <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-        </svg>
-      ),
-      label: 'إعلانات الرحلات الشاغرة',
-      badge: 'جديد',
-      action: () => go('/ads'),
-    },
-    ...(isDriver
-      ? [
-          {
-            key: 'requests',
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-              </svg>
-            ),
-            label: 'طلبات الحجز الواردة',
-            badge: 'فوري',
-            action: () => go('/driver/requests'),
-          },
-          {
-            key: 'documents',
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-            ),
-            label: 'رفع المستمسكات والوثائق',
-            action: () => go('/driver/documents'),
-          },
-        ]
-      : []),
-    {
-      key: 'support',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-        </svg>
-      ),
-      label: 'الدعم الفني والشكاوى',
-      action: () => go('/support'),
-    },
-  ];
-
   return (
     <div
       className={`fixed inset-0 z-[120] transition-opacity duration-300 ${
@@ -152,133 +89,325 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
         onClick={onClose}
       />
 
-      {/* الحاوية المنزلقة من اليسار بالكامل وفق المتطلبات */}
+      {/* الحاوية المنزلقة من اليمين بالكامل وفق المتطلبات وتطابق الصورة */}
       <aside
-        className={`fixed inset-y-0 left-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl flex flex-col font-cairo transform transition-transform duration-300 ease-out ${
-          open ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 right-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl flex flex-col font-cairo transform transition-transform duration-300 ease-out ${
+          open ? 'translate-x-0' : 'translate-x-full'
         }`}
         dir="rtl"
       >
-        {/* الترويسة مع زر الإغلاق الأنيق في أعلى اليسار */}
-        <header className="relative bg-gradient-to-b from-[#1B4965] to-[#14364A] p-5 text-white">
-          {/* زر الإغلاق (✕) */}
+        {/* زر الإغلاق (✕) أعلى اليمين كما في الصورة */}
+        <div className="flex items-center justify-end px-5 pt-[calc(0.75rem+env(safe-area-inset-top,0.75rem))] pb-1">
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 left-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition-all active:scale-95 cursor-pointer"
+            className="p-1.5 text-gray-500 hover:text-black cursor-pointer transition active:scale-95"
             aria-label="إغلاق القائمة"
-            title="إغلاق"
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6L6 18M6 6l12 12" />
+            <svg
+              className="h-6 w-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
+        </div>
 
-          <div className="flex items-center gap-3.5 pt-1">
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/10 border border-white/20 text-xl font-bold text-white transition hover:bg-white/20"
-              aria-label="تغيير الصورة الشخصية"
+        {/* قسم الملف الشخصي كما في الصورة (أفاتار + الاسم + الهاتف + سهم) */}
+        <div
+          onClick={() => fileRef.current?.click()}
+          className="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-gray-50 transition border-b border-gray-100"
+          title="تغيير الصورة الشخصية"
+        >
+          {/* سهم التنقل الأيسر */}
+          <div className="text-gray-400">
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <h3 className="text-[20px] font-black text-gray-900 leading-tight truncate max-w-[170px]">{fullName}</h3>
+              <p dir="ltr" className="text-[13.5px] font-bold text-gray-500 mt-0.5 font-sans tracking-wide">
+                {phone || 'بدون رقم'}
+              </p>
+            </div>
+
+            <div className="relative flex h-15 w-15 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-gray-100 to-gray-200 border-2 border-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] overflow-hidden">
               {avatar ? (
-                <img src={avatar} alt="الصورة الشخصية" className="h-14 w-14 rounded-xl object-cover" />
+                <img src={avatar} alt="الصورة الشخصية" className="h-full w-full object-cover" />
               ) : (
-                fullName.charAt(0) || 'ت'
-              )}
-              <span className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/60 bg-[#1B4965] text-[10px] text-white">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
+                <svg className="h-11 w-11 text-gray-400 mt-1.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                 </svg>
-              </span>
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => onPickAvatar(e.target.files?.[0] ?? null)}
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="truncate text-base font-bold text-white">{fullName}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => onPickAvatar(e.target.files?.[0] ?? null)}
+        />
+
+        {/* قائمة البنود كما في الصورة تماماً */}
+        <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+          {/* وسائل الدفع */}
+          <div
+            onClick={() => show('الرصيد المتاح: 0 د.ع • لشحن المحفظة يرجى مراجعة أحد مراكزنا المعتمدة', 'info', 4000)}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
+          >
+            <div className="text-gray-400">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-[16px] font-black text-gray-900">وسائل الدفع</p>
+                <p className="text-[12.5px] font-bold text-gray-500 mt-0.5">الرصيد: 0 دينار</p>
               </div>
-              <div className="mt-1 flex items-center gap-2">
-                <span
-                  className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-                    isDriver ? 'bg-amber-500/20 text-amber-200 border border-amber-400/30' : 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30'
-                  }`}
-                >
-                  {isDriver ? 'كابتن توصيله' : 'مستخدم'}
-                </span>
-                <span dir="ltr" className="text-xs text-white/70 truncate">
-                  {phone}
-                </span>
+              <div className="text-gray-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
               </div>
             </div>
           </div>
-        </header>
 
-        {/* البنود */}
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {navItems.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={item.action}
-              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-[#1B4965]"
-            >
-              <span className="text-[#1B4965]">{item.icon}</span>
-              <span className="flex-1">{item.label}</span>
-              {item.badge && (
-                <span
-                  className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                    item.badge === 'فوري' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                  }`}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          ))}
-          <hr className="my-3 border-slate-100" />
-          <button
-            type="button"
+          {/* الرحلات */}
+          <div
+            onClick={() => go('/ads')}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
+          >
+            <div />
+            <div className="flex items-center gap-4">
+              <p className="text-[16px] font-black text-gray-900">الرحلات</p>
+              <div className="text-gray-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* العناوين المفضلة */}
+          <div
+            onClick={() => show('يمكنك إضافة الأماكن إلى المفضلة من شريط البحث في الخريطة ⭐', 'info', 4000)}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
+          >
+            <div />
+            <div className="flex items-center gap-4">
+              <p className="text-[16px] font-black text-gray-900">العناوين المفضلة</p>
+              <div className="text-gray-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* قسائم الخصومات والجوائز */}
+          <div
+            onClick={() => show('لا توجد قسائم خصم أو جوائز نشطة لحسابك حالياً 🏷️', 'info', 4000)}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
+          >
+            <div />
+            <div className="flex items-center gap-4">
+              <p className="text-[16px] font-black text-gray-900">قسائم الخصومات والجوائز</p>
+              <div className="text-gray-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                  <line x1="7" y1="7" x2="7.01" y2="7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* إرسال دعوة لأصدقائك */}
+          <div
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ title: 'تطبيق توصيلة', text: 'حمل تطبيق توصيلة لحجز مشاوير التكسي والخطوط في النجف', url: 'https://tawseelaiq.app' }).catch(() => {});
+              } else {
+                navigator.clipboard?.writeText('https://tawseelaiq.app');
+                show('تم نسخ رابط التطبيق لمشاركته مع أصدقائك 🎁', 'success');
+              }
+            }}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
+          >
+            <div />
+            <div className="flex items-center gap-4">
+              <p className="text-[16px] font-black text-gray-900">إرسال دعوة لأصدقائك</p>
+              <div className="text-gray-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 12 20 22 4 22 4 12" />
+                  <rect x="2" y="7" width="20" height="5" />
+                  <line x1="12" y1="22" x2="12" y2="7" />
+                  <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                  <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* الإعدادات */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
+          >
+            <div />
+            <div className="flex items-center gap-4">
+              <p className="text-[16px] font-black text-gray-900">الإعدادات</p>
+              <div className="text-gray-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* حول توصيلة */}
+          <div
             onClick={() => {
               onClose();
               alert('تطبيق النقل الذكي الأول المخصص لمحافظة النجف الأشرف.\nتوصيله v1.0.0 (Release)');
             }}
-            className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-gray-50 transition active:bg-gray-100"
           >
-            <span className="text-slate-500">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-            </span>
-            <span>حول تطبيق توصيله</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-right text-sm font-semibold text-red-600 transition hover:bg-red-50"
-          >
-            <span className="text-red-500">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </span>
-            <span>تسجيل الخروج</span>
-          </button>
-        </nav>
+            <div />
+            <div className="flex items-center gap-4">
+              <p className="text-[16px] font-black text-gray-900">حول توصيلة</p>
+              <div className="text-gray-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+              </div>
+            </div>
+          </div>
 
-        <footer className="flex items-center justify-center gap-1.5 p-4 text-[11px] text-slate-400 border-t border-slate-100">
-          <span>توصيله v1.0 • النجف الأشرف</span>
-        </footer>
+          {/* إذا كان كابتن: طلبات الحجز والمستمسكات */}
+          {isDriver && (
+            <>
+              <div
+                onClick={() => go('/driver/requests')}
+                className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-amber-50/50 transition active:bg-amber-100"
+              >
+                <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">فوري</span>
+                <div className="flex items-center gap-4">
+                  <p className="text-[16px] font-black text-amber-900">طلبات الحجز الواردة</p>
+                  <div className="text-amber-600">
+                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={() => go('/driver/documents')}
+                className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-amber-50/50 transition active:bg-amber-100"
+              >
+                <div />
+                <div className="flex items-center gap-4">
+                  <p className="text-[16px] font-black text-amber-900">رفع المستمسكات والوثائق</p>
+                  <div className="text-amber-600">
+                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* تقديم شكوى أو بلاغ 🛡️ */}
+          <div
+            onClick={() => go('/support')}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-red-50/60 transition border-t border-red-100 bg-red-50/20 active:bg-red-100"
+          >
+            <div className="text-red-400">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-[16px] font-black text-red-700">تقديم شكوى أو بلاغ 🛡️</p>
+                <p className="text-[12px] font-medium text-red-500 mt-0.5">بلاغ فوري عن الكابتن أو الرحلة</p>
+              </div>
+              <div className="text-red-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* زر تسجيل الخروج */}
+          <div
+            onClick={handleLogout}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-rose-50/60 transition border-t border-b border-slate-100 active:scale-[0.99]"
+          >
+            <div />
+            <div className="flex items-center gap-4">
+              <p className="text-[16px] font-black text-rose-600">تسجيل الخروج</p>
+              <div className="text-rose-600">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* كارد التواصل مع الدعم أسفل القائمة كما في الصورة تماماً */}
+        <div
+          onClick={() => go('/support')}
+          className="flex items-center justify-between bg-slate-50 px-6 py-4 cursor-pointer hover:bg-slate-100/70 transition border-t border-slate-100 pb-[calc(1rem+env(safe-area-inset-bottom,0.5rem))]"
+        >
+          <div />
+          <div className="flex items-center gap-3.5">
+            <div className="text-right">
+              <h4 className="text-[15px] font-bold text-[#1A1A1A]">التواصل مع الدعم</h4>
+              <p className="text-[12.5px] font-medium text-[#6C757D] mt-0.5">
+                لأي مشاكل أو استفسارات، فريقنا بخدمتكم.
+              </p>
+            </div>
+            <div className="text-[#1B4965]">
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+              </svg>
+            </div>
+          </div>
+        </div>
       </aside>
     </div>
   );

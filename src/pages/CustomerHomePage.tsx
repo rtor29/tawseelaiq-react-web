@@ -1685,19 +1685,23 @@ export default function CustomerHomePage() {
         )}
 
         {/* 5. زر إعادة التمركز وتحديد الموقع عبر الـ GPS */}
-        {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
+        {stage !== 'searching' && stage !== 'driver_arriving' && (
           <button
             type="button"
             disabled={isLocatingCurrent}
             onClick={handleUseCurrentLocation}
-            className={`absolute bottom-44 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50 ${
+            className={`absolute ${
+              stage === 'ride_options'
+                ? 'bottom-[calc(22rem+env(safe-area-inset-bottom))]'
+                : 'bottom-[calc(14rem+env(safe-area-inset-bottom))]'
+            } left-4 z-30 bg-white p-3 rounded-full shadow-lg border border-slate-200 active:scale-95 transition-all text-amber-500 flex items-center justify-center cursor-pointer hover:bg-slate-50 ${
               isLocatingCurrent ? 'opacity-80' : ''
             }`}
             title="موقعي الحالي عبر الـ GPS"
             aria-label="تحديد موقعي"
           >
             <svg
-              className={`h-5 w-5 ${isLocatingCurrent ? 'animate-spin text-[#D97706]' : ''}`}
+              className={`h-6 w-6 ${isLocatingCurrent ? 'animate-spin' : ''}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
