@@ -186,6 +186,7 @@ export default function CustomerHomePage() {
   const navigate = useNavigate();
   const { show } = useToast();
   const mapRef = useRef<MapRef>(null);
+  const hasAutoLocatedRef = useRef(false);
 
   const session = authStore.getSession();
   const rawRole = session?.role || storage.getUserRole() || 'Customer';
@@ -540,7 +541,77 @@ export default function CustomerHomePage() {
     }
   }, [rideRequestId, stage, rideStatus, pickup, pickupName, dropoff, dropoffName, selectedTierId, assignedDriverInfo, routeCoordinates]);
 
+  // دالة التوسيط التلقائي السلس عند فتح شاشة التكسي لأول مرة
+  const autoLocateUserOnMapReady = useCallback((mapInstance?: any) => {
+    // تشغيل التوسيط التلقائي لمرة واحدة فقط لمنع إزعاج المستخدم عند الاستكشاف
+    if (hasAutoLocatedRef.current) return;
+    hasAutoLocatedRef.current = true;
 
+    // التحقق من دعم المتصفح لتحديد الموقع الجغرافي
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return;
+    }
+
+    // إذا كانت هناك رحلة نشطة جارية أو تم استعادتها من التخزين، لا نعيد كتابة نقطة الانطلاق
+    const rawSaved = localStorage.getItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+    if (rawSaved) {
+      try {
+        const parsed = JSON.parse(rawSaved);
+        if (parsed?.rideRequestId && (parsed.stage === 'searching' || parsed.stage === 'driver_arriving')) {
+          return;
+        }
+      } catch (_) {}
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const userPoint: LngLat = { lat: latitude, lng: longitude };
+
+        // تحريك كاميرا الخريطة بسلاسة وانسيابية عبر map.flyTo
+        const targetMap = mapInstance || mapRef.current?.getMap?.() || mapRef.current;
+        if (targetMap && typeof targetMap.flyTo === 'function') {
+          targetMap.flyTo({
+            center: [longitude, latitude],
+            zoom: 16,
+            essential: true,
+            duration: 1200,
+          });
+        }
+
+        // تحديث إحداثيات نقطة الانطلاق بموقع المستخدم الحقيقي
+        setPickup(userPoint);
+
+        // تشغيل العكس الجغرافي (Reverse Geocoding) تلقائياً لتحديث اسم الشارع/الحي
+        try {
+          const addr = await reverseGeocode(userPoint);
+          if (addr) {
+            setPickupName(addr);
+          } else {
+            setPickupName('موقعي الحالي عبر الـ GPS 📍');
+          }
+        } catch (_) {
+          setPickupName('موقعي الحالي عبر الـ GPS 📍');
+        }
+      },
+      (err) => {
+        // عند الفشل أو الرفض: البقاء بسلامة وهدوء على المركز الافتراضي الحالي دون رسائل خطأ مزعجة
+        console.warn('[AutoGeolocation] Location unavailable or denied, staying at default Najaf center:', err.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 10000,
+      }
+    );
+  }, []);
+
+  // محاولة التوسيط التلقائي لمرة واحدة عند جاهزية مرجع الخريطة
+  useEffect(() => {
+    if (!hasAutoLocatedRef.current && mapRef.current) {
+      autoLocateUserOnMapReady(mapRef.current);
+    }
+  }, [autoLocateUserOnMapReady]);
 
   // تحديث العنوان عند تحريك الخريطة في مرحلتي الانطلاق والوصول
   const handleMapMoveEnd = useCallback(
@@ -1553,7 +1624,10 @@ export default function CustomerHomePage() {
           style={{ width: '100%', height: '100%' }}
           onMoveEnd={handleMapMoveEnd}
           onClick={handleMapClick}
-          onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
+          onLoad={(e) => {
+            applyArabicAndEnhancedLabels(e.target);
+            autoLocateUserOnMapReady(e.target);
+          }}
         >
           {/* خط المسار بين النقطتين */}
           <RouteLines lines={routeLines} />

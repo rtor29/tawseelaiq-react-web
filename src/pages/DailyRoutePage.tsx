@@ -62,6 +62,7 @@ export default function DailyRoutePage() {
   const navigate = useNavigate();
   const { show } = useToast();
   const mapRef = useRef<MapRef | null>(null);
+  const hasAutoLocatedRef = useRef(false);
   const [userLoc, setUserLoc] = useState(USER_LOC);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<DriverItem | null>(null);
@@ -252,18 +253,52 @@ export default function DailyRoutePage() {
         Boolean(matchingBooking.cancellationReason || matchingBooking.cancellation_reason))
   );
 
-  // جلب موقع المستخدم الحقيقي عبر GPS المتوافق مع iOS Safari
-  useEffect(() => {
-    getCurrentPositionWithFallback(
+  // دالة التوسيط التلقائي السلس عند فتح شاشة حجز خط دائمي لمرة واحدة فقط
+  const autoLocateDailyRouteOnMapReady = useCallback((mapInstance?: any) => {
+    // تشغيل التوسيط التلقائي لمرة واحدة فقط لمنع إزعاج المستخدم عند استكشاف الخريطة
+    if (hasAutoLocatedRef.current) return;
+    hasAutoLocatedRef.current = true;
+
+    // التحقق من دعم المتصفح لتحديد الموقع الجغرافي
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const { latitude, longitude } = pos.coords;
+        const loc = { lat: latitude, lng: longitude };
         setUserLoc(loc);
-        mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 14.2, duration: 800 });
+
+        // تحريك كاميرا الخريطة بسلاسة وانسيابية نحو موقع الراكب
+        const targetMap = mapInstance || mapRef.current?.getMap?.() || mapRef.current;
+        if (targetMap && typeof targetMap.flyTo === 'function') {
+          targetMap.flyTo({
+            center: [longitude, latitude],
+            zoom: 16,
+            essential: true,
+            duration: 1200,
+          });
+        }
       },
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+      (err) => {
+        // عند الفشل أو الرفض: الاستقرار بهدوء على الإحداثيات الافتراضية
+        console.warn('[DailyRoute AutoGeo] Geolocation unavailable or denied, staying at default location:', err.message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 10000,
+      }
     );
   }, []);
+
+  // محاولة التوسيط التلقائي لمرة واحدة عند اكتمال جاهزية مرجع الخريطة
+  useEffect(() => {
+    if (!hasAutoLocatedRef.current && mapRef.current) {
+      autoLocateDailyRouteOnMapReady(mapRef.current);
+    }
+  }, [autoLocateDailyRouteOnMapReady]);
 
   // جلب سائقي الخط الدائمي الحقيقيين من الخادم
   useEffect(() => {
@@ -593,7 +628,10 @@ export default function DailyRoutePage() {
         mapStyle={config.mapStyle}
         initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
         onClick={handleMapClick}
-        onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
+        onLoad={(e) => {
+          applyArabicAndEnhancedLabels(e.target);
+          autoLocateDailyRouteOnMapReady(e.target);
+        }}
         style={{ width: '100%', height: '100%' }}
       >
         {/* مسار الملاحة بنمط ويز بين الراكب وسائق الخط الدائمي */}
