@@ -92,14 +92,17 @@ export default function DailyRoutePage() {
     const cleaned = sanitizeSearchQuery(val);
     if (!cleaned) {
       setSearchResults(NAJAF_LOCAL_PLACES);
+      setIsSearching(false);
       return;
     }
 
+    setIsSearching(true);
     searchTimer.current = window.setTimeout(async () => {
-      setIsSearching(true);
       try {
         const results = await searchPlaces(cleaned, userLoc);
         setSearchResults(results);
+      } catch {
+        setSearchResults([]);
       } finally {
         setIsSearching(false);
       }
@@ -544,23 +547,41 @@ export default function DailyRoutePage() {
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-500 mb-2 font-map-search"
             />
             {isSearching && (
-              <div className="text-center py-2 text-xs text-slate-500 font-semibold font-map-search">
-                جاري البحث في معالم النجف...
+              <div className="text-center py-3 text-xs text-slate-500 font-semibold font-map-search flex items-center justify-center gap-2">
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                <span>جاري البحث في معالم وأحياء النجف...</span>
               </div>
             )}
-            {searchResults.map((p, idx) => (
-              <div
-                key={`${p.lat}-${p.lon}-${idx}`}
-                onClick={() => handleSelectPlace(p)}
-                className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-50/70 cursor-pointer transition border-b border-slate-50 last:border-none font-map-search"
-              >
-                <span className="text-amber-500 shrink-0">📍</span>
-                <div className="flex flex-col text-right truncate">
-                  <span className="text-[13.5px] font-bold text-slate-800 truncate">{p.name}</span>
-                  <span className="text-[11px] text-slate-500 truncate">{p.subName || 'النجف الأشرف'}</span>
-                </div>
+            {!isSearching && searchResults.length > 0 && (
+              <div className="space-y-1">
+                {searchQuery.trim().length > 0 && (
+                  <p className="text-[11px] font-bold text-slate-400 px-1 mb-1">
+                    نتائج البحث ({searchResults.length})
+                  </p>
+                )}
+                {searchResults.map((p, idx) => (
+                  <div
+                    key={`${p.lat}-${p.lon}-${idx}`}
+                    onClick={() => handleSelectPlace(p)}
+                    className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-50/70 cursor-pointer transition border-b border-slate-50 last:border-none font-map-search"
+                  >
+                    <span className="text-amber-500 shrink-0">📍</span>
+                    <div className="flex flex-col text-right truncate">
+                      <span className="text-[13.5px] font-bold text-slate-800 truncate">{p.name}</span>
+                      <span className="text-[11px] text-slate-500 truncate">{p.subName || 'النجف الأشرف'}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            {!isSearching && searchResults.length === 0 && searchQuery.trim().length > 0 && (
+              <div className="text-center py-6 px-3">
+                <p className="text-[13px] font-bold text-slate-700">لم يتم العثور على نتائج تطابق بحثك</p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  تأكد من كتابة اسم المعلم أو الحي بدقة
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

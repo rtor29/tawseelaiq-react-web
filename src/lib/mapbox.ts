@@ -140,7 +140,7 @@ import {
 import { sanitizeSearchQuery, normalizeArabicText } from './sanitize';
 
 // بحث الأماكن الذكي باللغة العربية داخل النجف الأشرف والعراق
-// يدعم كافة المعالم، الأحياء، الفنادق، المطاعم والشوارع مع Proximity للنجف و Fuzzy Matching
+// يدمج بين Mapbox Geocoding و OpenStreetMap Nominatim للأماكن والمحلات المحلية (مثل السوبرماركت والمعالم)
 export async function searchPlaces(query: string, proximity?: LngLat): Promise<PlaceResult[]> {
   const q = sanitizeSearchQuery(query).trim();
   if (!q) return NAJAF_LOCAL_PLACES;
@@ -151,78 +151,43 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
     return cached;
   }
 
-  // 1. تحديد ثقل البحث الجغرافي (Proximity Bias):
-  // توجيه البحث مباشرة نحو مركز محافظة النجف الأشرف 44.3358,31.9922 لتعطى الأولوية للأحياء والمعالم القريبة
+  // تحديد ثقل البحث الجغرافي (Proximity Bias):
+  // توجيه البحث جغرافياً حول موقع المستخدم أو مركز النجف الأشرف [44.32, 32.02]
   const proximityParam = proximity
     ? `${proximity.lng},${proximity.lat}`
-    : '44.3358,31.9922';
+    : '44.32,32.02';
 
-  // 2. تجهيز معلمات استدعاء Mapbox Geocoding API الصارمة:
-  // language=ar, country=iq, proximity=44.3358,31.9922,
-  // types=poi,neighborhood,locality,address,street, fuzzyMatch=true
-  const baseParams: Record<string, string> = {
-    access_token: config.mapboxToken,
-    country: 'iq',
-    language: 'ar',
-    proximity: proximityParam,
-    types: 'poi,neighborhood,locality,address,street',
-    fuzzyMatch: 'true',
-    autocomplete: 'true',
-    limit: '10',
-  };
+  // 1. محرك Mapbox Geocoding API الصارم
+  const fetchMapbox = async (): Promise<PlaceResult[]> => {
+    if (!config.mapboxToken) return [];
+    try {
+      const url = `${GEOCODE_URL}/${encodeURIComponent(q)}.json`;
+      const data = await externalGet<{
+        features?: Array<{
+          id: string;
+          place_name_ar?: string;
+          place_name?: string;
+          text_ar?: string;
+          text?: string;
+          center: [number, number];
+          context?: Array<{ id: string; text_ar?: string; text?: string }>;
+          properties?: { address?: string; category?: string };
+        }>;
+      }>(url, {
+        params: {
+          access_token: config.mapboxToken,
+          country: 'iq',
+          language: 'ar',
+          types: 'poi,address,neighborhood,locality',
+          proximity: proximityParam,
+          autocomplete: 'true',
+          fuzzyMatch: 'true',
+          limit: '8',
+        },
+        timeout: 7000,
+      });
 
-  try {
-    const url = `${GEOCODE_URL}/${encodeURIComponent(q)}.json`;
-
-    // استعلام أول مع BBOX النجف لحصر النتائج بدقة محلية عالية
-    let data = await externalGet<{
-      features?: Array<{
-        id: string;
-        place_name_ar?: string;
-        place_name?: string;
-        text_ar?: string;
-        text?: string;
-        center: [number, number];
-        context?: Array<{ id: string; text_ar?: string; text?: string }>;
-        properties?: { address?: string; category?: string };
-      }>;
-    }>(url, {
-      params: {
-        ...baseParams,
-        bbox: `${NAJAF_BBOX.west},${NAJAF_BBOX.south},${NAJAF_BBOX.east},${NAJAF_BBOX.north}`,
-      },
-      timeout: 10000,
-    });
-
-    let rawFeatures = data?.features ?? [];
-
-    // إذا لم تُرجع الـ BBOX نتائج (مثلاً لمعلم قريب جداً من الحدود)، نبحث بمرونة في العراق مع ثقل Proximity النجف
-    if (rawFeatures.length === 0) {
-      try {
-        const fallbackData = await externalGet<{
-          features?: Array<{
-            id: string;
-            place_name_ar?: string;
-            place_name?: string;
-            text_ar?: string;
-            text?: string;
-            center: [number, number];
-            context?: Array<{ id: string; text_ar?: string; text?: string }>;
-            properties?: { address?: string; category?: string };
-          }>;
-        }>(url, {
-          params: baseParams,
-          timeout: 8000,
-        });
-        if (fallbackData?.features && fallbackData.features.length > 0) {
-          rawFeatures = fallbackData.features;
-        }
-      } catch {}
-    }
-
-    const mapped: PlaceResult[] = rawFeatures
-      .map((f) => {
-        // استخراج الاسم العربي المباشر للمعلم أو الحي أو الشارع
+      return (data?.features ?? []).map((f) => {
         const name =
           f.text_ar ||
           (f.place_name_ar ? f.place_name_ar.split(',')[0].trim() : '') ||
@@ -230,7 +195,6 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
           (f.place_name ? f.place_name.split(',')[0].trim() : '') ||
           '';
 
-        // استخراج اسم الحي والمدينة من context أو place_name_ar
         const neighborhood =
           f.context?.find((c) => c.id?.startsWith('neighborhood'))?.text_ar ||
           f.context?.find((c) => c.id?.startsWith('neighborhood'))?.text;
@@ -251,9 +215,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
             subName = parts.slice(1, 3).join('، ');
           }
         }
-        if (!subName) {
-          subName = 'النجف الأشرف';
-        }
+        if (!subName) subName = 'النجف الأشرف، العراق';
 
         return {
           name,
@@ -262,10 +224,71 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
           subName,
           fullName: f.place_name_ar || f.place_name || name,
         };
-      })
-      .filter((p) => isStrictlyNajaf(p.name, p.lat, p.lon));
+      });
+    } catch {
+      return [];
+    }
+  };
 
-    // مطابقة محلية مرنة في قائمة أحياء ومعالم النجف (Local Arabic Normalization)
+  // 2. محرك OpenStreetMap Nominatim Fallback للأماكن والمحلات المحلية الدقيقة بالعراق
+  const fetchNominatim = async (): Promise<PlaceResult[]> => {
+    try {
+      // توجيه معلمات Nominatim مع حصر بالعراق ودعم اللغة العربية وثقل النجف (viewbox)
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+        q
+      )}&format=json&countrycodes=iq&accept-language=ar&limit=8&viewbox=44.05,32.35,44.65,31.75`;
+      const res = await externalGet<
+        Array<{
+          place_id: number;
+          lat: string;
+          lon: string;
+          name?: string;
+          display_name: string;
+          class?: string;
+          type?: string;
+        }>
+      >(nominatimUrl, {
+        headers: {
+          'Accept-Language': 'ar',
+        },
+        timeout: 7000,
+      });
+
+      if (!Array.isArray(res)) return [];
+
+      return res.map((item) => {
+        const rawName = item.name || (item.display_name ? item.display_name.split(',')[0].trim() : q);
+        let subName = '';
+        if (item.display_name) {
+          const parts = item.display_name.split(',').map((s) => s.trim());
+          if (parts.length > 2) {
+            subName = parts.slice(1, 3).join('، ');
+          } else if (parts.length > 1) {
+            subName = parts[1];
+          }
+        }
+        if (!subName) subName = 'النجف الأشرف، العراق';
+
+        return {
+          name: rawName,
+          lat: parseFloat(item.lat),
+          lon: parseFloat(item.lon),
+          subName,
+          fullName: item.display_name || rawName,
+        };
+      });
+    } catch {
+      return [];
+    }
+  };
+
+  try {
+    // تشغيل محركي Mapbox و OpenStreetMap معاً بالتوازي لتحقيق أقصى سرعة ودقة
+    const [mapboxSettled, nominatimSettled] = await Promise.allSettled([fetchMapbox(), fetchNominatim()]);
+    const mapboxResults = mapboxSettled.status === 'fulfilled' ? mapboxSettled.value : [];
+    const nominatimResults = nominatimSettled.status === 'fulfilled' ? nominatimSettled.value : [];
+
+    // مطابقة محلية فورية في قائمة معالم النجف الأشرف
     const normQ = normalizeArabicText(q);
     const localMatches = NAJAF_LOCAL_PLACES.filter((p) => {
       const normName = normalizeArabicText(p.name);
@@ -273,27 +296,46 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
       return normName.includes(normQ) || normSub.includes(normQ) || normQ.includes(normName);
     });
 
-    // دمج النتائج مع إزالة التكرار
+    // دمج نتائج المصادر مع إعطاء الأولوية لمعالم Nominatim والمحلات والمطابقة المحلية
+    const combined = [...localMatches, ...nominatimResults, ...mapboxResults];
+
+    // إزالة التكرار مع الحفاظ على الأماكن المحددة داخل العراق
     const seen = new Set<string>();
     const finalResults: PlaceResult[] = [];
 
-    for (const item of [...mapped, ...localMatches]) {
-      const key = `${normalizeArabicText(item.name)}-${item.lat.toFixed(3)},${item.lon.toFixed(3)}`;
+    for (const item of combined) {
+      if (!item.name || isNaN(item.lat) || isNaN(item.lon)) continue;
+      // تصفية جغرافية تضمن أن النتائج داخل العراق (خطوط عرض 29 إلى 38، خطوط طول 38.5 إلى 49)
+      if (item.lat < 29.0 || item.lat > 38.0 || item.lon < 38.5 || item.lon > 49.0) continue;
+
+      const normName = normalizeArabicText(item.name).slice(0, 20);
+      const key = `${normName}-${item.lat.toFixed(3)},${item.lon.toFixed(3)}`;
       if (!seen.has(key)) {
         seen.add(key);
         finalResults.push(item);
       }
     }
 
-    const fallbackResults = finalResults.length > 0 ? finalResults : localMatches;
+    // فرز ذكي: الأماكن داخل النجف الأشرف والكوفة أولاً، ثم مطابقة الاسم
+    finalResults.sort((a, b) => {
+      const aInNajaf = isStrictlyNajaf(a.name, a.lat, a.lon) ? 1 : 0;
+      const bInNajaf = isStrictlyNajaf(b.name, b.lat, b.lon) ? 1 : 0;
+      if (aInNajaf !== bInNajaf) return bInNajaf - aInNajaf;
 
-    if (fallbackResults.length > 0) {
-      setCachedSearchResults(q, fallbackResults, proximity);
+      const aExact = normalizeArabicText(a.name).includes(normQ) ? 1 : 0;
+      const bExact = normalizeArabicText(b.name).includes(normQ) ? 1 : 0;
+      return bExact - aExact;
+    });
+
+    // تخزين النتائج في الكاش إذا وجدت نتائج
+    if (finalResults.length > 0) {
+      setCachedSearchResults(q, finalResults, proximity);
     }
 
-    return fallbackResults.length > 0 ? fallbackResults : NAJAF_LOCAL_PLACES;
+    // إرجاع مصفوفة النتائج (أو مصفوفة فارغة إذا لم يعثر على شيء لإظهار رسالة عدم التطابق)
+    return finalResults;
   } catch {
-    // السقوط الآمن على المطابقة المحلية الذكية في النجف الأشرف
+    // السقوط الآمن على المطابقة المحلية الذكية في النجف الأشرف فقط إذا تطابقت، أو مصفوفة فارغة
     const normQ = normalizeArabicText(q);
     const localMatches = NAJAF_LOCAL_PLACES.filter((p) => {
       const normName = normalizeArabicText(p.name);
@@ -301,7 +343,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
       return normName.includes(normQ) || normSub.includes(normQ) || normQ.includes(normName);
     });
 
-    return localMatches.length > 0 ? localMatches : NAJAF_LOCAL_PLACES;
+    return localMatches;
   }
 }
 

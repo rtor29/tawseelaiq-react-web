@@ -652,7 +652,7 @@ export default function CustomerHomePage() {
     );
   }
 
-  // بحث الأماكن في نافذة البحث (مضبوط بـ 400ms Debounce وتنقية أمنية ضد الحقن)
+  // بحث الأماكن في نافذة البحث (مضبوط بـ 350ms Debounce وتنقية أمنية ضد الحقن)
   function handleSearchChange(query: string) {
     const cleaned = sanitizeSearchQuery(query);
     setSearchQuery(query);
@@ -660,19 +660,23 @@ export default function CustomerHomePage() {
 
     if (!cleaned) {
       setSearchResults(NAJAF_LOCAL_PLACES);
+      setIsSearchingPlaces(false);
       return;
     }
 
+    setIsSearchingPlaces(true);
     const proximity = stage === 'pickup' ? pickup : dropoff;
     searchTimer.current = window.setTimeout(async () => {
-      setIsSearchingPlaces(true);
       try {
         const results = await searchPlaces(cleaned, proximity);
         setSearchResults(results);
+      } catch (err) {
+        console.error('[Search] Failed:', err);
+        setSearchResults([]);
       } finally {
         setIsSearchingPlaces(false);
       }
-    }, 400);
+    }, 350);
   }
 
   // اختيار مكان من نتائج البحث وتحديث كاش الأماكن الأخيرة
@@ -735,7 +739,7 @@ export default function CustomerHomePage() {
     // تحريك كاميرا الخريطة بسلاسة وتحديث موقع الدبوس (Marker)
     mapRef.current?.flyTo({
       center: [lng, lat],
-      zoom: 15,
+      zoom: 16,
       essential: true,
       duration: 700,
     });
@@ -2678,14 +2682,14 @@ export default function CustomerHomePage() {
             {isSearchingPlaces && (
               <div className="flex items-center justify-center py-8 text-[#6C757D]">
                 <Spinner className="h-5 w-5 ml-2 text-[#1B4965]" />
-                <span className="text-xs font-semibold">جاري البحث في الأماكن...</span>
+                <span className="text-xs font-semibold">جاري البحث في الأماكن والمعالم...</span>
               </div>
             )}
 
-            {searchResults.length > 0 ? (
+            {!isSearchingPlaces && searchResults.length > 0 && (
               <div className="space-y-1">
                 <p className="mb-2 text-[12px] font-bold text-[#6C757D] px-1">
-                  {searchQuery.trim().length === 0 ? 'أماكن مقترحة' : 'نتائج البحث'}
+                  {searchQuery.trim().length === 0 ? 'أماكن مقترحة' : `نتائج البحث (${searchResults.length})`}
                 </p>
                 {searchResults.map((place, idx) => (
                   <div
@@ -2745,7 +2749,25 @@ export default function CustomerHomePage() {
                   </div>
                 ))}
               </div>
-            ) : (
+            )}
+
+            {!isSearchingPlaces && searchResults.length === 0 && searchQuery.trim().length > 0 && (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 mb-3 shadow-2xs">
+                  <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    <line x1="8" y1="11" x2="14" y2="11" />
+                  </svg>
+                </div>
+                <p className="text-[15px] font-bold text-slate-800">لم يتم العثور على نتائج تطابق بحثك</p>
+                <p className="text-[12.5px] text-slate-400 mt-1 max-w-xs">
+                  تأكد من كتابة اسم المعلم أو الحي أو المحل بدقة (مثل: هايبر ماركت جوري، شارع الروان، حي العدالة)
+                </p>
+              </div>
+            )}
+
+            {!isSearchingPlaces && searchQuery.trim().length === 0 && searchResults.length === 0 && (
               <div className="space-y-1">
                 <p className="mb-2 text-[12px] font-bold text-[#6C757D] px-1">الأماكن الأخيرة الشائعة</p>
                 <div className="space-y-1.5">
