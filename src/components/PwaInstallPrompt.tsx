@@ -114,12 +114,9 @@ export default function PwaInstallPrompt() {
         </button>
 
         <div className="flex items-start gap-3 pl-6">
-          {/* أيقونة التطبيق الرسمية */}
-          <img
-            src="/icons/icon-192.png"
-            alt="تطبيق توصيله"
-            className="h-12 w-12 rounded-xl shadow-xs border border-slate-100 shrink-0 object-cover"
-          />
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center p-1.5 border border-amber-500/20 shadow-sm flex-shrink-0">
+            <img src="/logo-v2.png" alt="توصيلة" className="w-full h-full object-contain" />
+          </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-1">
