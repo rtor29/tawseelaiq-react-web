@@ -353,7 +353,7 @@ export default function LoginPage() {
   // في حال الوصول لخطوة اختيار الخدمة، عرض هب خدمات الزبون الحديث (Baly Style)
   if (step === 'service_select') {
     return (
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50"><Spinner className="w-8 h-8 text-[#1B4965]" /></div>}>
+      <Suspense fallback={<div className="min-h-[100dvh] flex items-center justify-center bg-gray-50"><Spinner className="w-8 h-8 text-[#1B4965]" /></div>}>
         <CustomerHub onSelectService={handleSelectService} />
       </Suspense>
     );

@@ -720,7 +720,7 @@ export default function DriverHomePage() {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-white font-cairo overflow-y-auto pb-32"
+      className="flex min-h-[100dvh] flex-col bg-white font-cairo overflow-y-auto pb-32"
       style={{
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',

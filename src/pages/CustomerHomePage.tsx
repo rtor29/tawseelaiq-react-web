@@ -1452,7 +1452,7 @@ export default function CustomerHomePage() {
     : [];
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-slate-100 select-none font-cairo" dir="rtl">
+    <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-slate-100 select-none font-cairo" dir="rtl">
       {/* 1. زر التحكم أعلى اليمين */}
       {stage === 'pickup' ? (
         <button
@@ -1718,7 +1718,7 @@ export default function CustomerHomePage() {
 
         {/* 6. البطاقة السفلية البيضاء في مرحلتي الانطلاق والوصول */}
         {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-2xl bg-white px-5 pt-3 pb-8 shadow-sheet border-t border-slate-100">
+          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-2xl bg-white px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-sheet border-t border-slate-100">
             <div className="flex justify-center mb-3">
               <div className="h-1 w-10 rounded-full bg-slate-300" />
             </div>
@@ -1798,7 +1798,7 @@ export default function CustomerHomePage() {
 
         {/* 7. بطاقة خيارات فئات الرحلة */}
         {stage === 'ride_options' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-white pt-2 pb-6 shadow-sheet border-t border-slate-100 animate-fade-in">
+          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-white pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-sheet border-t border-slate-100 animate-fade-in">
             {/* التبويبات العلوية: تكسي و بوكس */}
             <div className="flex border-b border-slate-100 px-4">
               <button
@@ -1954,7 +1954,7 @@ export default function CustomerHomePage() {
 
         {/* 7. بطاقة البحث — قابلة للتوسيع */}
         {stage === 'searching' && (
-          <div className={`absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.18)] animate-fade-in ${isDriverSheetExpanded ? 'top-0 rounded-none overflow-y-auto' : 'pb-8'}`}>
+          <div className={`absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.18)] animate-fade-in ${isDriverSheetExpanded ? 'top-0 rounded-none overflow-y-auto' : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)]'}`}>
             {/* مقبض — الضغط يوسّع */}
             <div className="flex justify-center py-3 cursor-pointer" onClick={() => setIsDriverSheetExpanded(v => !v)}>
               {isDriverSheetExpanded
@@ -2089,7 +2089,7 @@ export default function CustomerHomePage() {
               transform: rideSheetState === 'expanded' ? 'translateY(0)' : 'translateY(calc(100% - 130px))',
               transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white pb-6 shadow-[0_-8px_30px_rgba(0,0,0,0.18)] will-change-transform animate-fade-in"
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.18)] will-change-transform animate-fade-in"
           >
             {/* مقبض السحب وترويسة الورقة (Drag Handle & Header with touch-action: none) */}
             <div
@@ -2383,6 +2383,8 @@ export default function CustomerHomePage() {
                 <div className="py-2 animate-fade-in">
                   <input
                     type="text"
+                    name="fake_dest_rand_88"
+                    id="fake_dest_rand_88"
                     inputMode="text"
                     autoComplete="off"
                     autoCorrect="off"
@@ -2598,6 +2600,8 @@ export default function CustomerHomePage() {
 
               <input
                 type="text"
+                name="fake_search_rand_99"
+                id="fake_search_rand_99"
                 inputMode="text"
                 autoComplete="off"
                 autoCorrect="off"
@@ -2854,6 +2858,8 @@ export default function CustomerHomePage() {
                 </svg>
                 <input
                   type="text"
+                  name="fake_city_rand_77"
+                  id="fake_city_rand_77"
                   inputMode="text"
                   autoComplete="off"
                   autoCorrect="off"
@@ -3710,13 +3716,7 @@ export default function CustomerHomePage() {
               </button>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSubmitComplaint();
-              }}
-              className="space-y-4"
-            >
+            <div className="space-y-4">
               {/* تصنيف الشكوى */}
               <div>
                 <label className="text-[12.5px] font-bold text-slate-800 block mb-1.5">
@@ -3770,7 +3770,8 @@ export default function CustomerHomePage() {
               {/* أزرار الإجراء */}
               <div className="flex gap-2.5 pt-2">
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmitComplaint}
                   disabled={isSubmittingComplaint || !complaintText.trim()}
                   className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-[14px] shadow-sm transition active:scale-[0.98] cursor-pointer disabled:opacity-50"
                 >
@@ -3784,7 +3785,7 @@ export default function CustomerHomePage() {
                   إلغاء
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

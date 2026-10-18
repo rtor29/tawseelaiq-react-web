@@ -256,17 +256,17 @@ export default function ChatModal({
         </div>
 
         {/* 4. حقل كتابة الرسالة */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSend();
-          }}
-          className="flex items-center gap-2 border-t border-slate-100 bg-white p-3.5 pb-safe shrink-0"
-        >
+        <div className="flex items-center gap-2 border-t border-slate-100 bg-white p-3.5 pb-safe shrink-0">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
             placeholder={
               currentUserRole === 'Customer'
                 ? 'اكتب رسالة للكابتن...'
@@ -276,7 +276,8 @@ export default function ChatModal({
           />
 
           <button
-            type="submit"
+            type="button"
+            onClick={() => void handleSend()}
             disabled={!inputText.trim() || sending}
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1B4965] text-white shadow-subtle transition hover:bg-[#14364A] active:scale-95 disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0"
             title="إرسال"
@@ -294,7 +295,7 @@ export default function ChatModal({
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

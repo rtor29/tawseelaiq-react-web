@@ -26,7 +26,7 @@ const CustomerHub = lazy(() => import('./components/CustomerHub').then((m) => ({
 
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-gray-50">
       <div className="flex flex-col items-center gap-3">
         <Spinner className="h-8 w-8 text-[#1B4965]" />
         <span className="text-xs font-bold text-gray-500">جاري التحميل...</span>
@@ -81,7 +81,7 @@ export default function App() {
 
   return (
     <Suspense fallback={<PageLoader />}>
-      <main className="min-h-screen">
+      <main className="min-h-[100dvh] h-[100dvh]">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<Navigate to="/login" replace />} />
