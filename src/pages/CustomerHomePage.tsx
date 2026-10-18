@@ -1458,7 +1458,7 @@ export default function CustomerHomePage() {
         <button
           type="button"
           onClick={() => navigate('/login')}
-          className="absolute top-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+          className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
           title="الرجوع لصفحة اختيار الخدمة"
           aria-label="الرئيسية"
         >
@@ -1479,7 +1479,7 @@ export default function CustomerHomePage() {
         <button
           type="button"
           onClick={handleBackNav}
-          className="absolute top-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+          className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
           title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
           aria-label="رجوع"
         >
@@ -1501,7 +1501,7 @@ export default function CustomerHomePage() {
       <button
         type="button"
         onClick={() => setIsProfileOpen(true)}
-        className="absolute top-4 left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+        className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
         title="معلومات الزبون"
         aria-label="الملف الشخصي للزبون"
       >
@@ -1522,7 +1522,7 @@ export default function CustomerHomePage() {
       {/* زر الأمان العائم — يظهر فقط في مرحلة السائق قادم */}
       {stage === 'driver_arriving' && (
         <button type="button" onClick={() => show('ميزة الأمان قريباً 🛡️','info')}
-          className="absolute top-18 left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50">
+          className="absolute top-[calc(4.5rem+env(safe-area-inset-top))] left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50">
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </button>
       )}
@@ -1670,7 +1670,7 @@ export default function CustomerHomePage() {
 
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
         {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-28 inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
+          <div className="pointer-events-auto absolute top-[calc(7rem+env(safe-area-inset-top))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
             <div className="flex items-center gap-2 rounded-full bg-white/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-[#1B4965] shadow-lg border border-amber-300">
               <span>يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍</span>
               <button
@@ -2292,7 +2292,7 @@ export default function CustomerHomePage() {
       {isTripOptionsOpen && (
         <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white overflow-y-auto animate-fade-in" dir="rtl">
           {/* الترويسة العلوية: سهم الرجوع وعنوان خيارات الرحلة */}
-          <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-3 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-gray-100">
             <button
               type="button"
               onClick={() => setIsTripOptionsOpen(false)}
@@ -2547,7 +2547,7 @@ export default function CustomerHomePage() {
       {/* 9. نافذة البحث عن الأماكن */}
       {isSearchOpen && (
         <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white">
-          <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100">
+          <div className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-slate-100">
             <h2 className="text-[18px] font-bold text-[#1A1A1A]">
               {stage === 'pickup' ? 'حدد نقطة الانطلاق' : 'حدد وجهة الوصول'}
             </h2>
@@ -2935,7 +2935,7 @@ export default function CustomerHomePage() {
       {/* 11. درج الزبون الكامل مع "حول توصيلة" */}
       {isProfileOpen && (
         <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white overflow-hidden" role="dialog" aria-modal="true">
-          <div className="flex items-center px-5 pt-4 pb-2">
+          <div className="flex items-center px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-2">
             <button
               type="button"
               onClick={() => setIsProfileOpen(false)}
