@@ -74,13 +74,17 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
 
   return (
     <div
-      className="w-full min-h-[100dvh] overflow-y-auto overscroll-y-contain bg-[#F8FAFC] text-[#0F172A] font-cairo flex flex-col selection:bg-amber-100 selection:text-amber-900"
+      className="w-full min-h-[100dvh] bg-[#F8FAFC] text-[#0F172A] font-cairo flex flex-col flex-1 selection:bg-amber-100 selection:text-amber-900 touch-pan-y"
+      style={{ touchAction: 'pan-y' }}
       dir="rtl"
     >
       {/* الحاوية الرئيسية مع هامش أمان سفلي ديناميكي فوق شريط التنقل */}
       <div
-        className="w-full max-w-[480px] mx-auto min-h-[100dvh] flex flex-col justify-between relative"
-        style={{ paddingBottom: 'calc(90px + env(safe-area-inset-bottom) + 24px)' }}
+        className="w-full max-w-[480px] mx-auto min-h-[100dvh] flex flex-col justify-between relative flex-1 min-h-0 touch-pan-y"
+        style={{
+          paddingBottom: 'calc(115px + env(safe-area-inset-bottom, 20px))',
+          touchAction: 'pan-y'
+        }}
       >
         {/* ====================================================================
             1. الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe Header)
@@ -127,7 +131,10 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
         {/* ====================================================================
             2. المحتوى الرئيسي (سؤال الوجهة + شريط الإعلانات + الخدمات + بطاقة الكابتن)
             ==================================================================== */}
-        <main className="flex-1 flex flex-col gap-5 pt-4 px-4">
+        <main
+          className="flex-1 min-h-0 flex flex-col gap-5 pt-4 px-4 touch-pan-y"
+          style={{ touchAction: 'pan-y' }}
+        >
           {/* سؤال الوجهة الهادئ */}
           <div className="px-1">
             <h1 className="text-[21px] font-black text-slate-900 tracking-tight">
@@ -145,7 +152,8 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
               ================================================================== */}
           <section
             aria-label="شريط الإعلانات الرسمي"
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-amber-500/15 via-amber-500/5 to-white border-2 border-amber-200/90 p-4 sm:p-5 shadow-sm transition-all duration-200 min-h-[120px] flex flex-col justify-between"
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-amber-500/15 via-amber-500/5 to-white border-2 border-amber-200/90 p-4 sm:p-5 shadow-sm transition-all duration-200 min-h-[120px] flex flex-col justify-between touch-pan-y"
+            style={{ touchAction: 'pan-y' }}
           >
             <div className="relative z-10 flex flex-col">
               <div className="flex items-center justify-between gap-2 mb-2">
@@ -179,15 +187,19 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
               شبكة الخدمات الرئيسية (Services Grid)
               بطاقتان داخل حاوية رمادية فاتحة متناسقة
               ================================================================== */}
-          <div className="bg-slate-100/90 p-3 rounded-3xl border border-slate-200/80">
-            <div className="grid grid-cols-2 gap-3">
+          <div
+            className="bg-slate-100/90 p-3 rounded-3xl border border-slate-200/80 touch-pan-y"
+            style={{ touchAction: 'pan-y' }}
+          >
+            <div className="grid grid-cols-2 gap-3 touch-pan-y" style={{ touchAction: 'pan-y' }}>
               {/* بطاقة تكسي */}
               <div
                 role="button"
                 tabIndex={0}
                 onClick={() => handleServiceClick('taxi')}
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleServiceClick('taxi')}
-                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:border-amber-400 hover:shadow-md transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer select-none min-h-[160px]"
+                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:border-amber-400 hover:shadow-md transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer select-none min-h-[160px] touch-pan-y"
+                style={{ touchAction: 'pan-y' }}
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -247,7 +259,8 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
                 tabIndex={0}
                 onClick={() => handleServiceClick('permanent')}
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleServiceClick('permanent')}
-                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:border-[#1B4965] hover:shadow-md transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer select-none min-h-[160px]"
+                className="group relative flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:border-[#1B4965] hover:shadow-md transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer select-none min-h-[160px] touch-pan-y"
+                style={{ touchAction: 'pan-y' }}
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -311,7 +324,8 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
               ================================================================== */}
           <section
             aria-label="الانضمام لكباتن توصيلة"
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B1528] via-[#0E1E38] to-[#1B4965] text-white p-5 sm:p-6 shadow-xl border-2 border-amber-400/30"
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B1528] via-[#0E1E38] to-[#1B4965] text-white p-5 sm:p-6 shadow-xl border-2 border-amber-400/30 touch-pan-y"
+            style={{ touchAction: 'pan-y' }}
           >
             <div className="relative z-10 flex flex-col gap-4">
               <div>
