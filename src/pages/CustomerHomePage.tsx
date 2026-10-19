@@ -1532,8 +1532,8 @@ export default function CustomerHomePage() {
           {stage === 'pickup' ? (
             <button
               type="button"
-              onClick={() => navigate('/login')}
-              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+              onClick={() => navigate('/hub')}
+              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
               title="الرجوع لصفحة اختيار الخدمة"
               aria-label="الرئيسية"
             >
@@ -1554,7 +1554,7 @@ export default function CustomerHomePage() {
             <button
               type="button"
               onClick={handleBackNav}
-              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
               title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
               aria-label="رجوع"
             >
@@ -1581,13 +1581,13 @@ export default function CustomerHomePage() {
         {/* اليسار: ترحيب المستخدم وزر الحساب الموحد الذي يفتح AppDrawer */}
         <div className="flex items-center gap-2.5">
           <div className="text-left hidden sm:block">
-            <div className="text-[11px] font-medium text-slate-500">مرحباً بك 👋</div>
-            <div className="text-[14px] font-bold text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
+            <div className="text-[12px] font-bold text-slate-600">مرحباً بك 👋</div>
+            <div className="text-[15px] font-black text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
           </div>
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
             aria-label="الحساب والإعدادات"
             title="الحساب والإعدادات"
           >
