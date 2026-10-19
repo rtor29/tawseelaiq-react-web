@@ -16,6 +16,10 @@ export default function LoginPage() {
   const { show } = useToast();
   const session = useSession();
 
+  // Role switching: 'passenger' or 'driver'
+  const [role, setRole] = useState<'passenger' | 'driver'>('passenger');
+
+  // Auth flow steps
   const [step, setStep] = useState<'phone' | 'otp' | 'profile' | 'telegram_link' | 'service_select'>('phone');
   const [phone, setPhone] = useState('');
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
@@ -25,12 +29,26 @@ export default function LoginPage() {
   const [isResending, setIsResending] = useState(false);
   const [detectedRole, setDetectedRole] = useState<'Customer' | 'Driver'>('Customer');
   const [termsModalTab, setTermsModalTab] = useState<'terms' | 'privacy' | null>(null);
-  const [selectedRegType, setSelectedRegType] = useState<'passenger' | 'driver'>('passenger');
+
+  // Smart PWA prompt dismissal
+  const [isPwaDismissed, setIsPwaDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    if (isStandalone) return true;
+    return sessionStorage.getItem('tawseela_pwa_dismissed') === 'true';
+  });
 
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
-  const navigateAfterLogin = (role: string) => {
-    navigate(role === 'Driver' ? '/driver' : '/', { replace: true });
+  const dismissPwa = () => {
+    setIsPwaDismissed(true);
+    try {
+      sessionStorage.setItem('tawseela_pwa_dismissed', 'true');
+    } catch (_) {}
+  };
+
+  const navigateAfterLogin = (userRole: string) => {
+    navigate(userRole === 'Driver' ? '/driver' : '/', { replace: true });
   };
 
   useEffect(() => {
@@ -68,7 +86,8 @@ export default function LoginPage() {
     }
   }
 
-  async function handleSubmitPhone() {
+  async function handleSubmitPhone(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     if (isLoading) return;
     setErrorMessage(null);
 
@@ -152,7 +171,6 @@ export default function LoginPage() {
         });
         show('تم إرسال رمز التحقق إلى واتساب 📲', 'success');
       } catch (_) {
-        // بديل endpoint
         await http.post('/auth/send-otp', {
           phoneNumber: cleanPhone,
           role: checkData.role || 'Customer',
@@ -162,7 +180,7 @@ export default function LoginPage() {
 
       setStep('otp');
       setOtpDigits(['', '', '', '', '', '']);
-      setTimeout(() => otpInputsRef.current[0]?.focus(), 200);
+      setTimeout(() => otpInputsRef.current[0]?.focus(), 250);
     } catch (err: any) {
       const serverErr = err?.response?.data?.error;
       setErrorMessage(serverErr || 'تعذر الاتصال بالخادم. تأكد من اتصال الإنترنت.');
@@ -180,7 +198,6 @@ export default function LoginPage() {
       return;
     }
 
-    // إذا تم إدخال أو لصق عدة أرقام دفعة واحدة
     if (normalized.length > 1) {
       const chars = normalized.slice(0, 6).split('');
       const newDigits = [...otpDigits];
@@ -299,7 +316,6 @@ export default function LoginPage() {
         }
       }
 
-      // إذا لم يكن مسجلاً، الانتقال لإكمال الملف الشخصي
       setStep('profile');
     } catch (err: any) {
       const serverErr = err?.response?.data?.error;
@@ -322,15 +338,16 @@ export default function LoginPage() {
         phoneNumber: cleanPhone,
         role: detectedRole,
       });
-      show('تمت إعادة إرسال رمز التحقق عبر واتساب', 'success');
-    } catch (err) {
+      show('تمت إعادة إرسال رمز التحقق عبر واتساب 📲', 'success');
+    } catch (_) {
       show('تعذر إعادة الإرسال حالياً', 'error');
     } finally {
       setIsResending(false);
     }
   }
 
-  async function handleCompleteProfile() {
+  async function handleCompleteProfile(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     if (isLoading) return;
     if (!fullName.trim()) {
       setErrorMessage('يرجى إدخال اسمك الكريم');
@@ -367,7 +384,7 @@ export default function LoginPage() {
           },
           cleanPhone
         );
-        show('تم إنشاء حسابك بنجاح! مرحباً بك في توصيله 🚖', 'success');
+        show('تم إنشاء حسابك بنجاح! مرحباً بك في توصيلة 🚖', 'success');
         setStep('telegram_link');
       } else {
         setErrorMessage(data.error || 'حدث خطأ أثناء إكمال التسجيل');
@@ -380,425 +397,489 @@ export default function LoginPage() {
     }
   }
 
-  // في حال الوصول لخطوة اختيار الخدمة، عرض هب خدمات الزبون الحديث (Baly Style)
+  // إذا تم اختيار الخدمة والانتقال للهب الرئيسي
   if (step === 'service_select') {
     return (
-      <Suspense fallback={<div className="min-h-[100dvh] flex items-center justify-center bg-gray-50"><Spinner className="w-8 h-8 text-[#1B4965]" /></div>}>
+      <Suspense fallback={<div className="min-h-[100dvh] flex items-center justify-center bg-[#080E1A]"><Spinner className="w-8 h-8 text-amber-400" /></div>}>
         <CustomerHub onSelectService={handleSelectService} />
       </Suspense>
     );
   }
 
   return (
-    <div
-      className="min-h-dvh bg-white flex flex-col justify-between max-w-[480px] mx-auto px-6 pt-6 relative text-right font-cairo overflow-y-auto"
-      style={{ paddingBottom: 'max(160px, calc(env(safe-area-inset-bottom) + 140px))' }}
-      dir="rtl"
-    >
-      {/* 1. الخطوة الأولى: واجهة ياهلا ورقم الهاتف (مع موشن دخول الشعار من اليمين) */}
-      {step === 'phone' && (
-        <div className="flex-1 flex flex-col pt-4 overflow-hidden">
-          {/* الشعار بالأعلى مع حركة الدخول من اليمين */}
-          <div className="mb-8 text-center flex justify-center">
-            <img
-              src="/logo-v2.png"
-              alt="شعار منصة توصيلة"
-              width="250"
-              height="136"
-              fetchPriority="high"
-              className="w-[240px] max-w-[85%] h-auto object-contain animate-drive-in"
-            />
-          </div>
+    <div className="relative w-full min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 bg-[#080E1A] text-[#DDE2F4] overflow-x-hidden font-cairo" dir="rtl">
+      {/* هالات التوهج الضبابية المحيطية في الخلفية */}
+      <div className="absolute top-1/4 -right-24 w-96 h-96 rounded-full bg-amber-500/10 blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-orange-600/10 blur-[100px] pointer-events-none"></div>
 
-          {/* نصوص الترحيب والحقول تظهر بعد استقرار الشعار في مكانه */}
-          <div className="text-right animate-fade-in-text">
-            <h1 className="text-[32px] font-black text-[#1A1A1A] font-cairo mb-2 tracking-tight">
-              ياهلا
+      {/* الحاوية المركزية الفاخرة */}
+      <div className="relative z-10 w-full max-w-[430px] mx-auto flex flex-col gap-4">
+        
+        {/* البطاقة الزجاجية المعتمة */}
+        <div className="w-full bg-[#161C28]/90 backdrop-blur-2xl rounded-3xl border border-white/5 shadow-2xl p-6 flex flex-col gap-5 relative overflow-hidden">
+          {/* خط التوهج الذهبي العلوي */}
+          <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-80"></div>
+
+          {/* ترويسة الشعار مع حركة الدخول من اليمين */}
+          <div className="flex flex-col items-center text-center pt-1">
+            <div className="relative mb-2 flex items-center justify-center animate-logo-entrance">
+              <img 
+                src="/logo.png" 
+                alt="شعار توصيلة" 
+                className="h-20 w-auto max-w-[200px] object-contain drop-shadow-md"
+              />
+            </div>
+            
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-amber-400 text-xs font-semibold mb-2 shadow-sm border border-amber-500/15">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>النسخة الحصرية • النجف الأشرف</span>
+            </div>
+            
+            <h1 className="text-2xl font-bold text-white tracking-tight font-alexandria">
+              أهلاً بك في <span className="text-amber-400">توصيلة</span>
             </h1>
-            <p className="text-[16px] font-medium text-[#6C757D] font-cairo mb-6">
-              قم بإدخال رقم هاتفك للمتابعة
-            </p>
-
-            {/* رسالة الخطأ إن وجدت */}
-            {errorMessage && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-[13px] font-bold text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
-            {/* نموذج إدخال رقم الهاتف مع زر المتابعة المدمج في تدفق النموذج */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSubmitPhone();
-              }}
-              className="space-y-4"
-            >
-              <div className="bg-white border-2 border-slate-200/90 rounded-2xl shadow-xs flex items-center px-4 py-3 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/10 transition-colors">
-                <input
-                  type="tel"
-                  aria-label="رقم الهاتف"
-                  dir="ltr"
-                  value={phone}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
-                  placeholder="07XXXXXXXX"
-                  autoFocus
-                  className="w-full border-none outline-none text-[22px] font-bold text-[#1A1A1A] text-center bg-transparent tracking-widest placeholder-slate-300"
-                />
-              </div>
-
-              {/* زر المتابعة بارز وواضح داخل تدفق النموذج مباشرة */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full min-h-[52px] bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {isLoading ? (
-                  <Spinner className="w-6 h-6 text-white" />
-                ) : (
-                  <>
-                    <span>متابعة</span>
-                    <span>🚖</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* عبارة الشروط والأحكام التفاعلية مع فتح نافذة الـ Modal */}
-            <p className="text-[13px] font-medium text-[#6C757D] text-center leading-relaxed mt-4">
-              عند المتابعة أنت توافق على{' '}
-              <button
-                type="button"
-                onClick={() => setTermsModalTab('terms')}
-                className="text-amber-600 hover:text-amber-700 underline font-bold cursor-pointer inline-block mx-0.5"
-              >
-                شروط الاستخدام
-              </button>
-              {' '}و{' '}
-              <button
-                type="button"
-                onClick={() => setTermsModalTab('privacy')}
-                className="text-amber-600 hover:text-amber-700 underline font-bold cursor-pointer inline-block mx-0.5"
-              >
-                سياسة الخصوصية
-              </button>
-            </p>
-
-            <p className="text-[12px] font-semibold text-slate-400 text-center leading-relaxed mt-2.5">
-              ✨ للانضمام لأسطول كباتن توصيلة، يرجى مراجعة إدارة المنظومة أو التواصل مع الدعم
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* 2. الخطوة الثانية: واجهة التحقق عبر واتساب (OTP) */}
-      {step === 'otp' && (
-        <div className="flex-1 flex flex-col pt-6">
-          {/* أيقونة الواتساب الخضراء */}
-          <div className="text-center mb-8 flex justify-center">
-            <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center shadow-card border border-emerald-100">
-              <svg className="w-10 h-10 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.972.531 1.942.812 2.802.812l.006-.001c3.178 0 5.767-2.587 5.768-5.766 0-3.18-2.589-5.768-5.78-5.768zm3.364 8.163c-.144.405-.837.774-1.17.824-.311.045-.698.077-2.226-.554-1.828-.756-3.003-2.612-3.094-2.733-.092-.122-.743-.988-.743-1.884 0-.896.469-1.338.636-1.52.167-.183.365-.228.487-.228.121 0 .243.001.349.006.112.006.262-.042.41.314.152.365.517 1.26.562 1.352.045.092.076.2.015.321-.061.122-.091.198-.182.304-.091.106-.192.237-.274.318-.091.091-.186.19-.08.372.106.183.473.78 1.017 1.265.7.625 1.29.818 1.472.91.183.091.289.076.395-.045.106-.122.456-.531.577-.714.122-.183.243-.152.41-.091.167.061 1.063.501 1.245.592.183.091.304.137.35.213.045.076.045.441-.099.846zm-3.364-10.335c-5.523 0-10 4.477-10 10 0 1.769.459 3.486 1.332 5.006l-1.417 5.176 5.309-1.392c1.464.799 3.116 1.22 4.776 1.22 5.523 0 10-4.477 10-10s-4.477-10-10-10z" />
-              </svg>
-            </div>
+            <p className="text-xs text-slate-400 mt-1">ياهلا بيكم وين تردون نوديكم</p>
           </div>
 
-          <div className="text-right">
-            <h2 className="text-[24px] font-bold text-[#1A1A1A] font-cairo mb-1.5">
-              أدخل رمز التفعيل
-            </h2>
-            <p className="text-[14px] font-medium text-[#6C757D] mb-1">
-              تم إرسال رمز التفعيل إلى الواتساب على الرقم{' '}
-              <span dir="ltr" className="font-bold text-[#1A1A1A]">
-                {phone}
-              </span>
-            </p>
-            <p className="text-[13px] font-medium text-[#6C757D] mb-7">
-              الرجاء إدخال الرمز المكون من 6 أرقام
-            </p>
-
-            {errorMessage && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-[13px] font-bold text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
-            {/* خانات رمز OTP الست */}
-            <div className="flex justify-center gap-2 mb-7" dir="ltr">
-              {[0, 1, 2, 3, 4, 5].map((idx) => (
-                <input
-                  key={idx}
-                  ref={(el) => (otpInputsRef.current[idx] = el)}
-                  type="tel"
-                  maxLength={6}
-                  value={otpDigits[idx]}
-                  onChange={(e) => handleOtpDigitChange(e.target.value, idx)}
-                  onKeyDown={(e) => handleOtpKeyDown(e, idx)}
-                  onPaste={(e) => {
-                    e.preventDefault();
-                    const pasted = e.clipboardData.getData('text');
-                    handleOtpDigitChange(pasted, idx);
-                  }}
-                  className="w-11 h-13 border border-slate-200 rounded-xl text-center text-[22px] font-bold text-[#1A1A1A] bg-slate-50 outline-none focus:bg-white focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/10 transition-all"
-                />
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <button
-                type="button"
-                onClick={handleResendOtp}
-                disabled={isResending}
-                className="text-[14px] font-bold text-[#1B4965] hover:underline disabled:opacity-50 cursor-pointer"
-              >
-                {isResending ? 'جاري الإرسال...' : 'إعادة إرسال'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStep('phone');
-                  setErrorMessage(null);
-                }}
-                className="text-[13px] font-medium text-[#6C757D] hover:underline cursor-pointer"
-              >
-                تغيير رقم الهاتف
-              </button>
-            </div>
-
-            {/* زر تأكيد رمز التحقق داخل تدفق النموذج */}
-            <button
-              type="button"
-              onClick={() => handleVerifyOtp(otpDigits.join(''))}
-              disabled={isLoading || otpDigits.join('').length < 4}
-              className="w-full min-h-[52px] mt-6 bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-            >
-              {isLoading ? (
-                <Spinner className="w-6 h-6 text-white" />
-              ) : (
-                <>
-                  <span>تأكيد رمز التحقق</span>
-                  <span>✅</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 3. الخطوة الثالثة: إكمال التسجيل (اختيار راكب أو كابتن) */}
-      {step === 'profile' && (
-        <div className="flex-1 flex flex-col pt-4">
-          <div className="mb-6 text-center flex justify-center">
-            <img
-              src="/logo-v2.png"
-              alt="شعار منصة توصيلة"
-              width="220"
-              height="120"
-              className="w-[200px] max-w-[75%] h-auto object-contain animate-drive-in"
-            />
-          </div>
-
-          <div className="text-right animate-fade-in-text">
-            {/* أزرار التبديل الصريحة بين: أنا راكب / أنا كابتن */}
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-2 mb-6 border border-slate-200/80">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRegType('passenger');
-                  setErrorMessage(null);
-                }}
-                className={`flex-1 py-3 px-3 rounded-xl font-black text-[15px] transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                  selectedRegType === 'passenger'
-                    ? 'bg-white text-[#1B4965] shadow-sm border border-slate-200/60 scale-[1.01]'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="text-lg">🧳</span>
-                <span>أنا راكب</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedRegType('driver');
-                  setErrorMessage(null);
-                }}
-                className={`flex-1 py-3 px-3 rounded-xl font-black text-[15px] transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                  selectedRegType === 'driver'
-                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 scale-[1.01]'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="text-lg">🚖</span>
-                <span>أنا كابتن / سائق</span>
-              </button>
-            </div>
-
-            {errorMessage && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-[13px] font-bold text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
-            {/* في حال اختيار: أنا راكب */}
-            {selectedRegType === 'passenger' ? (
-              <div>
-                <h1 className="text-[26px] font-black text-[#1A1A1A] font-cairo mb-1.5">
-                  إنشاء حساب راكب جديد
-                </h1>
-                <p className="text-[14.5px] font-medium text-[#6C757D] font-cairo mb-5">
-                  أدخل اسمك الكريم للمتابعة وحجز رحلاتك
-                </p>
-
-                <div className="bg-white border-2 border-slate-200/90 rounded-2xl shadow-xs flex items-center px-4 py-3.5 mb-5 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/10 transition-colors">
-                  <input
-                    type="text"
-                    dir="rtl"
-                    value={fullName}
-                    onChange={(e) => {
-                      setErrorMessage(null);
-                      setFullName(e.target.value);
-                    }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCompleteProfile()}
-                    placeholder="مثال: علي الموسوي"
-                    autoFocus
-                    className="w-full border-none outline-none text-[17px] font-bold text-[#1A1A1A] text-right bg-transparent placeholder-slate-400 placeholder:text-right"
-                  />
-                </div>
-
-                {/* زر إنهاء التسجيل داخل تدفق النموذج */}
-                <button
-                  type="button"
-                  onClick={handleCompleteProfile}
-                  disabled={isLoading || !fullName.trim()}
-                  className="w-full min-h-[52px] bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  {isLoading ? (
-                    <Spinner className="w-6 h-6 text-white" />
-                  ) : (
-                    <>
-                      <span>إكمال التسجيل والدخول</span>
-                      <span>🚖</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              /* في حال اختيار: أنا كابتن / سائق */
-              <div className="rounded-3xl bg-gradient-to-br from-amber-50 via-white to-amber-50/50 border-2 border-amber-200 p-5 sm:p-6 text-right shadow-sm space-y-4 animate-fade-in">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-2xl shadow-xs shrink-0">
-                    🚖
-                  </div>
-                  <div>
-                    <h2 className="text-[19px] font-black text-slate-900 leading-tight">
-                      الانضمام لأسطول كباتن توصيلة
-                    </h2>
-                    <p className="text-[12.5px] font-bold text-amber-800 mt-0.5">
-                      اعتماد وتفعيل حسابات الكباتن يتم حصراً عبر الإدارة
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-[13px] font-medium text-slate-700 leading-relaxed">
-                  أهلاً بك كابتن! لضمان الأمان والامتثال المعتمد، يتم إنشاء وتفعيل حسابات السائقين مباشرة من قِبل الإدارة بعد تدقيق البيانات. يرجى التواصل معنا عبر القنوات السريعة أدناه لتفعيل حسابك فوراً:
-                </p>
-
-                {/* روابط التواصل الفورية بنقرة واحدة */}
-                <div className="space-y-2.5 pt-1">
-                  {/* واتساب الإدارة */}
-                  <a
-                    href="https://wa.me/9647722154182?text=السلام%20عليكم،%20أرغب%20بالانضمام%20لكباتن%20توصيلة"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full min-h-[50px] rounded-2xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-black text-[14.5px] flex items-center justify-center gap-2.5 shadow-md shadow-emerald-500/20 transition-all active:scale-[0.98] cursor-pointer no-underline"
-                  >
-                    <span className="text-xl">💬</span>
-                    <span>واتساب الإدارة (07722154182)</span>
-                  </a>
-
-                  {/* تيليجرام الإدارة */}
-                  <a
-                    href="https://t.me/wsam_ta"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full min-h-[50px] rounded-2xl bg-[#0088cc] hover:bg-[#0077b5] text-white font-black text-[14.5px] flex items-center justify-center gap-2.5 shadow-md shadow-sky-500/20 transition-all active:scale-[0.98] cursor-pointer no-underline"
-                  >
-                    <span className="text-xl">✈️</span>
-                    <span>تيليجرام الإدارة (@wsam_ta)</span>
-                  </a>
-
-                  {/* الاتصال الهاتفي المباشر */}
-                  <a
-                    href="tel:07722154182"
-                    className="w-full min-h-[48px] rounded-2xl bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-800 font-black text-[14px] flex items-center justify-center gap-2 shadow-xs transition-all active:scale-[0.98] cursor-pointer no-underline"
-                  >
-                    <span className="text-lg">📞</span>
-                    <span>اتصال هاتفي مباشر: <span dir="ltr" className="font-mono font-bold">07722154182</span></span>
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* خطوة ربط التيليجرام لاستلام إشعارات الرحلات والتأكيد */}
-      {step === 'telegram_link' && (
-        <div className="flex-1 flex flex-col justify-between pt-6 pb-4 animate-fade-in-text">
-          <div className="text-right">
-            <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-3xl mb-6 shadow-sm mx-auto md:mx-0">
-              ✈️
-            </div>
-
-            <h1 className="text-[22px] font-black text-[#1A1A1A] font-cairo mb-3 leading-snug">
-              تأكيد استلام إشعارات المشوار 📱
-            </h1>
-
-            <div className="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-4.5 mb-6 text-right">
-              <p className="text-[15px] font-bold text-[#1B4965] font-cairo leading-relaxed mb-3">
-                🚖 خطوة أخيرة لتأكيد حسابك واستلام إشعارات المشوار (وصول الكابتن، تفاصيل الرحلة) عبر تيليجرام
-              </p>
-              <ul className="space-y-2 text-[13px] font-medium text-slate-700">
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
-                  <span>إشعار فوري وتنبيه عند وصول الكابتن لموقعك</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
-                  <span>تفاصيل سيارة الكابتن ورقم اللوحة بأمان</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
-                  <span>دعم فني واستفسارات مباشرة عبر البوت</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 pt-4">
-            <button
+          {/* محدد الأدوار: أنا راكب / أنا كابتن */}
+          <div className="relative w-full p-1 bg-[#1A202C] rounded-2xl flex items-center justify-between shadow-inner">
+            <button 
               type="button"
               onClick={() => {
-                const cleanPhone = normalizePhone(phone);
-                window.open(`https://t.me/tawseela_najaf_bot?start=reg_${cleanPhone}`, '_blank');
-                setStep('service_select');
+                setRole('passenger');
+                setErrorMessage(null);
               }}
-              className="w-full h-13 rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-[16px] flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+              className={`relative z-10 flex-1 py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                role === 'passenger' 
+                  ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <span>إكمال التسجيل عبر بوت التيليجرام 📱</span>
+              <span className="text-base">🧳</span>
+              <span>أنا راكب</span>
             </button>
 
-            <button
+            <button 
               type="button"
-              onClick={() => setStep('service_select')}
-              className="w-full py-3 text-center text-[14px] font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+              onClick={() => {
+                setRole('driver');
+                setErrorMessage(null);
+              }}
+              className={`relative z-10 flex-1 py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                role === 'driver' 
+                  ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              تخطي والبدء بدون إشعارات تيليجرام
+              <span className="text-base">🚖</span>
+              <span>أنا كابتن / سائق</span>
             </button>
           </div>
+
+          {/* رسالة الخطأ إن وجدت */}
+          {errorMessage && (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-950/40 p-3 text-center text-xs font-bold text-rose-300 animate-fade-in">
+              {errorMessage}
+            </div>
+          )}
+
+          {/* 1. مسار الراكب: إدخال الرقم والـ OTP */}
+          {role === 'passenger' && (
+            <div className="flex flex-col gap-4 animate-fade-in">
+              {/* الخطوة 1: إدخال رقم الهاتف */}
+              {step === 'phone' && (
+                <form onSubmit={handleSubmitPhone} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-xs font-bold text-slate-200">رقم الهاتف العراقي</label>
+                      <span className="text-[11px] text-amber-400 font-medium flex items-center gap-1">
+                        🛡️ تسجيل سريع وآمن
+                      </span>
+                    </div>
+
+                    {/* صندوق إدخال الهاتف المطور */}
+                    <div className="relative flex items-center w-full bg-[#242A37] border border-slate-700/60 rounded-2xl p-1.5 focus-within:ring-2 focus-within:ring-amber-500/70 focus-within:border-amber-500 transition-all shadow-inner">
+                      {/* شارة كود العراق */}
+                      <div className="flex items-center gap-1.5 px-3 py-2 bg-[#1A202C] rounded-xl text-white select-none">
+                        <span className="text-base">🇮🇶</span>
+                        <span className="text-xs font-mono font-bold tracking-wider" dir="ltr">+964</span>
+                      </div>
+                      
+                      {/* حقل الإدخال */}
+                      <input 
+                        type="tel"
+                        inputMode="tel"
+                        dir="ltr"
+                        placeholder="07XXXXXXXX"
+                        value={phone}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        className="w-full bg-transparent border-0 outline-none px-3 py-2 text-white font-mono text-lg font-bold text-left placeholder:text-slate-500"
+                        autoFocus
+                      />
+
+                      {phone && (
+                        <button 
+                          type="button" 
+                          onClick={() => setPhone('')} 
+                          className="p-2 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* زر المتابعة */}
+                  <button 
+                    type="submit"
+                    disabled={isLoading || !phone.trim()}
+                    className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
+                  >
+                    {isLoading ? (
+                      <span className="animate-pulse">جاري التحقق...</span>
+                    ) : (
+                      <>
+                        <span>متابعة 🚖</span>
+                        <span>←</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* رابط الشروط والخصوصية */}
+                  <div className="text-center pt-1">
+                    <p className="text-xs text-slate-400">
+                      بالمتابعة أنت توافق على{' '}
+                      <button 
+                        type="button" 
+                        onClick={() => setTermsModalTab('terms')} 
+                        className="text-amber-400 hover:underline font-semibold cursor-pointer"
+                      >
+                        شروط الخدمة
+                      </button>
+                      {' '}و{' '}
+                      <button 
+                        type="button" 
+                        onClick={() => setTermsModalTab('privacy')} 
+                        className="text-amber-400 hover:underline font-semibold cursor-pointer"
+                      >
+                        سياسة الخصوصية
+                      </button>
+                    </p>
+                  </div>
+                </form>
+              )}
+
+              {/* الخطوة 2: كود التحقق OTP */}
+              {step === 'otp' && (
+                <div className="flex flex-col gap-4 animate-fade-in text-right">
+                  <div className="text-center mb-2 flex justify-center">
+                    <div className="w-16 h-16 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl flex items-center justify-center shadow-sm">
+                      <span className="text-3xl">📲</span>
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <h2 className="text-lg font-bold text-white mb-1">
+                      أدخل رمز التفعيل
+                    </h2>
+                    <p className="text-xs text-slate-300 mb-0.5">
+                      تم إرسال رمز التفعيل إلى الواتساب على الرقم{' '}
+                      <span dir="ltr" className="font-mono font-bold text-amber-400">
+                        {phone}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      الرجاء إدخال الرمز المكون من 6 أرقام
+                    </p>
+                  </div>
+
+                  {/* خانات الـ OTP الست */}
+                  <div className="flex justify-center gap-2 my-2" dir="ltr">
+                    {[0, 1, 2, 3, 4, 5].map((idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => (otpInputsRef.current[idx] = el)}
+                        type="tel"
+                        maxLength={6}
+                        value={otpDigits[idx]}
+                        onChange={(e) => handleOtpDigitChange(e.target.value, idx)}
+                        onKeyDown={(e) => handleOtpKeyDown(e, idx)}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasted = e.clipboardData.getData('text');
+                          handleOtpDigitChange(pasted, idx);
+                        }}
+                        className="w-11 h-13 bg-[#242A37] border border-slate-700/80 rounded-xl text-center text-[22px] font-bold text-white outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition-all font-mono"
+                      />
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={isResending}
+                      className="text-amber-400 hover:text-amber-300 font-bold disabled:opacity-50 cursor-pointer"
+                    >
+                      {isResending ? 'جاري الإرسال...' : 'إعادة إرسال كود الواتساب 💬'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep('phone');
+                        setErrorMessage(null);
+                      }}
+                      className="text-slate-400 hover:text-white cursor-pointer"
+                    >
+                      تغيير رقم الهاتف
+                    </button>
+                  </div>
+
+                  {/* زر تأكيد رمز التحقق */}
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyOtp(otpDigits.join(''))}
+                    disabled={isLoading || otpDigits.join('').length < 4}
+                    className="w-full min-h-[52px] mt-2 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
+                  >
+                    {isLoading ? (
+                      <span className="animate-pulse">جاري التحقق...</span>
+                    ) : (
+                      <>
+                        <span>تأكيد رمز التحقق</span>
+                        <span>✅</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* الخطوة 3: إدخال اسم الراكب الجديد */}
+              {step === 'profile' && (
+                <form onSubmit={handleCompleteProfile} className="flex flex-col gap-4 animate-fade-in text-right">
+                  <div>
+                    <h2 className="text-lg font-bold text-white mb-1">
+                      إنشاء حساب راكب جديد
+                    </h2>
+                    <p className="text-xs text-slate-300">
+                      أدخل اسمك الكريم للمتابعة وحجز رحلاتك
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-200">الاسم الكامل</label>
+                    <input
+                      type="text"
+                      dir="rtl"
+                      value={fullName}
+                      onChange={(e) => {
+                        setErrorMessage(null);
+                        setFullName(e.target.value);
+                      }}
+                      placeholder="مثال: علي الموسوي"
+                      autoFocus
+                      className="w-full bg-[#242A37] border border-slate-700/80 rounded-2xl p-3 text-white font-bold text-base outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition-all placeholder:text-slate-500"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || !fullName.trim()}
+                    className="w-full min-h-[52px] rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
+                  >
+                    {isLoading ? (
+                      <span className="animate-pulse">جاري الحفظ...</span>
+                    ) : (
+                      <>
+                        <span>إكمال التسجيل والدخول</span>
+                        <span>🚖</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+
+              {/* الخطوة 4: تأكيد إشعارات التيليجرام */}
+              {step === 'telegram_link' && (
+                <div className="flex flex-col gap-4 animate-fade-in text-right">
+                  <div className="text-center mb-1 flex justify-center">
+                    <div className="w-14 h-14 bg-sky-500/15 border border-sky-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-sm">
+                      ✈️
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <h2 className="text-lg font-bold text-white mb-1">
+                      تأكيد استلام إشعارات المشوار 📱
+                    </h2>
+                    <p className="text-xs text-slate-300">
+                      خطوة لتأكيد حسابك واستلام إشعار وصول الكابتن فورياً
+                    </p>
+                  </div>
+
+                  <div className="bg-[#1A202C] border border-sky-500/20 rounded-2xl p-3.5 space-y-2 text-xs">
+                    <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                      <span>✓</span>
+                      <span>إشعار فوري وصوت هورن "بيب بيب" عند وصول الكابتن</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                      <span>✓</span>
+                      <span>تفاصيل سيارة الكابتن ورقم اللوحة بأمان</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                      <span>✓</span>
+                      <span>دعم فني واستفسارات مباشرة عبر البوت</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cleanPhone = normalizePhone(phone);
+                        window.open(`https://t.me/tawseela_najaf_bot?start=reg_${cleanPhone}`, '_blank');
+                        setStep('service_select');
+                      }}
+                      className="w-full min-h-[50px] rounded-2xl bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                    >
+                      <span>تأكيد الإشعارات عبر بوت التيليجرام 📱</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setStep('service_select')}
+                      className="w-full py-2.5 text-center text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    >
+                      تخطي والبدء بدون إشعارات تيليجرام
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 2. مسار الكابتن: بطاقة الانضمام والتواصل المباشر */}
+          {role === 'driver' && (
+            <div className="flex flex-col gap-4 animate-fade-in text-right">
+              <div className="bg-[#1A202C] rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden border border-white/5">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0">
+                    🛡️
+                  </div>
+                  <div className="flex flex-col">
+                    <h3 className="text-base font-bold text-white">بوابة انضمام الكباتن</h3>
+                    <span className="text-xs text-amber-400">اعتماد النخبة • تدقيق رسمي</span>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed mt-1">
+                  انضمام الكباتن يتم حصرياً عبر الإدارة المركزية لضمان أعلى معايير الأمان وفحص المركبات لحماية العائلات والزائرين في النجف.
+                </p>
+                <div className="flex items-center gap-2 pt-1 text-emerald-400 text-xs font-semibold">
+                  <span>🌟</span>
+                  <span>أعلى نسبة أرباح للمشاوير في النجف الأشرف والكوفة</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                <span className="text-xs text-slate-400 px-1 font-semibold">تواصل مباشر مع مسؤولي التسجيل:</span>
+                
+                {/* زر واتساب */}
+                <a 
+                  href="https://wa.me/9647722154182?text=تحية%20طيبة،%20أرغب%20بالانضمام%20ككابتن%20في%20توصيلة%20النجف" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">💬</span>
+                    <span className="text-sm">تفعيل الحساب عبر واتساب (WhatsApp)</span>
+                  </div>
+                  <span>←</span>
+                </a>
+
+                {/* زر تيليجرام */}
+                <a 
+                  href="https://t.me/wsam_ta" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#0088CC]/15 hover:bg-[#0088CC]/25 text-[#29B6F6] border border-[#0088CC]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">✈️</span>
+                    <span className="text-sm">المكتب الرقمي تيليجرام (@wsam_ta)</span>
+                  </div>
+                  <span>←</span>
+                </a>
+
+                {/* الاتصال الهاتفي المباشر */}
+                <a 
+                  href="tel:07722154182"
+                  className="w-full min-h-[48px] py-2.5 px-4 rounded-2xl bg-[#1A202C] hover:bg-[#242A37] text-slate-300 font-bold flex items-center justify-between transition-all active:scale-[0.98] border border-white/5 no-underline"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📞</span>
+                    <span className="text-xs">اتصال هاتفي مباشر</span>
+                  </div>
+                  <span dir="ltr" className="font-mono text-xs text-amber-400 font-bold">07722154182</span>
+                </a>
+              </div>
+
+              <button 
+                type="button"
+                onClick={() => setRole('passenger')}
+                className="w-full py-2 text-center text-xs text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
+              >
+                العودة لواجهة الركاب
+              </button>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* شريط تثبيت التطبيق الفوري الذكي (PWA Smart Install) */}
+        {!isPwaDismissed && (
+          <div className="w-full bg-[#161C28]/80 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-white/5 flex flex-col gap-2 relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-sm shadow-sm">
+                  ⚡
+                </div>
+                <div className="flex flex-col">
+                  <h4 className="text-xs font-bold text-white">تثبيت التطبيق الفوري (PWA)</h4>
+                  <p className="text-[11px] text-slate-400">يعمل دون الحاجة لمتجر التطبيقات وبسرعة فائقة</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={dismissPwa}
+                className="text-slate-400 hover:text-white p-1 text-sm cursor-pointer"
+                title="إغلاق التنبيه"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-[#080E1A]/60">
+                <span className="w-5 h-5 rounded-lg bg-slate-800 text-amber-400 font-bold text-[11px] flex items-center justify-center shrink-0">١</span>
+                <span className="text-[11px] text-slate-300">زر المشاركة ⎋</span>
+              </div>
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-[#080E1A]/60">
+                <span className="w-5 h-5 rounded-lg bg-slate-800 text-amber-400 font-bold text-[11px] flex items-center justify-center shrink-0">٢</span>
+                <span className="text-[11px] text-slate-300">إضافة للشاشة ➕</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* شارات الأمان والترخيص السفلي */}
+        <div className="flex items-center justify-center gap-4 text-slate-500 text-[11px] pb-6">
+          <span>🔒 تشفير كامل للبيانات</span>
+          <span>•</span>
+          <span>🚖 ترخيص رسمي</span>
+          <span>•</span>
+          <span>النجف • الكوفة</span>
+        </div>
+      </div>
 
       {/* نافذة شروط الاستخدام وسياسة الخصوصية المنبثقة */}
       <TermsPrivacyModal
