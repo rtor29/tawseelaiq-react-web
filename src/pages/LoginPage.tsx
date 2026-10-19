@@ -407,12 +407,15 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* عبارة الشروط والأحكام */}
-            <p className="text-[12.5px] font-medium text-[#6C757D] text-center leading-relaxed">
+            {/* عبارة الشروط والأحكام وملاحظة الانضمام للكباتن */}
+            <p className="text-[12.5px] font-medium text-[#6C757D] text-center leading-relaxed mb-2">
               عند المتابعة أنت توافق على{' '}
               <a href="#" onClick={(e) => e.preventDefault()} className="text-[#1B4965] font-semibold hover:underline">
                 شروط الاستخدام وسياسة الخصوصية
               </a>
+            </p>
+            <p className="text-[12px] font-semibold text-slate-400 text-center leading-relaxed">
+              ✨ للانضمام لأسطول كباتن توصيلة، يرجى مراجعة إدارة المنظومة أو التواصل مع الدعم
             </p>
           </div>
 
@@ -556,11 +559,15 @@ export default function LoginPage() {
 
           <div className="text-right animate-fade-in-text">
             <h1 className="text-[28px] font-bold text-[#1A1A1A] font-cairo mb-2">
-              إنشاء حساب جديد
+              إنشاء حساب راكب جديد
             </h1>
-            <p className="text-[15px] font-medium text-[#6C757D] font-cairo mb-7">
-              أدخل اسمك الكريم للمتابعة
+            <p className="text-[15px] font-medium text-[#6C757D] font-cairo mb-3">
+              أدخل اسمك الكريم للمتابعة وحجز رحلاتك
             </p>
+
+            <div className="mb-6 p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-[12.5px] font-medium text-slate-500 text-center">
+              💡 هذا التسجيل مخصص للركاب فقط. للانضمام لأسطول كباتن توصيلة، يرجى مراجعة إدارة المنظومة أو التواصل مع الدعم.
+            </div>
 
             {errorMessage && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-[13px] font-bold text-red-700">

@@ -26,27 +26,52 @@ export function extractTokensFromCurrentUrl(): Record<string, string> {
   return out;
 }
 
-// معالجة login_token القادم من جوجل/تليجرام (بديل main.dart)
+// معالجة login_token القادم من جوجل/تليجرام وتوجيه الدور (Role-Based)
 export function consumeLoginTokenFromUrl(): Session | null {
   const params = extractTokensFromCurrentUrl();
   const loginToken = params.login_token;
-  if (!loginToken) return null;
+  const roleParam = params.role ? (params.role.toLowerCase() === 'driver' ? 'Driver' : 'Customer') : undefined;
+  const phoneParam = params.phone;
 
-  const session: Session = {
-    token: loginToken,
-    userId: params.userId || 'usr-google',
-    role: (params.role as Session['role']) || 'Customer',
-    fullName: params.fullName || 'مستخدم Google',
-  };
-  authStore.save(session);
+  if (loginToken) {
+    const session: Session = {
+      token: loginToken,
+      userId: params.userId || (roleParam === 'Driver' ? 'drv-tg' : 'usr-tg'),
+      role: (roleParam || (params.role as Session['role']) || 'Customer'),
+      fullName: params.fullName || (roleParam === 'Driver' ? 'كابتن توصيله' : 'راكب توصيله'),
+    };
+    authStore.save(session, phoneParam);
 
-  // تنظيف الرابط بعد الحفظ
-  try {
-    window.history.replaceState(null, '', window.location.pathname);
-  } catch {
-    /* تجاهل */
+    // تنظيف الرابط بعد الحفظ
+    try {
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch {
+      /* تجاهل */
+    }
+    return session;
   }
-  return session;
+
+  // إذا وصل المستخدم عبر رابط مباشر يحتوي على الدور ورقم الهاتف (مثل بوت التيليجرام: ?role=Driver&phone=...)
+  if (roleParam) {
+    const existing = authStore.getSession();
+    const token = existing?.token || `jwt_${roleParam.toLowerCase()}_` + Date.now();
+    const session: Session = {
+      token,
+      userId: existing?.userId || (roleParam === 'Driver' ? `drv-${phoneParam || 'auto'}` : `usr-${phoneParam || 'auto'}`),
+      role: roleParam,
+      fullName: existing?.fullName || (roleParam === 'Driver' ? 'كابتن توصيله' : 'راكب توصيله'),
+    };
+    authStore.save(session, phoneParam);
+
+    try {
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch {
+      /* تجاهل */
+    }
+    return session;
+  }
+
+  return null;
 }
 
 // إرسال توكن جوجل إلى الخادم لتبديله بجلسة — بديل authenticateWithBackend
