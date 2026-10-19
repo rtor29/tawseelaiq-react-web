@@ -33,7 +33,7 @@ import {
 } from '../lib/cache';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { storage } from '../lib/storage';
-import { playCarHornBeep } from '../lib/sound';
+import { playCarHornBeep, initAudioUnlock } from '../lib/sound';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, type RouteLineData } from '../components/map/MapPins';
@@ -190,9 +190,6 @@ export default function CustomerHomePage() {
   const hasAutoLocatedRef = useRef(false);
 
   const session = authStore.getSession();
-  const rawRole = session?.role || storage.getUserRole() || 'Customer';
-  const isCaptain = rawRole.toLowerCase() === 'driver' || rawRole.toLowerCase() === 'captain';
-  const isPassenger = !isCaptain;
 
   // حالة الرحلة اللحظية: Pending | Accepted | Arrived | InProgress | Completed | Cancelled
   const [rideStatus, setRideStatus] = useState<string | null>(null);
@@ -412,6 +409,7 @@ export default function CustomerHomePage() {
 
   // استعادة الطلب المحفوظ تلقائياً عند تحديث الصفحة أو الخروج منها والعودة
   useEffect(() => {
+    initAudioUnlock();
     const rawSaved = localStorage.getItem('TAWSEELA_ACTIVE_TAXI_RIDE');
     let savedReqId: string | null = null;
     if (rawSaved) {
@@ -451,10 +449,16 @@ export default function CustomerHomePage() {
             .then((res) => {
               if (res.data?.success && res.data.request) {
                 const req = res.data.request;
-                if (req.status === 'Accepted' || req.status === 'Arrived' || req.status === 'InProgress' || req.status === 'in_progress') {
+                const s = (req.status || '').toLowerCase();
+                if (s === 'accepted' || s === 'arrived' || s === 'inprogress' || s === 'in_progress') {
                   setStage('driver_arriving');
                   setRideStatus(req.status);
-                } else if (req.status === 'Pending') {
+                  if (s === 'arrived' && !hasNotifiedArrivalRef.current) {
+                    hasNotifiedArrivalRef.current = true;
+                    show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
+                    playCarHornBeep();
+                  }
+                } else if (s === 'pending') {
                   setStage('searching');
                   setRideStatus('Pending');
                 } else if (
@@ -937,16 +941,7 @@ export default function CustomerHomePage() {
     }
   }
 
-  // فتح Waze أو Google Maps بوجهة نقطة الوصول
-  function handleOpenNavigation() {
-    const wazeUrl = `waze://ul?ll=${dropoff.lat},${dropoff.lng}&navigate=yes`;
-    const googleUrl = `https://maps.google.com/?daddr=${dropoff.lat},${dropoff.lng}`;
-    const a = document.createElement('a');
-    a.href = wazeUrl;
-    a.click();
-    setTimeout(() => { window.open(googleUrl, '_blank'); }, 1200);
-    show('السائق وصل! 🚗 جاري تشغيل الملاحة...', 'success', 5000);
-  }
+
 
   // جلب الأسعار الديناميكية الذكية وحساب الذروة (Baly-like Dynamic Surge Pricing)
   useEffect(() => {
@@ -1279,7 +1274,8 @@ export default function CustomerHomePage() {
 
         if (data.success && data.request) {
           const req = data.request;
-          if (req.status === 'Accepted') {
+          const status = (req.status || '').toLowerCase();
+          if (status === 'accepted') {
             setRideStatus('Accepted');
             if (stage !== 'driver_arriving') {
               setStage('driver_arriving');
@@ -1287,16 +1283,23 @@ export default function CustomerHomePage() {
               show('تم قبول رحلتك من قبل الكابتن! 🚖 الكابتن في طريقه إليك', 'success');
               mapRef.current?.flyTo({ center: [pickup.lng, pickup.lat], zoom: 15.5, duration: 700 });
             }
-          } else if (req.status === 'Arrived') {
+          } else if (status === 'arrived') {
             setRideStatus('Arrived');
+            if (stage !== 'driver_arriving') {
+              setStage('driver_arriving');
+              setRideSheetState('expanded');
+            }
             if (!hasNotifiedArrivalRef.current) {
               hasNotifiedArrivalRef.current = true;
-              show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 6000);
+              show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
               playCarHornBeep();
             }
-          } else if (req.status === 'InProgress' || req.status === 'in_progress') {
+          } else if (status === 'inprogress' || status === 'in_progress') {
             if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
               setRideStatus('InProgress');
+              if (stage !== 'driver_arriving') {
+                setStage('driver_arriving');
+              }
               show('انطلقت الرحلة الآن! الكابتن في الطريق إلى الوجهة 🚗💨', 'success', 5000);
               if (dropoff.lat && dropoff.lng) {
                 mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
@@ -1396,23 +1399,31 @@ export default function CustomerHomePage() {
     void realtime.joinTrip(rideRequestId);
     const unsubStatus = realtime.onTripStatus((e) => {
       if (e.tripId === rideRequestId) {
-        if (e.status === 'Accepted') {
+        const evStatus = (e.status || '').toLowerCase();
+        if (evStatus === 'accepted') {
           setRideStatus('Accepted');
           if (stage !== 'driver_arriving') {
             setStage('driver_arriving');
             setRideSheetState('expanded');
             show('تم قبول رحلتك من قبل الكابتن! 🚖', 'success');
           }
-        } else if (e.status === 'Arrived') {
+        } else if (evStatus === 'arrived') {
           setRideStatus('Arrived');
+          if (stage !== 'driver_arriving') {
+            setStage('driver_arriving');
+            setRideSheetState('expanded');
+          }
           if (!hasNotifiedArrivalRef.current) {
             hasNotifiedArrivalRef.current = true;
-            show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 6000);
+            show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
             playCarHornBeep();
           }
-        } else if (e.status === 'InProgress' || e.status === 'in_progress') {
+        } else if (evStatus === 'inprogress' || evStatus === 'in_progress') {
           if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
             setRideStatus('InProgress');
+            if (stage !== 'driver_arriving') {
+              setStage('driver_arriving');
+            }
             show('انطلقت الرحلة الآن! الكابتن في الطريق إلى الوجهة 🚗💨', 'success', 5000);
             if (dropoff.lat && dropoff.lng) {
               mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
@@ -1614,6 +1625,34 @@ export default function CustomerHomePage() {
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </button>
+        )}
+
+        {/* شريط تنبيه وصول الكابتن العائم في أعلى الشاشة مع زر بيب بيب */}
+        {(rideStatus?.toLowerCase() === 'arrived') && (
+          <div className="absolute top-4 inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
+            <div className="w-full max-w-md bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgba(217,119,6,0.45)] border-2 border-white/90 flex items-center justify-between gap-3 backdrop-blur-md">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-2xl animate-pulse shrink-0">🚖</span>
+                <div className="flex flex-col text-right min-w-0">
+                  <span className="text-[14px] font-black leading-tight text-white drop-shadow-xs">الكابتن وصل إلى موقعك الآن!</span>
+                  <span className="text-[11.5px] font-bold text-amber-100">يرجى التوجه إلى السيارة</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  playCarHornBeep();
+                  show('بيب بيب! 🚖 تم إطلاق التنبيه الصوتي', 'info', 3000);
+                }}
+                className="bg-white text-amber-700 hover:bg-amber-50 active:scale-90 font-black px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer shrink-0 border border-amber-300"
+                title="إعادة تشغيل صوت الهورن"
+              >
+                <span className="text-base">📢</span>
+                <span className="text-[13px]">بيب بيب</span>
+              </button>
+            </div>
+          </div>
         )}
         <MapGL
           ref={mapRef}
@@ -2164,7 +2203,7 @@ export default function CustomerHomePage() {
         )}
 
         {/* 8. بطاقة تفاصيل الرحلة التفاعلية متعددة الارتفاعات (Interactive Draggable / Collapsible Sheet) */}
-        {stage === 'driver_arriving' && (
+        {(stage === 'driver_arriving' || Boolean(rideRequestId && ['accepted', 'arrived', 'inprogress', 'in_progress'].includes((rideStatus || '').toLowerCase()))) && (
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -2219,58 +2258,54 @@ export default function CustomerHomePage() {
 
               {/* شريط الحالة الحالي الدائم (يظهر دائماً في الأعلى ليبقى ظاهراً في حالتي expanded و collapsed) */}
               <div className="w-full">
-                {isCaptain ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenNavigation();
-                    }}
-                    className="w-full rounded-xl bg-[#f97316] py-2.5 text-center text-[15px] font-black text-white shadow-sm transition active:scale-[0.98] hover:bg-orange-600 cursor-pointer"
-                  >
-                    🚗 السائق وصل — انطلاق إلى الوجهة
-                  </button>
-                ) : isPassenger ? (
-                  <div
-                    className={`w-full rounded-xl py-2 px-3.5 text-center select-none border transition-colors ${
-                      rideStatus === 'InProgress' || rideStatus === 'in_progress'
-                        ? 'bg-emerald-50 border-emerald-200/80 text-emerald-800'
-                        : rideStatus === 'Arrived'
-                        ? 'bg-amber-50 border-amber-200/80 text-amber-900'
-                        : 'bg-slate-100 border-slate-200 text-[#1B4965]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      {rideStatus === 'InProgress' || rideStatus === 'in_progress' ? (
-                        <span className="text-[14px] font-black">في الطريق إلى الوجهة 🚗💨</span>
-                      ) : rideStatus === 'Arrived' ? (
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center gap-1.5">
-                            <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping mr-1" />
-                            <span className="text-[13px] md:text-[13.5px] font-bold">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
+                {(() => {
+                  const lowerSt = (rideStatus || '').toLowerCase();
+                  const isArr = lowerSt === 'arrived';
+                  const isInProg = lowerSt === 'inprogress' || lowerSt === 'in_progress';
+
+                  return (
+                    <div
+                      className={`w-full rounded-xl py-2 px-3.5 text-center select-none border transition-colors ${
+                        isInProg
+                          ? 'bg-emerald-50 border-emerald-200/80 text-emerald-800'
+                          : isArr
+                          ? 'bg-amber-50 border-amber-300 text-amber-950 shadow-xs'
+                          : 'bg-slate-100 border-slate-200 text-[#1B4965]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        {isInProg ? (
+                          <span className="text-[14px] font-black">في الطريق إلى الوجهة 🚗💨</span>
+                        ) : isArr ? (
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-1.5 text-right min-w-0">
+                              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping mr-1 shrink-0" />
+                              <span className="text-[13px] md:text-[13.5px] font-black text-amber-900 truncate">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playCarHornBeep();
+                                show('بيب بيب! 🚖 تم إطلاق التنبيه الصوتي', 'info', 3000);
+                              }}
+                              className="text-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black px-3 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 border border-amber-600/20"
+                              title="إعادة تشغيل صوت الهورن"
+                            >
+                              <span className="text-sm">📢</span>
+                              <span>بيب بيب</span>
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              playCarHornBeep();
-                            }}
-                            className="text-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold px-2.5 py-1 rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer"
-                            title="إعادة تشغيل صوت الهورن"
-                          >
-                            <span>بيب بيب</span>
-                            <span>📢</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <span className="inline-block h-2 w-2 rounded-full bg-[#1B4965] animate-pulse mr-1" />
-                          <span className="text-[13.5px] font-bold">الكابتن في طريقه إليك 🚗</span>
-                        </>
-                      )}
+                        ) : (
+                          <>
+                            <span className="inline-block h-2 w-2 rounded-full bg-[#1B4965] animate-pulse mr-1" />
+                            <span className="text-[13.5px] font-bold">الكابتن في طريقه إليك 🚗</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  );
+                })()}
               </div>
             </div>
 
@@ -2359,12 +2394,12 @@ export default function CustomerHomePage() {
               </div>
 
               {/* تفاصيل حالة الرحلة الفرعية */}
-              {isPassenger && (rideStatus === 'Arrived' || rideStatus === 'InProgress' || rideStatus === 'in_progress') && (
+              {Boolean(rideStatus && ['arrived', 'inprogress', 'in_progress'].includes(rideStatus.toLowerCase())) && (
                 <div className="text-center">
-                  {rideStatus === 'Arrived' && (
+                  {rideStatus?.toLowerCase() === 'arrived' && (
                     <p className="text-[12px] text-amber-700/90 font-medium">بانتظار تأكيد السائق لبدء الرحلة ⏳</p>
                   )}
-                  {(rideStatus === 'InProgress' || rideStatus === 'in_progress') && (
+                  {(rideStatus?.toLowerCase() === 'inprogress' || rideStatus?.toLowerCase() === 'in_progress') && (
                     <p className="text-[12px] text-emerald-700/90 font-medium">الرحلة جارية الآن نحو وجهتك المحددة ✨</p>
                   )}
                 </div>
