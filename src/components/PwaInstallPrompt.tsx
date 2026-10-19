@@ -99,40 +99,60 @@ export default function PwaInstallPrompt() {
 
   return (
     <div
-      className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-4 md:max-w-md md:mx-auto z-50 animate-sheet-up font-cairo select-none"
+      className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-5 md:max-w-lg md:mx-auto z-50 animate-sheet-up font-cairo select-none"
       dir="rtl"
     >
-      <div className="relative rounded-2xl bg-white/95 backdrop-blur-md p-4 shadow-2xl border border-slate-200/90 text-right">
-        {/* زر الإغلاق المؤقت للجلسة */}
+      <div className="relative rounded-3xl bg-white/98 backdrop-blur-lg p-5 sm:p-6 shadow-2xl border-2 border-amber-100 text-right">
+        {/* زر الإغلاق المؤقت للجلسة بمساحة لمس مريحة >= 44x44px */}
         <button
           type="button"
           onClick={handleDismiss}
-          className="absolute top-2.5 left-2.5 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition active:scale-90 cursor-pointer"
+          className="absolute top-2.5 left-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition active:scale-90 cursor-pointer"
           aria-label="إغلاق التنبيه"
         >
-          ✕
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
 
-        <div className="flex items-start gap-3 pl-6">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center p-1.5 border border-amber-500/20 shadow-sm flex-shrink-0">
+        {/* ترويسة بطاقة التثبيت مع اللوجو والشارة */}
+        <div className="flex items-center gap-3.5 pl-9 mb-3">
+          <div className="w-13 h-13 rounded-2xl bg-amber-500/10 flex items-center justify-center p-2 border border-amber-500/20 shadow-xs flex-shrink-0">
             <img src="/logo-v2.png" alt="توصيلة" className="w-full h-full object-contain" />
           </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-1">
-              <h4 className="text-[15px] font-bold text-slate-900">تطبيق توصيله</h4>
-              <span className="rounded-md bg-amber-50 text-amber-700 text-[10.5px] font-bold px-1.5 py-0.5 border border-amber-200/60">
-                تثبيت سريع
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h4 className="text-[17px] font-black text-slate-900 leading-tight">تطبيق توصيلة</h4>
+              <span className="rounded-full bg-amber-50 text-amber-800 text-[11.5px] font-black px-2.5 py-0.5 border border-amber-300 shadow-xs">
+                تثبيت سريع ⚡
               </span>
             </div>
+            <p className="text-[12.5px] font-semibold text-slate-500 mt-0.5">
+              تطبيق نقل الركاب الأول في النجف الأشرف
+            </p>
+          </div>
+        </div>
 
-            {isIos ? (
-              <div className="space-y-1.5">
-                <p className="text-[12px] font-medium text-slate-600 leading-relaxed">
-                  للحصول على أفضل تجربة، أضف توصيلة لشاشتك الرئيسية. اضغط على زر المشاركة{' '}
-                  <span className="inline-flex items-center justify-center align-middle mx-0.5 p-1 rounded-md bg-slate-100 text-[#1B4965] border border-slate-200/60">
+        {/* محتوى الشرح المخصص حسب نظام التشغيل */}
+        {isIos ? (
+          <div className="space-y-3">
+            <p className="text-[13.5px] font-bold text-slate-700 leading-relaxed">
+              لتثبيت التطبيق على جهاز الآيفون وتلقي التنبيهات المباشرة، اتبع الخطوات الثلاث البسيطة:
+            </p>
+
+            <div className="space-y-2 rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 text-[13px] font-semibold text-slate-800">
+              {/* الخطوة 1 */}
+              <div className="flex items-start gap-2.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white font-black text-[12px] shadow-xs">
+                  ١
+                </span>
+                <p className="leading-relaxed flex-1">
+                  اضغط على زر المشاركة{' '}
+                  <span className="inline-flex items-center justify-center align-middle mx-1 px-1.5 py-0.5 rounded-lg bg-white border border-slate-300 shadow-xs font-mono font-bold text-[#1B4965]">
                     <svg
-                      className="h-3.5 w-3.5"
+                      className="h-4 w-4 inline-block"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -145,25 +165,45 @@ export default function PwaInstallPrompt() {
                       <line x1="12" y1="2" x2="12" y2="15" />
                     </svg>
                   </span>{' '}
-                  بالأسفل ثم اختر <span className="font-bold text-slate-900">«إضافة للشاشة الرئيسية» ➕</span>
+                  في شريط سفاري السفلي.
                 </p>
               </div>
-            ) : (
-              <div className="space-y-2.5">
-                <p className="text-[12px] font-medium text-slate-600 leading-relaxed">
-                  ثبّت التطبيق على جهازك لتشغيل أسرع، وتتبع مباشر للكباتن بدون فتح المتصفح.
+
+              {/* الخطوة 2 */}
+              <div className="flex items-start gap-2.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white font-black text-[12px] shadow-xs">
+                  ٢
+                </span>
+                <p className="leading-relaxed flex-1">
+                  مرر القائمة لأسفل ثم اضغط على <span className="font-bold text-slate-900">«عرض المزيد»</span> (إن لم تظهر مباشرة).
                 </p>
-                <button
-                  type="button"
-                  onClick={handleInstallClick}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.98] py-2.5 px-4 text-[13.5px] font-bold text-white shadow-md shadow-amber-500/20 transition cursor-pointer"
-                >
-                  <span>تثبيت التطبيق 📲</span>
-                </button>
               </div>
-            )}
+
+              {/* الخطوة 3 */}
+              <div className="flex items-start gap-2.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white font-black text-[12px] shadow-xs">
+                  ٣
+                </span>
+                <p className="leading-relaxed flex-1">
+                  اختر <span className="font-black text-amber-700 bg-amber-100/70 px-1.5 py-0.5 rounded-md">«إضافة إلى الصفحة الرئيسية ➕»</span> (Add to Home Screen) ليثبت على شاشتك.
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-[13.5px] font-bold text-slate-700 leading-relaxed">
+              ثبّت التطبيق على هاتفك لتجربة تصفح فائقة السرعة، وتتبع حي للكباتن بدقة دون الحاجة لفتح المتصفح في كل مرة.
+            </p>
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-2xl bg-amber-500 hover:bg-amber-600 active:scale-[0.98] py-2.5 px-4 text-[15px] font-black text-white shadow-lg shadow-amber-500/25 transition cursor-pointer"
+            >
+              <span>تثبيت التطبيق الآن 📲</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

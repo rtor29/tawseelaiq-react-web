@@ -6,6 +6,7 @@ import { consumeLoginTokenFromUrl } from '../lib/googleAuth';
 import type { Session } from '../types';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import TermsPrivacyModal from '../components/TermsPrivacyModal';
 
 const CustomerHub = lazy(() => import('../components/CustomerHub').then((m) => ({ default: m.CustomerHub })));
 
@@ -22,6 +23,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [detectedRole, setDetectedRole] = useState<'Customer' | 'Driver'>('Customer');
+  const [termsModalTab, setTermsModalTab] = useState<'terms' | 'privacy' | null>(null);
 
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -360,28 +362,32 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-white flex flex-col justify-between max-w-[480px] mx-auto px-6 py-6 relative text-right font-cairo" dir="rtl">
+    <div
+      className="min-h-dvh bg-white flex flex-col justify-between max-w-[480px] mx-auto px-6 pt-6 relative text-right font-cairo overflow-y-auto"
+      style={{ paddingBottom: 'max(160px, calc(env(safe-area-inset-bottom) + 140px))' }}
+      dir="rtl"
+    >
       {/* 1. الخطوة الأولى: واجهة ياهلا ورقم الهاتف (مع موشن دخول الشعار من اليمين) */}
       {step === 'phone' && (
         <div className="flex-1 flex flex-col pt-4 overflow-hidden">
           {/* الشعار بالأعلى مع حركة الدخول من اليمين */}
-          <div className="mb-10 text-center flex justify-center">
+          <div className="mb-8 text-center flex justify-center">
             <img
               src="/logo-v2.png"
               alt="شعار منصة توصيلة"
               width="250"
               height="136"
               fetchPriority="high"
-              className="w-[250px] max-w-[85%] h-auto object-contain animate-drive-in"
+              className="w-[240px] max-w-[85%] h-auto object-contain animate-drive-in"
             />
           </div>
 
           {/* نصوص الترحيب والحقول تظهر بعد استقرار الشعار في مكانه */}
           <div className="text-right animate-fade-in-text">
-            <h1 className="text-[32px] font-bold text-[#1A1A1A] font-cairo mb-2 tracking-tight">
+            <h1 className="text-[32px] font-black text-[#1A1A1A] font-cairo mb-2 tracking-tight">
               ياهلا
             </h1>
-            <p className="text-[16px] font-medium text-[#6C757D] font-cairo mb-7">
+            <p className="text-[16px] font-medium text-[#6C757D] font-cairo mb-6">
               قم بإدخال رقم هاتفك للمتابعة
             </p>
 
@@ -392,58 +398,68 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* حقل إدخال رقم الهاتف — إزالة transition-all لمنع Non-composited animations */}
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-7 focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
-              <input
-                type="tel"
-                aria-label="رقم الهاتف"
-                dir="ltr"
-                value={phone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmitPhone()}
-                placeholder=""
-                autoFocus
-                className="w-full border-none outline-none text-[20px] font-bold text-[#1A1A1A] text-left bg-transparent tracking-widest placeholder-slate-300"
-              />
-            </div>
+            {/* نموذج إدخال رقم الهاتف مع زر المتابعة المدمج في تدفق النموذج */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSubmitPhone();
+              }}
+              className="space-y-4"
+            >
+              <div className="bg-white border-2 border-slate-200/90 rounded-2xl shadow-xs flex items-center px-4 py-3 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/10 transition-colors">
+                <input
+                  type="tel"
+                  aria-label="رقم الهاتف"
+                  dir="ltr"
+                  value={phone}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  placeholder="07XXXXXXXX"
+                  autoFocus
+                  className="w-full border-none outline-none text-[22px] font-bold text-[#1A1A1A] text-center bg-transparent tracking-widest placeholder-slate-300"
+                />
+              </div>
 
-            {/* عبارة الشروط والأحكام وملاحظة الانضمام للكباتن */}
-            <p className="text-[12.5px] font-medium text-[#6C757D] text-center leading-relaxed mb-2">
+              {/* زر المتابعة بارز وواضح داخل تدفق النموذج مباشرة */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full min-h-[52px] bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {isLoading ? (
+                  <Spinner className="w-6 h-6 text-white" />
+                ) : (
+                  <>
+                    <span>متابعة</span>
+                    <span>🚖</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* عبارة الشروط والأحكام التفاعلية مع فتح نافذة الـ Modal */}
+            <p className="text-[13px] font-medium text-[#6C757D] text-center leading-relaxed mt-4">
               عند المتابعة أنت توافق على{' '}
-              <a href="#" onClick={(e) => e.preventDefault()} className="text-[#1B4965] font-semibold hover:underline">
-                شروط الاستخدام وسياسة الخصوصية
-              </a>
+              <button
+                type="button"
+                onClick={() => setTermsModalTab('terms')}
+                className="text-amber-600 hover:text-amber-700 underline font-bold cursor-pointer inline-block mx-0.5"
+              >
+                شروط الاستخدام
+              </button>
+              {' '}و{' '}
+              <button
+                type="button"
+                onClick={() => setTermsModalTab('privacy')}
+                className="text-amber-600 hover:text-amber-700 underline font-bold cursor-pointer inline-block mx-0.5"
+              >
+                سياسة الخصوصية
+              </button>
             </p>
-            <p className="text-[12px] font-semibold text-slate-400 text-center leading-relaxed">
+
+            <p className="text-[12px] font-semibold text-slate-400 text-center leading-relaxed mt-2.5">
               ✨ للانضمام لأسطول كباتن توصيلة، يرجى مراجعة إدارة المنظومة أو التواصل مع الدعم
             </p>
           </div>
-
-          {/* زر المتابعة العائم في أسفل اليسار */}
-          <button
-            type="button"
-            onClick={handleSubmitPhone}
-            disabled={isLoading}
-            className="fixed bottom-14 left-6 md:absolute md:bottom-16 md:left-8 w-14 h-14 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white flex items-center justify-center shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 disabled:opacity-60 z-40 animate-fade-in-text"
-            aria-label="تسجيل الدخول"
-          >
-            {isLoading ? (
-              <Spinner className="w-6 h-6 text-white" />
-            ) : (
-              <svg
-                className="w-6 h-6 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 5 12 12 5" />
-              </svg>
-            )}
-          </button>
         </div>
       )}
 
@@ -515,32 +531,24 @@ export default function LoginPage() {
                 تغيير رقم الهاتف
               </button>
             </div>
-          </div>
 
-          {/* زر المتابعة العائم */}
-          <button
-            type="button"
-            onClick={() => handleVerifyOtp(otpDigits.join(''))}
-            disabled={isLoading || otpDigits.join('').length < 4}
-            className="fixed bottom-14 left-6 md:absolute md:bottom-16 md:left-8 w-14 h-14 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white flex items-center justify-center shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 disabled:opacity-60 z-40"
-            aria-label="تأكيد"
-          >
-            {isLoading ? (
-              <Spinner className="w-6 h-6 text-white" />
-            ) : (
-              <svg
-                className="w-6 h-6 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            )}
-          </button>
+            {/* زر تأكيد رمز التحقق داخل تدفق النموذج */}
+            <button
+              type="button"
+              onClick={() => handleVerifyOtp(otpDigits.join(''))}
+              disabled={isLoading || otpDigits.join('').length < 4}
+              className="w-full min-h-[52px] mt-6 bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            >
+              {isLoading ? (
+                <Spinner className="w-6 h-6 text-white" />
+              ) : (
+                <>
+                  <span>تأكيد رمز التحقق</span>
+                  <span>✅</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
@@ -575,7 +583,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-7 focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
+            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-5 focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
               <input
                 type="text"
                 dir="rtl"
@@ -590,32 +598,24 @@ export default function LoginPage() {
                 className="w-full border-none outline-none text-[17px] font-medium text-[#1A1A1A] text-right bg-transparent placeholder-slate-400 placeholder:text-right"
               />
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={handleCompleteProfile}
-            disabled={isLoading || !fullName.trim()}
-            className="fixed bottom-14 left-6 md:absolute md:bottom-16 md:left-8 w-14 h-14 rounded-xl bg-[#1B4965] hover:bg-[#14364A] text-white flex items-center justify-center shadow-subtle cursor-pointer transition-all duration-200 active:scale-95 disabled:opacity-60 z-40 animate-fade-in-text"
-            aria-label="إنهاء التسجيل"
-          >
-            {isLoading ? (
-              <Spinner className="w-6 h-6 text-white" />
-            ) : (
-              <svg
-                className="w-6 h-6 text-white"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 5 12 12 5" />
-              </svg>
-            )}
-          </button>
+            {/* زر إنهاء التسجيل داخل تدفق النموذج */}
+            <button
+              type="button"
+              onClick={handleCompleteProfile}
+              disabled={isLoading || !fullName.trim()}
+              className="w-full min-h-[52px] bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            >
+              {isLoading ? (
+                <Spinner className="w-6 h-6 text-white" />
+              ) : (
+                <>
+                  <span>إكمال التسجيل والدخول</span>
+                  <span>🚖</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
@@ -675,6 +675,13 @@ export default function LoginPage() {
           </div>
         </div>
       )}
+
+      {/* نافذة شروط الاستخدام وسياسة الخصوصية المنبثقة */}
+      <TermsPrivacyModal
+        isOpen={Boolean(termsModalTab)}
+        initialTab={termsModalTab || 'terms'}
+        onClose={() => setTermsModalTab(null)}
+      />
     </div>
   );
 }
