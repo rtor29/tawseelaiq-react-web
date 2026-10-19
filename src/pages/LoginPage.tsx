@@ -7,6 +7,7 @@ import type { Session } from '../types';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import TermsPrivacyModal from '../components/TermsPrivacyModal';
+import { normalizeArabicDigits } from '../lib/utils';
 
 const CustomerHub = lazy(() => import('../components/CustomerHub').then((m) => ({ default: m.CustomerHub })));
 
@@ -24,6 +25,7 @@ export default function LoginPage() {
   const [isResending, setIsResending] = useState(false);
   const [detectedRole, setDetectedRole] = useState<'Customer' | 'Driver'>('Customer');
   const [termsModalTab, setTermsModalTab] = useState<'terms' | 'privacy' | null>(null);
+  const [selectedRegType, setSelectedRegType] = useState<'passenger' | 'driver'>('passenger');
 
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -49,10 +51,7 @@ export default function LoginPage() {
   }, []);
 
   function normalizePhone(val: string): string {
-    return val
-      .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString())
-      .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d).toString())
-      .replace(/[^0-9+]/g, '');
+    return normalizeArabicDigits(val).replace(/[^0-9+]/g, '');
   }
 
   function handlePhoneChange(rawVal: string) {
@@ -173,7 +172,34 @@ export default function LoginPage() {
   }
 
   function handleOtpDigitChange(val: string, index: number) {
-    const digit = val.replace(/[^0-9]/g, '').slice(-1);
+    const normalized = normalizeArabicDigits(val).replace(/[^0-9]/g, '');
+    if (!normalized) {
+      const newDigits = [...otpDigits];
+      newDigits[index] = '';
+      setOtpDigits(newDigits);
+      return;
+    }
+
+    // إذا تم إدخال أو لصق عدة أرقام دفعة واحدة
+    if (normalized.length > 1) {
+      const chars = normalized.slice(0, 6).split('');
+      const newDigits = [...otpDigits];
+      for (let i = 0; i < chars.length; i++) {
+        if (index + i < 6) {
+          newDigits[index + i] = chars[i];
+        }
+      }
+      setOtpDigits(newDigits);
+      setErrorMessage(null);
+      const nextFocus = Math.min(index + chars.length, 5);
+      otpInputsRef.current[nextFocus]?.focus();
+      if (newDigits.every((d) => d !== '')) {
+        handleVerifyOtp(newDigits.join(''));
+      }
+      return;
+    }
+
+    const digit = normalized.slice(-1);
     const newDigits = [...otpDigits];
     newDigits[index] = digit;
     setOtpDigits(newDigits);
@@ -205,20 +231,22 @@ export default function LoginPage() {
     setErrorMessage(null);
     setIsLoading(true);
 
+    const cleanCode = normalizeArabicDigits(code).replace(/[^0-9]/g, '');
     const cleanPhone = normalizePhone(phone);
     try {
       try {
         await http.post('/auth/verify-whatsapp-otp', {
           phone: cleanPhone,
           phoneNumber: cleanPhone,
-          code,
-          otp: code,
+          code: cleanCode,
+          otp: cleanCode,
           role: detectedRole,
         });
       } catch (_) {
         await http.post('/auth/verify-otp', {
           phoneNumber: cleanPhone,
-          otp: code,
+          code: cleanCode,
+          otp: cleanCode,
           role: detectedRole,
         });
       }
@@ -502,10 +530,15 @@ export default function LoginPage() {
                   key={idx}
                   ref={(el) => (otpInputsRef.current[idx] = el)}
                   type="tel"
-                  maxLength={1}
+                  maxLength={6}
                   value={otpDigits[idx]}
                   onChange={(e) => handleOtpDigitChange(e.target.value, idx)}
                   onKeyDown={(e) => handleOtpKeyDown(e, idx)}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const pasted = e.clipboardData.getData('text');
+                    handleOtpDigitChange(pasted, idx);
+                  }}
                   className="w-11 h-13 border border-slate-200 rounded-xl text-center text-[22px] font-bold text-[#1A1A1A] bg-slate-50 outline-none focus:bg-white focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/10 transition-all"
                 />
               ))}
@@ -552,29 +585,53 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* 3. الخطوة الثالثة: إكمال الاسم للمستخدم الجديد */}
+      {/* 3. الخطوة الثالثة: إكمال التسجيل (اختيار راكب أو كابتن) */}
       {step === 'profile' && (
         <div className="flex-1 flex flex-col pt-4">
-          <div className="mb-10 text-center flex justify-center">
+          <div className="mb-6 text-center flex justify-center">
             <img
               src="/logo-v2.png"
               alt="شعار منصة توصيلة"
               width="220"
               height="120"
-              className="w-[220px] max-w-[80%] h-auto object-contain animate-drive-in"
+              className="w-[200px] max-w-[75%] h-auto object-contain animate-drive-in"
             />
           </div>
 
           <div className="text-right animate-fade-in-text">
-            <h1 className="text-[28px] font-bold text-[#1A1A1A] font-cairo mb-2">
-              إنشاء حساب راكب جديد
-            </h1>
-            <p className="text-[15px] font-medium text-[#6C757D] font-cairo mb-3">
-              أدخل اسمك الكريم للمتابعة وحجز رحلاتك
-            </p>
+            {/* أزرار التبديل الصريحة بين: أنا راكب / أنا كابتن */}
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-2 mb-6 border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRegType('passenger');
+                  setErrorMessage(null);
+                }}
+                className={`flex-1 py-3 px-3 rounded-xl font-black text-[15px] transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  selectedRegType === 'passenger'
+                    ? 'bg-white text-[#1B4965] shadow-sm border border-slate-200/60 scale-[1.01]'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="text-lg">🧳</span>
+                <span>أنا راكب</span>
+              </button>
 
-            <div className="mb-6 p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-[12.5px] font-medium text-slate-500 text-center">
-              💡 هذا التسجيل مخصص للركاب فقط. للانضمام لأسطول كباتن توصيلة، يرجى مراجعة إدارة المنظومة أو التواصل مع الدعم.
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRegType('driver');
+                  setErrorMessage(null);
+                }}
+                className={`flex-1 py-3 px-3 rounded-xl font-black text-[15px] transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  selectedRegType === 'driver'
+                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20 scale-[1.01]'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="text-lg">🚖</span>
+                <span>أنا كابتن / سائق</span>
+              </button>
             </div>
 
             {errorMessage && (
@@ -583,38 +640,105 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="bg-white border border-slate-200/90 rounded-xl shadow-card flex items-center px-4 py-3.5 mb-5 focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
-              <input
-                type="text"
-                dir="rtl"
-                value={fullName}
-                onChange={(e) => {
-                  setErrorMessage(null);
-                  setFullName(e.target.value);
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && handleCompleteProfile()}
-                placeholder="مثال: علي الموسوي"
-                autoFocus
-                className="w-full border-none outline-none text-[17px] font-medium text-[#1A1A1A] text-right bg-transparent placeholder-slate-400 placeholder:text-right"
-              />
-            </div>
+            {/* في حال اختيار: أنا راكب */}
+            {selectedRegType === 'passenger' ? (
+              <div>
+                <h1 className="text-[26px] font-black text-[#1A1A1A] font-cairo mb-1.5">
+                  إنشاء حساب راكب جديد
+                </h1>
+                <p className="text-[14.5px] font-medium text-[#6C757D] font-cairo mb-5">
+                  أدخل اسمك الكريم للمتابعة وحجز رحلاتك
+                </p>
 
-            {/* زر إنهاء التسجيل داخل تدفق النموذج */}
-            <button
-              type="button"
-              onClick={handleCompleteProfile}
-              disabled={isLoading || !fullName.trim()}
-              className="w-full min-h-[52px] bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-            >
-              {isLoading ? (
-                <Spinner className="w-6 h-6 text-white" />
-              ) : (
-                <>
-                  <span>إكمال التسجيل والدخول</span>
-                  <span>🚖</span>
-                </>
-              )}
-            </button>
+                <div className="bg-white border-2 border-slate-200/90 rounded-2xl shadow-xs flex items-center px-4 py-3.5 mb-5 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/10 transition-colors">
+                  <input
+                    type="text"
+                    dir="rtl"
+                    value={fullName}
+                    onChange={(e) => {
+                      setErrorMessage(null);
+                      setFullName(e.target.value);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCompleteProfile()}
+                    placeholder="مثال: علي الموسوي"
+                    autoFocus
+                    className="w-full border-none outline-none text-[17px] font-bold text-[#1A1A1A] text-right bg-transparent placeholder-slate-400 placeholder:text-right"
+                  />
+                </div>
+
+                {/* زر إنهاء التسجيل داخل تدفق النموذج */}
+                <button
+                  type="button"
+                  onClick={handleCompleteProfile}
+                  disabled={isLoading || !fullName.trim()}
+                  className="w-full min-h-[52px] bg-[#1B4965] hover:bg-[#14364A] text-white font-black text-lg rounded-2xl shadow-lg shadow-[#1B4965]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {isLoading ? (
+                    <Spinner className="w-6 h-6 text-white" />
+                  ) : (
+                    <>
+                      <span>إكمال التسجيل والدخول</span>
+                      <span>🚖</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              /* في حال اختيار: أنا كابتن / سائق */
+              <div className="rounded-3xl bg-gradient-to-br from-amber-50 via-white to-amber-50/50 border-2 border-amber-200 p-5 sm:p-6 text-right shadow-sm space-y-4 animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-2xl shadow-xs shrink-0">
+                    🚖
+                  </div>
+                  <div>
+                    <h2 className="text-[19px] font-black text-slate-900 leading-tight">
+                      الانضمام لأسطول كباتن توصيلة
+                    </h2>
+                    <p className="text-[12.5px] font-bold text-amber-800 mt-0.5">
+                      اعتماد وتفعيل حسابات الكباتن يتم حصراً عبر الإدارة
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-[13px] font-medium text-slate-700 leading-relaxed">
+                  أهلاً بك كابتن! لضمان الأمان والامتثال المعتمد، يتم إنشاء وتفعيل حسابات السائقين مباشرة من قِبل الإدارة بعد تدقيق البيانات. يرجى التواصل معنا عبر القنوات السريعة أدناه لتفعيل حسابك فوراً:
+                </p>
+
+                {/* روابط التواصل الفورية بنقرة واحدة */}
+                <div className="space-y-2.5 pt-1">
+                  {/* واتساب الإدارة */}
+                  <a
+                    href="https://wa.me/9647722154182?text=السلام%20عليكم،%20أرغب%20بالانضمام%20لكباتن%20توصيلة"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full min-h-[50px] rounded-2xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-black text-[14.5px] flex items-center justify-center gap-2.5 shadow-md shadow-emerald-500/20 transition-all active:scale-[0.98] cursor-pointer no-underline"
+                  >
+                    <span className="text-xl">💬</span>
+                    <span>واتساب الإدارة (07722154182)</span>
+                  </a>
+
+                  {/* تيليجرام الإدارة */}
+                  <a
+                    href="https://t.me/wsam_ta"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full min-h-[50px] rounded-2xl bg-[#0088cc] hover:bg-[#0077b5] text-white font-black text-[14.5px] flex items-center justify-center gap-2.5 shadow-md shadow-sky-500/20 transition-all active:scale-[0.98] cursor-pointer no-underline"
+                  >
+                    <span className="text-xl">✈️</span>
+                    <span>تيليجرام الإدارة (@wsam_ta)</span>
+                  </a>
+
+                  {/* الاتصال الهاتفي المباشر */}
+                  <a
+                    href="tel:07722154182"
+                    className="w-full min-h-[48px] rounded-2xl bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-800 font-black text-[14px] flex items-center justify-center gap-2 shadow-xs transition-all active:scale-[0.98] cursor-pointer no-underline"
+                  >
+                    <span className="text-lg">📞</span>
+                    <span>اتصال هاتفي مباشر: <span dir="ltr" className="font-mono font-bold">07722154182</span></span>
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
