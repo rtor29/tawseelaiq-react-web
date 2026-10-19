@@ -688,17 +688,23 @@ export default function DriverHomePage() {
 
   // السائق وصل لنقطة انطلاق الراكب
   async function handleDriverArrived() {
-    if (!activeRide || !driverId) return;
+    const currentId = driverId || rawPhone;
+    if (!activeRide || !currentId) return;
     try {
       const { data } = await http.post<{ success: boolean; message?: string }>('/ride/arrived', {
         requestId: activeRide.id,
-        driverId,
+        driverId: currentId,
+        driverPhone: rawPhone,
       });
       if (data?.success) {
         show('تم إشعار الراكب بوصولك إلى الموقع 📍', 'success');
         setActiveRide((prev: any) => ({ ...prev, status: 'Arrived' }));
+      } else {
+        show(data?.message || 'تعذر تأكيد الوصول', 'error');
       }
-    } catch (_) {}
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ أثناء تأكيد الوصول', 'error');
+    }
   }
 
   // فتح تطبيق خرائط جوجل بدقة للتوجه إلى الوجهة
@@ -747,11 +753,13 @@ export default function DriverHomePage() {
 
   // السائق انطلق إلى الوجهة بعد صعود الراكب
   async function handleDriverStartRide() {
-    if (!activeRide || !driverId) return;
+    const currentId = driverId || rawPhone;
+    if (!activeRide || !currentId) return;
     try {
       const { data } = await http.post<{ success: boolean; message?: string; status?: string }>('/ride/start', {
         requestId: activeRide.id,
-        driverId,
+        driverId: currentId,
+        driverPhone: rawPhone,
       });
       if (data?.success) {
         show('تم بدء الرحلة والانطلاق إلى الوجهة 🚗💨', 'success', 3000);
@@ -774,12 +782,14 @@ export default function DriverHomePage() {
 
   // السائق أنهى المشوار
   async function handleDriverComplete() {
-    if (!activeRide || !driverId) return;
+    const currentId = driverId || rawPhone;
+    if (!activeRide || !currentId) return;
     const fareAmount = activeRide.fare || activeRide.price || '5,000';
     try {
       const { data } = await http.post<{ success: boolean; message?: string }>('/ride/complete', {
         requestId: activeRide.id,
-        driverId,
+        driverId: currentId,
+        driverPhone: rawPhone,
       });
       if (data?.success) {
         show(`تم إكمال المشوار بنجاح، استلمت: ${fareAmount} د.ع 💵`, 'success', 3000);
