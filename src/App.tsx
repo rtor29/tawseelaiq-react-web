@@ -6,6 +6,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useSession } from './lib/auth';
 import { consumeLoginTokenFromUrl } from './lib/googleAuth';
 import { fetchAndApplyTheme } from './lib/theme';
+import { initAudioUnlock } from './lib/sound';
 import { Spinner } from './components/ui';
 
 // Standard import for instant initial render of login screen
@@ -71,8 +72,9 @@ export default function App() {
     };
   }, []);
 
-  // معالجة login_token من رابط العودة (OAuth/تليجرام) عند أول تحميل — بديل main.dart
+  // معالجة login_token من رابط العودة (OAuth/تليجرام) وفك قفل الصوت عند أول تحميل — بديل main.dart
   useEffect(() => {
+    initAudioUnlock();
     consumeLoginTokenFromUrl();
     setReady(true);
   }, []);

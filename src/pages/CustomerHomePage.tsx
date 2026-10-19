@@ -33,6 +33,7 @@ import {
 } from '../lib/cache';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { storage } from '../lib/storage';
+import { playCarHornBeep } from '../lib/sound';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, type RouteLineData } from '../components/map/MapPins';
@@ -1290,7 +1291,8 @@ export default function CustomerHomePage() {
             setRideStatus('Arrived');
             if (!hasNotifiedArrivalRef.current) {
               hasNotifiedArrivalRef.current = true;
-              show('الكابتن وصل إلى موقعك الآن! 🚗', 'success', 5000);
+              show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 6000);
+              playCarHornBeep();
             }
           } else if (req.status === 'InProgress' || req.status === 'in_progress') {
             if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
@@ -1405,7 +1407,8 @@ export default function CustomerHomePage() {
           setRideStatus('Arrived');
           if (!hasNotifiedArrivalRef.current) {
             hasNotifiedArrivalRef.current = true;
-            show('الكابتن وصل إلى موقعك الآن! 🚗', 'success', 5000);
+            show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 6000);
+            playCarHornBeep();
           }
         } else if (e.status === 'InProgress' || e.status === 'in_progress') {
           if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
@@ -2241,10 +2244,24 @@ export default function CustomerHomePage() {
                       {rideStatus === 'InProgress' || rideStatus === 'in_progress' ? (
                         <span className="text-[14px] font-black">في الطريق إلى الوجهة 🚗💨</span>
                       ) : rideStatus === 'Arrived' ? (
-                        <>
-                          <span className="inline-block h-2 w-2 rounded-full bg-amber-500 animate-ping mr-1" />
-                          <span className="text-[13.5px] font-bold">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
-                        </>
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping mr-1" />
+                            <span className="text-[13px] md:text-[13.5px] font-bold">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playCarHornBeep();
+                            }}
+                            className="text-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold px-2.5 py-1 rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer"
+                            title="إعادة تشغيل صوت الهورن"
+                          >
+                            <span>بيب بيب</span>
+                            <span>📢</span>
+                          </button>
+                        </div>
                       ) : (
                         <>
                           <span className="inline-block h-2 w-2 rounded-full bg-[#1B4965] animate-pulse mr-1" />
