@@ -14,7 +14,7 @@ export default function LoginPage() {
   const { show } = useToast();
   const session = useSession();
 
-  const [step, setStep] = useState<'phone' | 'otp' | 'profile' | 'service_select'>('phone');
+  const [step, setStep] = useState<'phone' | 'otp' | 'profile' | 'telegram_link' | 'service_select'>('phone');
   const [phone, setPhone] = useState('');
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [fullName, setFullName] = useState('');
@@ -338,7 +338,7 @@ export default function LoginPage() {
           cleanPhone
         );
         show('تم إنشاء حسابك بنجاح! مرحباً بك في توصيله 🚖', 'success');
-        setStep('service_select');
+        setStep('telegram_link');
       } else {
         setErrorMessage(data.error || 'حدث خطأ أثناء إكمال التسجيل');
       }
@@ -609,6 +609,63 @@ export default function LoginPage() {
               </svg>
             )}
           </button>
+        </div>
+      )}
+
+      {/* خطوة ربط التيليجرام لاستلام إشعارات الرحلات والتأكيد */}
+      {step === 'telegram_link' && (
+        <div className="flex-1 flex flex-col justify-between pt-6 pb-4 animate-fade-in-text">
+          <div className="text-right">
+            <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-3xl mb-6 shadow-sm mx-auto md:mx-0">
+              ✈️
+            </div>
+
+            <h1 className="text-[22px] font-black text-[#1A1A1A] font-cairo mb-3 leading-snug">
+              تأكيد استلام إشعارات المشوار 📱
+            </h1>
+
+            <div className="bg-sky-50/70 border border-sky-200/80 rounded-2xl p-4.5 mb-6 text-right">
+              <p className="text-[15px] font-bold text-[#1B4965] font-cairo leading-relaxed mb-3">
+                🚖 خطوة أخيرة لتأكيد حسابك واستلام إشعارات المشوار (وصول الكابتن، تفاصيل الرحلة) عبر تيليجرام
+              </p>
+              <ul className="space-y-2 text-[13px] font-medium text-slate-700">
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>إشعار فوري وتنبيه عند وصول الكابتن لموقعك</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>تفاصيل سيارة الكابتن ورقم اللوحة بأمان</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">✓</span>
+                  <span>دعم فني واستفسارات مباشرة عبر البوت</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                const cleanPhone = normalizePhone(phone);
+                window.open(`https://t.me/tawseela_najaf_bot?start=reg_${cleanPhone}`, '_blank');
+                setStep('service_select');
+              }}
+              className="w-full h-13 rounded-xl bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-[16px] flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span>إكمال التسجيل عبر بوت التيليجرام 📱</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep('service_select')}
+              className="w-full py-3 text-center text-[14px] font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            >
+              تخطي والبدء بدون إشعارات تيليجرام
+            </button>
+          </div>
         </div>
       )}
     </div>
