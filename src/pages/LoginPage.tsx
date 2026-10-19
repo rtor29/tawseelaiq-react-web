@@ -424,7 +424,7 @@ export default function LoginPage() {
           <div className="flex flex-col items-center text-center pt-1">
             <div className="relative mb-2 flex items-center justify-center animate-logo-entrance">
               <img 
-                src="/logo.png" 
+                src="/logo.png?v=40" 
                 alt="شعار توصيلة" 
                 className="h-20 w-auto max-w-[200px] object-contain drop-shadow-md"
               />
