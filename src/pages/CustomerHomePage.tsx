@@ -1571,10 +1571,10 @@ export default function CustomerHomePage() {
               </svg>
             </button>
           )}
-          <span
-            className="tawseela-dynamic-logo w-24 sm:w-28 h-7 sm:h-8 block"
-            role="img"
-            aria-label="شعار توصيله"
+          <img
+            src="/logo.png?v=40"
+            alt="شعار توصيلة"
+            className="h-8 w-auto max-h-8 object-contain drop-shadow select-none pointer-events-none"
           />
         </div>
 

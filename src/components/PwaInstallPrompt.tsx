@@ -119,7 +119,7 @@ export default function PwaInstallPrompt() {
         {/* ترويسة بطاقة التثبيت مع اللوجو والشارة */}
         <div className="flex items-center gap-3.5 pl-9 mb-3">
           <div className="w-13 h-13 rounded-2xl bg-amber-500/10 flex items-center justify-center p-2 border border-amber-500/20 shadow-xs flex-shrink-0">
-            <img src="/logo-v2.png" alt="توصيلة" className="w-full h-full object-contain" />
+            <img src="/logo.png?v=40" alt="توصيلة" className="w-full h-full object-contain drop-shadow" />
           </div>
 
           <div className="min-w-0">

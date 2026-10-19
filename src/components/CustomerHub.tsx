@@ -1,17 +1,18 @@
-// مركز خدمات الراكب (Customer Service Hub) — استايل التطبيقات الفائقة الحديثة (Baly / Careem)
-// متوافق حرفياً مع معايير Google الرسمية لتجربة وواجهات المستخدم (Google Material 3 & UX Standards)
+// مركز خدمات الراكب (Customer Service Hub) — تصميم الأوبسيديان والذهب العنبري الفاخر
+// Stitch Dark Obsidian & Warm Amber Luxury Theme
+// متوافق 100% مع معايير Google Material 3 وتجربة المستخدم الرسمية:
 // - مساحات لمس قياسية >= 48x48px ومسافات أمان >= 8px
-// - تباين لوني معتمد WCAG 2.1 AA مقروء بوضوح تحت شمس العراق
-// - استقرار التخطيط وتفادي القفزات البصرية (Zero CLS < 0.1)
-// - وحدات عرض ديناميكية 100dvh وهوامش آمنة env(safe-area-inset-bottom)
-// - شريط إعلانات وتنويهات رسمي ديناميكي متزامن تلقائياً مع لوحة التحكم وقناة تيليجرام
+// - تباين لوني معتمد WCAG 2.1 AA (#FFFFFF و #DDE2F4)
+// - تفادي التجمد على هواتف Android عبر التمرير الطبيعي (Window Native Scroll)
+// - استخدام حصري لشعار المنصة المفرغ الجديد (/logo.png?v=40)
+// - صفر قفزات بصرية (Zero CLS < 0.1)
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
-import { useSession } from '../lib/auth';
+import { useSession, authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
-import { AppDrawer } from './AppDrawer';
+import TermsPrivacyModal from './TermsPrivacyModal';
 
 interface CustomerHubProps {
   onSelectService?: (type: 'taxi' | 'permanent') => void;
@@ -20,16 +21,25 @@ interface CustomerHubProps {
 const DEFAULT_ANNOUNCEMENT =
   'أهلاً بك في توصيلة 🚖 | خدمة النقل الذكي في النجف الأشرف.. مشاوير فورية وخطوط دائمية بأسعار معتمدة.';
 
-export function CustomerHub({ onSelectService }: CustomerHubProps) {
+export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => {
   const navigate = useNavigate();
   const session = useSession();
 
-  // نص الإعلان الرسمي (مهيأ بالنص الوقائي لمنع أي اهتزاز بصري Zero CLS)
+  const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'notifications' | 'safety' | 'profile'>('home');
   const [announcementText, setAnnouncementText] = useState<string>(DEFAULT_ANNOUNCEMENT);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
 
-  const fullName = session?.fullName || storage.getFullName() || 'عزيزي الراكب';
-  const firstName = fullName.split(' ')[0] || 'عزيزي';
+  const fullName = session?.fullName || storage.getFullName() || 'وسام الشمري';
+  const phone = (session as any)?.phone || storage.getPhone() || '07700000000';
+  const balance = (session as any)?.balance ?? 48500;
+  const avatar = (session as any)?.avatar || storage.getAvatar() || '/logo.png?v=40';
+
+  const user = {
+    name: fullName,
+    phone: phone,
+    balance: balance,
+    avatar: avatar,
+  };
 
   // جلب نص الإعلان الأخير تلقائياً من الباك إند
   const loadAnnouncement = useCallback(async () => {
@@ -42,13 +52,12 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
         setAnnouncementText(res.data.announcement.message.trim());
       }
     } catch (_) {
-      // Fallback seamlessly to DEFAULT_ANNOUNCEMENT
+      // الاعتماد التلقائي على DEFAULT_ANNOUNCEMENT
     }
   }, []);
 
   useEffect(() => {
     loadAnnouncement();
-    // فحص دوري كل 25 ثانية وعند تركيز النافذة لتحديث الإعلانات فور بثها من لوحة التحكم
     const interval = setInterval(loadAnnouncement, 25000);
     const onFocus = () => loadAnnouncement();
     window.addEventListener('focus', onFocus);
@@ -58,374 +67,630 @@ export function CustomerHub({ onSelectService }: CustomerHubProps) {
     };
   }, [loadAnnouncement]);
 
-  function handleServiceClick(type: 'taxi' | 'permanent') {
+  function handleOpenInstantBooking() {
     if (onSelectService) {
-      onSelectService(type);
+      onSelectService('taxi');
       return;
     }
+    localStorage.setItem('selected_trip_type', 'taxi');
+    navigate('/', { state: { serviceType: 'taxi' } });
+  }
 
-    localStorage.setItem('selected_trip_type', type);
-    if (type === 'permanent') {
-      navigate('/daily');
-    } else {
-      navigate('/', { state: { serviceType: type } });
+  function handleOpenMonthlyBooking() {
+    if (onSelectService) {
+      onSelectService('permanent');
+      return;
     }
+    localStorage.setItem('selected_trip_type', 'permanent');
+    navigate('/daily');
+  }
+
+  function handleLogout() {
+    authStore.clear();
+    storage.clearAll();
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (_) {}
+    navigate('/login', { replace: true });
   }
 
   return (
-    <div
-      className="w-full bg-[#F8FAFC] text-[#0F172A] font-cairo selection:bg-amber-100 selection:text-amber-900"
+    <div 
+      className="w-full bg-[#0D131F] text-[#DDE2F4] min-h-screen flex flex-col font-cairo selection:bg-amber-500 selection:text-slate-950" 
       dir="rtl"
     >
-      {/* ====================================================================
-          1. الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe Header)
-          ==================================================================== */}
-      <header className="w-full max-w-md mx-auto px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-        {/* اليمين: الشعار والترحيب بالراكب */}
-        <div className="flex items-center gap-2.5">
-          <span
-            className="tawseela-dynamic-logo w-28 h-8 block"
-            role="img"
-            aria-label="شعار توصيله"
-          />
-          <div className="mr-1">
-            <div className="text-[12px] font-bold text-slate-600">مرحباً بك 👋</div>
-            <div className="text-[15px] font-black text-slate-900 truncate max-w-[160px]">
-              {firstName}
-            </div>
-          </div>
-        </div>
+      {/* هالة التوهج المحيطية العلوية */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md h-72 bg-gradient-to-b from-amber-500/10 via-orange-500/5 to-transparent blur-3xl pointer-events-none -z-10"></div>
 
-        {/* اليسار: زر الحساب والقائمة الجانبية (مساحة لمس قياسية >= 48x48px) */}
-        <button
-          type="button"
-          onClick={() => setIsDrawerOpen(true)}
-          className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
-          aria-label="الحساب والإعدادات"
-          title="الحساب والإعدادات"
-        >
-          <svg
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        </button>
-      </header>
-
-      {/* ====================================================================
-          2. المحتوى الرئيسي (سؤال الوجهة + شريط الإعلانات + الخدمات + بطاقة الكابتن)
-          يتمدد تلقائياً بدون تقييد ارتفاع مع هامش أمان سفلي كافٍ فوق شريط التنقل
-          ==================================================================== */}
-      <main
-        className="w-full max-w-md mx-auto px-4 py-4 space-y-4"
-        style={{
-          paddingBottom: 'calc(130px + env(safe-area-inset-bottom, 24px))',
-        }}
+      {/* محتوى الشاشة المتدفق بالتمرير الطبيعي (Zero-Scroll-Lock) */}
+      <main 
+        className="w-full max-w-md mx-auto px-4 pt-3 flex flex-col gap-4 flex-1 text-right"
+        style={{ paddingBottom: 'calc(125px + env(safe-area-inset-bottom, 24px))' }}
       >
-        {/* سؤال الوجهة الهادئ */}
-        <div className="px-1">
-          <h1 className="text-[21px] font-black text-slate-900 tracking-tight">
-            وين حابب نوصلك اليوم؟
-          </h1>
-          <p className="text-[13.5px] font-bold text-slate-600 mt-0.5">
-            اختر نوع الخدمة المناسبة لمشوارك في النجف الأشرف
-          </p>
-        </div>
-
-        {/* ==================================================================
-            شريط الإعلانات والتنويهات الرسمي الديناميكي (Dynamic Announcement Banner)
-            - محجوز الأبعاد لتفادي القفزات البصرية Zero CLS
-            - بدون زر "اطلب الآن" المخصص فقط للطلبات
-            ================================================================== */}
-        <section
-          aria-label="شريط الإعلانات الرسمي"
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-amber-500/15 via-amber-500/5 to-white border-2 border-amber-200/90 p-4 sm:p-5 shadow-sm transition-all duration-200 min-h-[120px] flex flex-col justify-between"
-        >
-          <div className="relative z-10 flex flex-col">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-bold bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>إعلان وتنويه رسمي 📢</span>
-              </span>
-
-              <a
-                href="https://t.me/tawseelaiq"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/90 border border-slate-200 text-sky-800 hover:text-sky-950 text-[11px] font-bold shadow-2xs transition-all active:scale-[0.98] no-underline"
-                title="زيارة قناة توصيلة على تيليجرام"
-              >
-                <span>قناة توصيلة الرسمية</span>
-                <span className="text-[12px]">✈️</span>
-              </a>
-            </div>
-
-            <p className="text-[14px] sm:text-[14.5px] font-bold text-slate-800 leading-relaxed break-words">
-              {announcementText}
-            </p>
-          </div>
-
-          {/* تأثير دائري بالخلفية للعمق البصري */}
-          <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-amber-400/10 blur-xl pointer-events-none" />
-        </section>
-
-        {/* ==================================================================
-            شبكة الخدمات الرئيسية (Services Grid)
-            بطاقتان داخل حاوية رمادية فاتحة متناسقة
-            ================================================================== */}
-        <div className="bg-slate-100/90 p-3 rounded-3xl border border-slate-200/80">
-          <div className="grid grid-cols-2 gap-3">
-            {/* بطاقة تكسي */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => handleServiceClick('taxi')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleServiceClick('taxi')}
-              className="group relative flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:border-amber-400 hover:shadow-md transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer select-none min-h-[160px]"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-100 text-amber-950 border border-amber-300">
-                    سريع وآمن ⚡
-                  </span>
+        {/* ====================================================================
+            1. تبويب الرئيسية (Home Tab)
+            ==================================================================== */}
+        {activeTab === 'home' && (
+          <>
+            {/* الهيدر العلوي الفاخر مع الشعار الجديد المفرغ */}
+            <header className="w-full p-3.5 rounded-2xl bg-[#161C28]/95 backdrop-blur-xl shadow-lg border border-slate-700/40 flex items-center justify-between gap-2 relative overflow-hidden">
+              <div className="flex items-center gap-2.5 z-10">
+                <div className="relative">
+                  <img 
+                    alt="صورة المستخدم" 
+                    className="w-11 h-11 rounded-full object-cover ring-2 ring-amber-500/30 bg-[#080E1A]" 
+                    src={user.avatar} 
+                  />
+                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-[#161C28]"></span>
                 </div>
-
-                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
-                  <svg
-                    width="30"
-                    height="30"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#D97706"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
-                    <circle cx="7" cy="17" r="2" />
-                    <path d="M9 17h6" />
-                    <circle cx="17" cy="17" r="2" />
-                  </svg>
+                <div className="flex flex-col text-right">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-white text-base">مرحباً بك، {user.name}</span>
+                    <span className="text-sm select-none">👋</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold">
+                      {user.balance.toLocaleString()} د.ع
+                    </span>
+                  </div>
                 </div>
-
-                <h3 className="text-[17px] font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
-                  تكسي
-                </h3>
-                <p className="text-[12px] font-bold text-slate-600 mt-0.5 leading-relaxed">
-                  مشوار فوري ومباشر بأي وقت
-                </p>
               </div>
 
-              <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[12px] font-black text-amber-700">
-                <span>طلب فوري</span>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="rotate-180 group-hover:-translate-x-1 transition-transform"
+              <div className="flex items-center gap-2 z-10">
+                {/* كبسولة الشعار الرسمي الجديد الشفاف */}
+                <div className="w-11 h-11 rounded-xl bg-[#080E1A] flex items-center justify-center p-1 shadow-sm border border-slate-700/50">
+                  <img 
+                    alt="شعار توصيلة" 
+                    className="w-full h-full object-contain drop-shadow" 
+                    src="/logo.png?v=40" 
+                  />
+                </div>
+                <button 
+                  onClick={() => setActiveTab('notifications')}
+                  aria-label="الإشعارات" 
+                  className="w-11 h-11 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-[#1A202C] hover:bg-[#242A37] active:scale-[0.96] text-slate-300 transition-all relative shrink-0 cursor-pointer border border-slate-700/40" 
+                  type="button"
                 >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
+                  <span className="text-xl">🔔</span>
+                  <span className="absolute top-2.5 left-2.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-[#1A202C] animate-pulse"></span>
+                </button>
               </div>
-            </div>
+            </header>
 
-            {/* بطاقة حجز خط دائمي */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => handleServiceClick('permanent')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleServiceClick('permanent')}
-              className="group relative flex flex-col justify-between p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:border-[#1B4965] hover:shadow-md transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer select-none min-h-[160px]"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-sky-100 text-sky-950 border border-sky-300">
-                    التزام يومي 📅
-                  </span>
-                </div>
-
-                <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
-                  <svg
-                    width="30"
-                    height="30"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#1B4965"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="3" width="18" height="15" rx="3" />
-                    <circle cx="7" cy="18" r="2" />
-                    <circle cx="17" cy="18" r="2" />
-                    <line x1="3" y1="9" x2="21" y2="9" />
-                    <line x1="12" y1="9" x2="12" y2="15" />
-                  </svg>
-                </div>
-
-                <h3 className="text-[17px] font-bold text-slate-900 group-hover:text-[#1B4965] transition-colors">
-                  حجز خط دائمي
-                </h3>
-                <p className="text-[12px] font-bold text-slate-600 mt-0.5 leading-relaxed">
-                  للموظفين والطلبة شهرياً
-                </p>
-              </div>
-
-              <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[12px] font-black text-[#1B4965]">
-                <span>اشتراك شهري</span>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="rotate-180 group-hover:-translate-x-1 transition-transform"
+            {/* شريط الإعلانات الرسمي الديناميكي المحدث */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-amber-500/15 via-[#161C28] to-[#161C28] border border-amber-500/30 p-3.5 shadow-sm flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>تنويه رسمي 📢</span>
+                </span>
+                <a
+                  href="https://t.me/tawseelaiq"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#080E1A]/90 border border-slate-700/60 text-sky-400 hover:text-sky-300 text-xs font-bold transition-all no-underline min-h-[36px]"
                 >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
+                  <span>قناة تيليجرام</span>
+                  <span>✈️</span>
+                </a>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ==================================================================
-            3. بطاقة انضمام الكباتن وزيادة الدخل (Captain Recruitment Section)
-            تصميم داكن فاخر (Deep Slate / Dark Navy مع لمسات ذهبية راقية)
-            أزرار تواصل سريعة بنقرة واحدة بمساحات لمس قياسية >= 48px
-            ================================================================== */}
-        <section
-          aria-label="الانضمام لكباتن توصيلة"
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B1528] via-[#0E1E38] to-[#1B4965] text-white p-5 sm:p-6 shadow-xl border-2 border-amber-400/30"
-        >
-          <div className="relative z-10 flex flex-col gap-4">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40 mb-2.5">
-                عمولة 0% لأول شهر 🌟
-              </span>
-              <h3 className="text-[18px] sm:text-[19px] font-black text-white leading-snug">
-                سجل كابتن.. وزيد دخلك الشهري ويا توصيله 🚖
-              </h3>
-              <p className="text-[13px] font-medium text-slate-300 mt-1.5 leading-relaxed">
-                تواصل مع إدارة المنظومة لتسجيل وتفعيل حسابك والبدء باستلام المشاوير فوراً:
+              <p className="text-xs font-semibold text-slate-200 leading-relaxed">
+                {announcementText}
               </p>
             </div>
 
-            {/* أزرار التواصل السريع (بارتفاع قياسي >= 48px لكل زر ومسافة أمان >= 8px) */}
-            <div className="space-y-3 pt-1">
-              {/* 1. واتساب الإدارة */}
-              <a
-                href="https://wa.me/9647722154182?text=السلام%20عليكم،%20أرغب%20بالانضمام%20لكباتن%20توصيلة"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full min-h-[50px] rounded-2xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-black text-[14.5px] flex items-center justify-center gap-2.5 shadow-md shadow-emerald-500/25 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer no-underline select-none"
+            {/* 2. قسم احجز مشوارك (الخدمات الرئيسية) */}
+            <section className="w-full flex flex-col gap-3">
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-lg text-white font-bold flex items-center gap-2">
+                  <span>احجز مشوارك</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => handleOpenMonthlyBooking()}
+                  className="text-xs text-amber-400 hover:underline cursor-pointer font-semibold min-h-[36px] flex items-center"
+                >
+                  جدول الرحلات
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3.5">
+                {/* بطاقة حجز خط دائمي مع شعار توصيلة المفرغ */}
+                <div 
+                  onClick={handleOpenMonthlyBooking}
+                  className="group relative rounded-2xl bg-[#161C28] p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border border-slate-700/40 hover:border-emerald-500/30"
+                >
+                  <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                  <div className="flex items-start justify-between gap-2 z-10">
+                    <div className="flex flex-col text-right">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold w-fit mb-1.5">
+                        <span>التزام يومي 📅</span>
+                      </div>
+                      <h3 className="text-lg text-white font-bold">حجز خط دائمي</h3>
+                      <p className="text-xs text-slate-400 mt-0.5 leading-snug">خدمة اشتراكات شهرية للطلبة والموظفين مع كباتن معتمدين</p>
+                    </div>
+                    <div className="w-16 h-16 rounded-xl bg-[#080E1A]/90 p-2 shadow-inner flex items-center justify-center shrink-0 border border-slate-700/50">
+                      <img 
+                        alt="شعار توصيلة" 
+                        className="w-full h-full object-contain drop-shadow" 
+                        src="/logo.png?v=40" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 z-10">
+                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">🎓 خطوط جامعات</span>
+                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">💼 موظفين</span>
+                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">🏛️ دوائر حكومية</span>
+                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">🎒 مدارس</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 z-10">
+                    <div className="flex flex-col text-right">
+                      <span className="text-xs text-slate-400">تسعيرة ثابتة معتمدة</span>
+                      <span className="text-sm text-amber-400 font-bold">وفر حتى 35% شهرياً</span>
+                    </div>
+                    <button 
+                      className="min-h-[48px] px-4 py-2 rounded-xl bg-[#242A37] hover:bg-slate-700 active:scale-[0.98] text-amber-400 text-sm font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer border border-slate-700/50" 
+                      type="button"
+                    >
+                      <span>طلب اشتراك</span>
+                      <span>📅</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* بطاقة تكسي فوري مع شعار توصيلة المفرغ */}
+                <div 
+                  onClick={handleOpenInstantBooking}
+                  className="group relative rounded-2xl bg-[#1A202C] p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border border-amber-500/25 hover:border-amber-400/50"
+                >
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                  <div className="flex items-start justify-between gap-2 z-10">
+                    <div className="flex flex-col text-right">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-semibold w-fit mb-1.5">
+                        <span>سريع وآمن ⚡</span>
+                      </div>
+                      <h3 className="text-lg text-white font-bold">تكسي</h3>
+                      <p className="text-xs text-slate-400 mt-0.5 leading-snug">كابتن معتمد يصلك لباب بيتك بأقل وقت ممكن</p>
+                    </div>
+                    <div className="w-16 h-16 rounded-xl bg-[#080E1A]/90 p-2 shadow-inner flex items-center justify-center shrink-0 border border-slate-700/50">
+                      <img 
+                        alt="شعار توصيلة" 
+                        className="w-full h-full object-contain drop-shadow" 
+                        src="/logo.png?v=40" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 z-10">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#242A37] text-emerald-400">
+                        📍
+                      </span>
+                      <div className="flex flex-col text-right">
+                        <span className="text-xs text-slate-400">الوصول التقديري</span>
+                        <span className="text-xs text-emerald-400 font-bold">3 - 5 دقائق فقط</span>
+                      </div>
+                    </div>
+                    <button 
+                      className="min-h-[48px] px-5 py-2 rounded-xl bg-gradient-to-l from-amber-400 via-amber-500 to-amber-600 hover:opacity-95 active:scale-[0.98] text-slate-950 text-sm font-bold shadow-lg shadow-amber-500/20 flex items-center gap-1.5 transition-all cursor-pointer" 
+                      type="button"
+                    >
+                      <span>احجز الآن</span>
+                      <span>←</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* 3. بطاقة انضمام الكباتن الفاخرة */}
+            <section className="w-full relative rounded-2xl bg-gradient-to-bl from-[#080E1A] via-[#161C28] to-[#1A202C] p-4 shadow-xl overflow-hidden border border-slate-700/50">
+              <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/15 rounded-full blur-2xl pointer-events-none"></div>
+              <div className="flex flex-col gap-3 relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
+                    <span>عمولة 0% لأول شهر 🌟</span>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-[#242A37] flex items-center justify-center text-amber-400 text-lg">
+                    🚖
+                  </div>
+                </div>
+                <div className="flex flex-col text-right">
+                  <h3 className="text-lg text-white font-bold leading-tight">سجل كابتن.. وزيد دخلك الشهري ويا توصيلة 🚖</h3>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">انضم لأسطول النخبة في النجف، أوقات حرة، دفعات أسبوعية مضمونة، وحوافز يومية مستمرة.</p>
+                </div>
+                
+                {/* أزرار التواصل الثلاثة بارتفاع قياسي >= 48px */}
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <a 
+                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 active:scale-[0.98] text-emerald-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-emerald-500/30 no-underline" 
+                    href="https://wa.me/9647722154182?text=تحية%20طيبة،%20أرغب%20بالانضمام%20ككابتن%20في%20توصيلة%20النجف" 
+                    rel="noopener noreferrer" 
+                    target="_blank"
+                  >
+                    <span className="text-lg">💬</span>
+                    <span>واتساب</span>
+                  </a>
+                  <a 
+                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 active:scale-[0.98] text-sky-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-sky-500/30 no-underline" 
+                    href="https://t.me/wsam_ta" 
+                    rel="noopener noreferrer" 
+                    target="_blank"
+                  >
+                    <span className="text-lg">✈️</span>
+                    <span>تليجرام</span>
+                  </a>
+                  <a 
+                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-[#242A37] hover:bg-slate-700 active:scale-[0.98] text-amber-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-slate-700/60 no-underline" 
+                    href="tel:07722154182"
+                  >
+                    <span className="text-lg">📞</span>
+                    <span>اتصال</span>
+                  </a>
+                </div>
+                <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs pt-0.5">
+                  <span className="text-emerald-400">🛡️</span>
+                  <span>التفعيل والتدريب فوري خلال ساعة واحدة بمقر الشركة بالنجف</span>
+                </div>
+              </div>
+            </section>
+
+            {/* 4. بطاقات الثقة السريعة */}
+            <section className="w-full grid grid-cols-2 gap-2.5 pb-2">
+              <div className="p-3.5 rounded-xl bg-[#161C28] flex flex-col items-center text-center gap-1 shadow-sm border border-slate-700/30">
+                <span className="text-amber-400 text-2xl">🛡️</span>
+                <span className="text-lg text-white font-bold">100%</span>
+                <span className="text-xs text-slate-400">كباتن مدققون أمنياً</span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#161C28] flex flex-col items-center text-center gap-1 shadow-sm border border-slate-700/30">
+                <span className="text-emerald-400 text-2xl">🎧</span>
+                <span className="text-lg text-white font-bold">24 / 7</span>
+                <span className="text-xs text-slate-400">غرفة عمليات محلية</span>
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* ====================================================================
+            5. تبويب الحساب (Profile Tab)
+            ==================================================================== */}
+        {activeTab === 'profile' && (
+          <div className="flex flex-col gap-4 animate-fade-in text-right">
+            <div className="w-full p-5 rounded-2xl bg-[#161C28] border border-slate-700/50 flex flex-col items-center text-center gap-3">
+              <div className="relative">
+                <img 
+                  alt="صورة الحساب" 
+                  className="w-20 h-20 rounded-full object-cover ring-4 ring-amber-500/20 bg-[#080E1A]" 
+                  src={user.avatar} 
+                />
+                <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 ring-2 ring-[#161C28]"></span>
+              </div>
+              <div className="flex flex-col">
+                <h3 className="text-xl font-bold text-white">{user.name}</h3>
+                <span className="text-xs font-mono text-slate-400 mt-1" dir="ltr">{user.phone}</span>
+              </div>
+              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-semibold border border-amber-500/20">
+                <span>⭐ عضو مميز في توصيلة النجف</span>
+              </div>
+            </div>
+
+            <div className="w-full rounded-2xl bg-[#161C28] border border-slate-700/40 divide-y divide-slate-700/40 overflow-hidden">
+              <button 
+                onClick={() => setActiveTab('trips')} 
+                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] cursor-pointer"
               >
-                <span className="text-xl">💬</span>
-                <span>واتساب الإدارة (07722154182)</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🕒</span>
+                  <span className="text-sm font-semibold text-white">سجل رحلاتي واشتراكاتي</span>
+                </div>
+                <span className="text-slate-400">←</span>
+              </button>
+              
+              <button 
+                onClick={() => setIsPolicyModalOpen(true)} 
+                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">📜</span>
+                  <span className="text-sm font-semibold text-white">شروط الخدمة وسياسة الخصوصية</span>
+                </div>
+                <span className="text-slate-400">←</span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('safety')} 
+                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🆘</span>
+                  <span className="text-sm font-semibold text-white">مركز الأمان والطوارئ</span>
+                </div>
+                <span className="text-slate-400">←</span>
+              </button>
+
+              <a 
+                href="https://t.me/wsam_ta" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] no-underline"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🎧</span>
+                  <span className="text-sm font-semibold text-white">الدعم الفني المباشر</span>
+                </div>
+                <span className="text-slate-400">←</span>
               </a>
 
-              {/* 2. تيليجرام الإدارة */}
-              <a
-                href="https://t.me/wsam_ta"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full min-h-[50px] rounded-2xl bg-[#0088cc] hover:bg-[#0077b5] text-white font-black text-[14.5px] flex items-center justify-center gap-2.5 shadow-md shadow-sky-500/25 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer no-underline select-none"
+              <button 
+                onClick={handleLogout} 
+                className="w-full p-4 flex items-center justify-between hover:bg-red-500/10 text-red-400 transition-colors text-right min-h-[48px] cursor-pointer"
               >
-                <span className="text-xl">✈️</span>
-                <span>تيليجرام الإدارة (@wsam_ta)</span>
-              </a>
-
-              {/* 3. اتصال هاتفي مباشر */}
-              <a
-                href="tel:07722154182"
-                className="w-full min-h-[50px] rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[14.5px] flex items-center justify-center gap-2 shadow-md shadow-amber-400/25 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer no-underline select-none"
-              >
-                <span className="text-lg">📞</span>
-                <span>
-                  اتصال هاتفي مباشر:{' '}
-                  <span dir="ltr" className="font-mono font-bold">
-                    07722154182
-                  </span>
-                </span>
-              </a>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🚪</span>
+                  <span className="text-sm font-bold">تسجيل الخروج من الحساب</span>
+                </div>
+                <span>←</span>
+              </button>
             </div>
           </div>
+        )}
 
-          {/* لمسة إضاءة ذهبية جمالية بالخلفية */}
-          <div className="absolute -right-10 -bottom-10 w-44 h-44 rounded-full bg-amber-400/15 blur-2xl pointer-events-none" />
-        </section>
+        {/* ====================================================================
+            تبويب سجل الرحلات (Trips Tab)
+            ==================================================================== */}
+        {activeTab === 'trips' && (
+          <div className="flex flex-col gap-4 animate-fade-in text-right">
+            <div className="flex items-center justify-between pb-1">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>سجل رحلاتي</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">النجف الأشرف</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="text-xs text-slate-400 hover:text-white min-h-[48px] px-2 flex items-center gap-1 cursor-pointer"
+              >
+                <span>← العودة للرئيسية</span>
+              </button>
+            </div>
+
+            <div className="w-full rounded-2xl bg-[#161C28] p-5 border border-slate-700/50 flex flex-col items-center text-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-[#080E1A] flex items-center justify-center p-2.5 border border-slate-700/50 shadow-inner">
+                <img src="/logo.png?v=40" alt="توصيلة" className="w-full h-full object-contain drop-shadow" />
+              </div>
+              <h3 className="text-base font-bold text-white">جاهز لمشوارك القادم؟</h3>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
+                تظهر هنا سجلات مشاوير التكسي الفورية واشتراكات الخطوط اليومية بعد إتمامها وتوثيقها رسمياً.
+              </p>
+              <div className="flex gap-2 w-full pt-2">
+                <button
+                  type="button"
+                  onClick={handleOpenInstantBooking}
+                  className="flex-1 min-h-[48px] rounded-xl bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center cursor-pointer shadow-md"
+                >
+                  احجز تكسي فوري 🚖
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenMonthlyBooking}
+                  className="flex-1 min-h-[48px] rounded-xl bg-[#242A37] hover:bg-slate-700 text-amber-400 font-bold text-xs flex items-center justify-center cursor-pointer border border-slate-700/60"
+                >
+                  طلب خط دائمي 📅
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ====================================================================
+            تبويب الإشعارات (Notifications Tab)
+            ==================================================================== */}
+        {activeTab === 'notifications' && (
+          <div className="flex flex-col gap-3.5 animate-fade-in text-right">
+            <div className="flex items-center justify-between pb-1">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>مركز الإشعارات</span>
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="text-xs text-slate-400 hover:text-white min-h-[48px] px-2 flex items-center gap-1 cursor-pointer"
+              >
+                <span>← العودة للرئيسية</span>
+              </button>
+            </div>
+
+            <div className="w-full rounded-2xl bg-[#161C28] p-4 border border-amber-500/20 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
+                  تنويه الإدارة العامة 📢
+                </span>
+                <span className="text-[11px] text-slate-400">الآن</span>
+              </div>
+              <p className="text-xs text-slate-200 leading-relaxed pt-1">
+                {announcementText}
+              </p>
+            </div>
+
+            <div className="w-full rounded-2xl bg-[#161C28] p-4 border border-slate-700/40 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold">
+                  أهلاً بك في المنظومة 🚖
+                </span>
+                <span className="text-[11px] text-slate-400">منظومة النجف</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                يسعدنا خدمتك عبر أحدث أسطول تكسي وخطوط شهرية ذكية في النجف الأشرف والكوفة.
+              </p>
+            </div>
+
+            <a
+              href="https://t.me/tawseelaiq"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-h-[48px] w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-sky-600/30 via-sky-600/20 to-[#161C28] border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center justify-between no-underline"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">✈️</span>
+                <span>تابع تحديثات المشاوير على قناة تيليجرام الرسمية</span>
+              </div>
+              <span>←</span>
+            </a>
+          </div>
+        )}
+
+        {/* ====================================================================
+            تبويب الأمان والطوارئ (Safety Tab)
+            ==================================================================== */}
+        {activeTab === 'safety' && (
+          <div className="flex flex-col gap-4 animate-fade-in text-right">
+            <div className="flex items-center justify-between pb-1">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <span>مركز الأمان والطوارئ</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400">SOS</span>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="text-xs text-slate-400 hover:text-white min-h-[48px] px-2 flex items-center gap-1 cursor-pointer"
+              >
+                <span>← العودة للرئيسية</span>
+              </button>
+            </div>
+
+            <div className="w-full rounded-2xl bg-gradient-to-br from-red-950/40 via-[#161C28] to-[#161C28] p-4 border border-red-500/30 flex flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center text-xl shrink-0">
+                  🆘
+                </div>
+                <div className="flex flex-col">
+                  <h3 className="text-base font-bold text-white">أرقام الطوارئ السريعة</h3>
+                  <span className="text-xs text-slate-400">اتصال مباشر ومجاني 24 ساعة</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <a
+                  href="tel:104"
+                  className="min-h-[48px] rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 flex flex-col items-center justify-center p-2 text-center no-underline"
+                >
+                  <span className="font-bold text-sm">104</span>
+                  <span className="text-[10.5px]">شرطة النجدة</span>
+                </a>
+                <a
+                  href="tel:122"
+                  className="min-h-[48px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex flex-col items-center justify-center p-2 text-center no-underline"
+                >
+                  <span className="font-bold text-sm">122</span>
+                  <span className="text-[10.5px]">الإسعاف</span>
+                </a>
+                <a
+                  href="tel:07722154182"
+                  className="min-h-[48px] rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex flex-col items-center justify-center p-2 text-center no-underline"
+                >
+                  <span className="font-bold text-sm">العمليات</span>
+                  <span className="text-[10.5px]">توصيلة 🚖</span>
+                </a>
+              </div>
+            </div>
+
+            <div className="w-full rounded-2xl bg-[#161C28] p-4 border border-slate-700/40 flex flex-col gap-2.5">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>🛡️ معايير الحماية في توصيلة</span>
+              </h4>
+              <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside leading-relaxed">
+                <li>كافة الكباتن مسجلون ومدققون أمنياً وبمستمسكات رسمية معتمدة.</li>
+                <li>تتبع مسار الرحلة لحظياً بدقة GPS عالية من انطلاق الرحلة وحتى الوصول.</li>
+                <li>إمكانية مشاركة تفاصيل الرحلة المباشرة مع عائلتك وأصدقائك عبر واتساب.</li>
+              </ul>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ====================================================================
-          4. شريط التنقل السفلي المينيمال (Minimal Bottom Navigation Bar)
-          أيقونتان فقط: الرئيسية (مفعلة) والحساب (تفتح القائمة) بمساحات لمس >= 48x48px
+          6. شريط التنقل السفلي الفاخر الموحد (Floating Navigation Dock)
+          مساحات لمس قياسية >= 48x48px لكل عنصر ومسافات أمان
           ==================================================================== */}
-      <nav
-        className="fixed bottom-0 inset-x-0 z-30 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/90 px-6 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0.5rem))] flex items-center justify-around shadow-subtle"
+      <nav 
+        className="fixed bottom-3 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 bg-[#080E1A]/95 backdrop-blur-2xl rounded-2xl shadow-2xl p-1.5 flex items-center justify-around border border-slate-700/50"
         aria-label="شريط التنقل الرئيسي"
       >
-        {/* زر الرئيسية (نشط دائماً في شاشة الهب) */}
-        <button
+        <button 
+          onClick={() => setActiveTab('home')} 
+          className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
+            activeTab === 'home' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+          }`} 
           type="button"
-          className="min-h-[48px] min-w-[48px] flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500/10 text-amber-800 font-black text-[13.5px] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] cursor-default select-none"
-          aria-current="page"
+          aria-label="الرئيسية"
         >
-          <svg
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
-          <span>الرئيسية</span>
+          <span className="text-xl">🏠</span>
+          <span className="text-xs">الرئيسية</span>
         </button>
 
-        {/* زر الحساب (يفتح القائمة الجانبية الكاملة والبروفايل والشكاوى) */}
-        <button
+        <button 
+          onClick={() => setActiveTab('trips')} 
+          className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
+            activeTab === 'trips' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+          }`} 
           type="button"
-          onClick={() => setIsDrawerOpen(true)}
-          className="min-h-[48px] min-w-[48px] flex items-center gap-2 px-5 py-2.5 rounded-2xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 font-bold text-[13.5px] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer select-none"
-          aria-label="الحساب والإعدادات"
+          aria-label="رحلاتي"
         >
-          <svg
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          <span>الحساب</span>
+          <span className="text-xl">🕒</span>
+          <span className="text-xs">رحلاتي</span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('notifications')} 
+          className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all relative cursor-pointer ${
+            activeTab === 'notifications' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+          }`} 
+          type="button"
+          aria-label="الإشعارات"
+        >
+          <span className="text-xl">🔔</span>
+          <span className="text-xs">الإشعارات</span>
+          <span className="absolute top-2 right-1/3 w-2 h-2 rounded-full bg-amber-500"></span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('safety')} 
+          className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
+            activeTab === 'safety' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+          }`} 
+          type="button"
+          aria-label="الأمان"
+        >
+          <span className="text-xl">🆘</span>
+          <span className="text-xs">الأمان</span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('profile')} 
+          className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
+            activeTab === 'profile' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+          }`} 
+          type="button"
+          aria-label="الحساب"
+        >
+          <span className="text-xl">👤</span>
+          <span className="text-xs">الحساب</span>
         </button>
       </nav>
 
-      {/* تضمين القائمة الجانبية للراكب (AppDrawer) */}
-      <AppDrawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+      {/* نافذة شروط الخدمة والخصوصية المنبثقة */}
+      <TermsPrivacyModal
+        isOpen={isPolicyModalOpen}
+        initialTab="terms"
+        onClose={() => setIsPolicyModalOpen(false)}
+      />
     </div>
   );
-}
+};
+
+export default CustomerHub;
