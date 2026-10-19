@@ -102,9 +102,12 @@ export default function App() {
   if (!ready) return null;
 
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-100 flex justify-center flex-1" dir="rtl">
+    <div className="w-full min-h-screen bg-slate-100 flex justify-center" dir="rtl">
       <Suspense fallback={<PageLoader />}>
-        <main className="mx-auto w-full max-w-md min-h-[100dvh] relative bg-white md:shadow-2xl md:border-x md:border-slate-200 text-right font-cairo flex flex-col flex-1 min-h-0" dir="rtl">
+        <main 
+          className="mx-auto w-full max-w-md min-h-screen relative bg-white md:shadow-2xl md:border-x md:border-slate-200 text-right font-cairo" 
+          dir="rtl"
+        >
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<Navigate to="/login" replace />} />

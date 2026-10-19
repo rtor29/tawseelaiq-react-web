@@ -75,6 +75,8 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
     window.location.replace('/login');
   }
 
+  if (!open) return null;
+
   return (
     <div
       className={`fixed inset-0 z-[120] transition-opacity duration-300 font-cairo text-right ${
