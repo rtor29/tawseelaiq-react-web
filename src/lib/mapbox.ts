@@ -473,10 +473,11 @@ export function applyArabicAndEnhancedLabels(rawMap: any) {
             map.setPaintProperty(layer.id, 'text-opacity', 1);
           } catch {}
 
-          // 9. هالة بيضاء ناصعة ومريحة لسهولة قراءة أسماء المعالم فوق خلفيات الخريطة
+          // 9. هالة واضحة ومريحة لسهولة قراءة أسماء المعالم فوق خلفيات الخريطة
           try {
-            map.setPaintProperty(layer.id, 'text-halo-color', '#ffffff');
-            map.setPaintProperty(layer.id, 'text-halo-width', 2);
+            map.setPaintProperty(layer.id, 'text-color', '#FFFFFF');
+            map.setPaintProperty(layer.id, 'text-halo-color', '#090D16');
+            map.setPaintProperty(layer.id, 'text-halo-width', 2.5);
           } catch {}
         }
       }

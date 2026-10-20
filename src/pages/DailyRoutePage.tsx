@@ -491,7 +491,7 @@ export default function DailyRoutePage() {
           <button
             type="button"
             onClick={() => navigate('/hub')}
-            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#161C28]/95 border border-white/15 shadow-lg flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400/50 transition-all active:scale-95 cursor-pointer"
             title="الرئيسية"
             aria-label="الرئيسية"
           >
@@ -512,7 +512,7 @@ export default function DailyRoutePage() {
 
         {/* عنوان التبويب */}
         <div className="pointer-events-auto">
-          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-sm text-slate-800 text-[13px] font-bold">
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/15 shadow-lg text-white text-[13px] font-bold">
             <span>حجز خط دائمي</span>
             <span>🚌</span>
           </div>
@@ -523,7 +523,7 @@ export default function DailyRoutePage() {
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all active:scale-95 cursor-pointer"
+            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#161C28]/95 border border-white/15 shadow-lg flex items-center justify-center text-slate-300 hover:text-white hover:border-amber-400/50 transition-all active:scale-95 cursor-pointer"
             title="الحساب والإعدادات"
             aria-label="الحساب"
           >
@@ -550,10 +550,10 @@ export default function DailyRoutePage() {
             setIsSearchOpen(true);
             if (!searchQuery) setSearchResults(NAJAF_LOCAL_PLACES);
           }}
-          className="flex items-center gap-2.5 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-md border border-slate-200/80 cursor-pointer active:scale-[0.99] transition hover:border-amber-400"
+          className="flex items-center gap-2.5 bg-[#161C28]/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl border border-white/15 cursor-pointer active:scale-[0.99] transition hover:border-amber-400"
         >
           <span className="text-amber-500">🔍</span>
-          <span className="text-[13px] text-slate-500 font-medium truncate flex-1 font-map-search">
+          <span className="text-[13px] text-slate-300 font-medium truncate flex-1 font-map-search">
             {searchQuery ? searchQuery : 'ابحث عن حي، معلم، فندق أو شارع بالنجف...'}
           </span>
           {isSearchOpen && (
@@ -563,7 +563,7 @@ export default function DailyRoutePage() {
                 e.stopPropagation();
                 setIsSearchOpen(false);
               }}
-              className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              className="text-slate-400 hover:text-white text-sm font-bold"
             >
               ✕
             </button>
@@ -572,14 +572,14 @@ export default function DailyRoutePage() {
 
         {/* نافذة وقائمة نتائج البحث المنبثقة */}
         {isSearchOpen && (
-          <div className="mt-2 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 max-h-72 overflow-y-auto space-y-1 font-map-search">
+          <div className="mt-2 bg-[#161C28] rounded-2xl shadow-2xl border border-white/15 p-3 max-h-72 overflow-y-auto space-y-1 font-map-search text-white">
             <input
               autoFocus
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="اكتب اسم الحي أو المعلم (مثل: حي الأنصار، قصر الدر)..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-amber-500 mb-2 font-map-search"
+              className="w-full bg-slate-900 border border-white/20 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-400 outline-none focus:border-amber-500 mb-2 font-map-search"
             />
             {isSearching && (
               <div className="text-center py-3 text-xs text-slate-500 font-semibold font-map-search flex items-center justify-center gap-2">
@@ -681,12 +681,12 @@ export default function DailyRoutePage() {
       <button
         type="button"
         onClick={handleUseCurrentLocation}
-        className={`absolute ${selectedDriver ? 'bottom-28' : 'bottom-60'} right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-gray-800 shadow-[0_4px_16px_rgba(0,0,0,0.18)] transition-all active:scale-95 cursor-pointer hover:bg-gray-50`}
+        className={`absolute ${selectedDriver ? 'bottom-28' : 'bottom-60'} right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-[#161C28]/95 text-amber-400 border border-white/15 shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all active:scale-95 cursor-pointer hover:bg-[#161C28]`}
         title="موقعي الحالي عبر الـ GPS"
         aria-label="تحديد موقعي"
       >
         <svg
-          className="h-6 w-6 text-gray-700"
+          className="h-6 w-6 text-amber-400"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -705,8 +705,8 @@ export default function DailyRoutePage() {
 
       {/* مفتاح الألوان */}
       {!selectedDriver && (
-        <div className="absolute bottom-28 right-4 z-20 rounded-2xl bg-white px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.15)]">
-          <p className="text-[13px] font-black text-gray-900 mb-2">الخريطة</p>
+        <div className="absolute bottom-28 right-4 z-20 rounded-2xl bg-[#161C28]/95 border border-white/15 px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)] text-white">
+          <p className="text-[13px] font-black text-amber-400 mb-2">الخريطة</p>
           {[
             { color: '#16a34a', label: 'أخضر (قريب جداً < 500م)' },
             { color: '#7c3aed', label: 'بنفسجي (بعيد)' },
@@ -714,7 +714,7 @@ export default function DailyRoutePage() {
           ].map(item => (
             <div key={item.color} className="flex items-center gap-2 mb-1">
               <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-              <span className="text-[11px] font-bold text-gray-700">{item.label}</span>
+              <span className="text-[11px] font-bold text-slate-300">{item.label}</span>
             </div>
           ))}
         </div>
@@ -722,10 +722,10 @@ export default function DailyRoutePage() {
 
       {/* الزر السفلي الافتراضي */}
       {!selectedDriver && (
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-white px-5 pt-3 pb-8 shadow-sheet rounded-t-2xl border-t border-slate-100">
-          <div className="flex justify-center mb-3"><div className="h-1 w-10 rounded-full bg-slate-200" /></div>
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-[#161C28]/95 px-5 pt-3 pb-8 shadow-2xl rounded-t-3xl border-t border-white/15 text-white">
+          <div className="flex justify-center mb-3"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
           <button type="button" onClick={() => show('اختر سائقاً من الخريطة أولاً', 'info')}
-            className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle cursor-pointer hover:bg-[#14364A] transition-all duration-200 ease-in-out active:scale-[0.98]">
+            className="w-full rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 py-3.5 text-center text-[16px] font-black text-slate-950 shadow-xl shadow-amber-500/25 cursor-pointer hover:brightness-105 transition-all duration-200 ease-in-out active:scale-[0.98]">
             تأكيد نقطة الانطلاق
           </button>
         </div>

@@ -1527,22 +1527,22 @@ export default function CustomerHomePage() {
 
   // إعداد طبقة خط المسار بنمط ويز
   const routeLines: RouteLineData[] = routeCoordinates && routeCoordinates.length
-    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#3b82f6', width: 5.5 }]
+    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#F59E0B', width: 5.5 }]
     : [];
 
   return (
-    <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-slate-100 select-none font-cairo flex flex-col" dir="rtl">
+    <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-[#080E1A] text-slate-100 select-none font-cairo flex flex-col" dir="rtl">
       {/* ====================================================================
           الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
           ==================================================================== */}
-      <header className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      <header className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-[#161C28]/95 backdrop-blur-md border-b border-amber-500/20 flex items-center justify-between sticky top-0 z-30 shadow-lg">
         {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
         <div className="flex items-center gap-2.5">
           {stage === 'pickup' ? (
             <button
               type="button"
               onClick={() => navigate('/hub')}
-              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
+              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#0F172A] border border-amber-500/30 shadow-sm flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
               title="الرجوع لصفحة اختيار الخدمة"
               aria-label="الرئيسية"
             >
@@ -1563,7 +1563,7 @@ export default function CustomerHomePage() {
             <button
               type="button"
               onClick={handleBackNav}
-              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-[#1B4965] hover:text-[#14364A] hover:border-slate-300 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
+              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#0F172A] border border-amber-500/30 shadow-sm flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
               title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
               aria-label="رجوع"
             >
@@ -1590,13 +1590,13 @@ export default function CustomerHomePage() {
         {/* اليسار: ترحيب المستخدم وزر الحساب الموحد الذي يفتح AppDrawer */}
         <div className="flex items-center gap-2.5">
           <div className="text-left hidden sm:block">
-            <div className="text-[12px] font-bold text-slate-600">مرحباً بك 👋</div>
-            <div className="text-[15px] font-black text-slate-900 truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
+            <div className="text-[12px] font-bold text-slate-400">مرحباً بك 👋</div>
+            <div className="text-[15px] font-black text-white truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
           </div>
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
+            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#0F172A] border border-amber-500/30 shadow-sm flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
             aria-label="الحساب والإعدادات"
             title="الحساب والإعدادات"
           >
@@ -1685,14 +1685,14 @@ export default function CustomerHomePage() {
                 className="flex flex-col items-center select-none cursor-pointer group"
                 title="تعديل نقطة الانطلاق"
               >
-                <div className="flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.18)] border border-gray-100 transition-transform group-hover:scale-105">
-                  <span className="text-[13px] font-black text-gray-900 font-cairo">الانطلاق</span>
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#f97316]">
-                    <div className="h-2 w-2 rounded-full bg-white" />
+                <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 px-3.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.5)] border border-amber-500/40 transition-transform group-hover:scale-105">
+                  <span className="text-[13px] font-black text-amber-300 font-cairo">الانطلاق</span>
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500">
+                    <div className="h-2 w-2 rounded-full bg-[#090D16]" />
                   </div>
                 </div>
-                <div className="h-3 w-0.5 bg-gray-600/80 -mt-0.5" />
-                <div className="h-1.5 w-4 rounded-full bg-black/20 blur-[1px]" />
+                <div className="h-3 w-0.5 bg-amber-500/80 -mt-0.5" />
+                <div className="h-1.5 w-4 rounded-full bg-black/40 blur-[1px]" />
               </div>
             </Marker>
           )}
@@ -1708,14 +1708,14 @@ export default function CustomerHomePage() {
                 className="flex flex-col items-center select-none cursor-pointer group"
                 title="تعديل نقطة الوصول"
               >
-                <div className="flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-card border border-slate-200 transition-transform group-hover:scale-105">
-                  <span className="text-[13px] font-bold text-[#1A1A1A] font-cairo">الوصول</span>
-                  <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#1B4965]">
-                    <div className="h-2 w-2 rounded-full bg-white" />
+                <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 px-3.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.5)] border border-emerald-500/40 transition-transform group-hover:scale-105">
+                  <span className="text-[13px] font-bold text-emerald-300 font-cairo">الوصول</span>
+                  <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500">
+                    <div className="h-2 w-2 rounded-full bg-[#090D16]" />
                   </div>
                 </div>
-                <div className="h-3 w-0.5 bg-slate-600/80 -mt-0.5" />
-                <div className="h-1.5 w-4 rounded-full bg-black/20 blur-[1px]" />
+                <div className="h-3 w-0.5 bg-emerald-500/80 -mt-0.5" />
+                <div className="h-1.5 w-4 rounded-full bg-black/40 blur-[1px]" />
               </div>
             </Marker>
           )}
@@ -1793,12 +1793,12 @@ export default function CustomerHomePage() {
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
         {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
           <div className="pointer-events-auto absolute top-3.5 inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
-            <div className="flex items-center gap-2 rounded-full bg-white/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-[#1B4965] shadow-lg border border-amber-300">
+            <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-amber-400 shadow-xl border border-amber-500/30">
               <span>يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍</span>
               <button
                 type="button"
                 onClick={() => setShowMapHint(false)}
-                className="text-slate-400 hover:text-slate-700 mr-1 cursor-pointer"
+                className="text-slate-400 hover:text-white mr-1 cursor-pointer"
                 aria-label="إغلاق التلميح"
               >
                 ✕
@@ -1817,7 +1817,7 @@ export default function CustomerHomePage() {
               stage === 'ride_options'
                 ? 'bottom-[calc(22rem+env(safe-area-inset-bottom))]'
                 : 'bottom-[calc(14rem+env(safe-area-inset-bottom))]'
-            } left-4 z-30 bg-white p-3 rounded-full shadow-lg border border-slate-200 active:scale-95 transition-all text-amber-500 flex items-center justify-center cursor-pointer hover:bg-slate-50 ${
+            } left-4 z-30 bg-[#161C28]/95 backdrop-blur-md p-3 rounded-full shadow-xl border border-amber-500/30 active:scale-95 transition-all text-amber-400 flex items-center justify-center cursor-pointer hover:bg-[#1E293B] hover:text-amber-300 hover:border-amber-400 ${
               isLocatingCurrent ? 'opacity-80' : ''
             }`}
             title="موقعي الحالي عبر الـ GPS"
@@ -1842,20 +1842,20 @@ export default function CustomerHomePage() {
           </button>
         )}
 
-        {/* 6. البطاقة السفلية البيضاء في مرحلتي الانطلاق والوصول */}
+        {/* 6. البطاقة السفلية الفاخرة في مرحلتي الانطلاق والوصول */}
         {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-2xl bg-white px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-sheet border-t border-slate-100">
+          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-2xl bg-[#161C28]/95 backdrop-blur-md px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white">
             <div className="flex justify-center mb-3">
-              <div className="h-1 w-10 rounded-full bg-slate-300" />
+              <div className="h-1 w-10 rounded-full bg-slate-700" />
             </div>
 
             <div
               onClick={() => { setIsSearchOpen(true); setSearchResults(NAJAF_LOCAL_PLACES); }}
-              className="mb-4 flex items-center justify-between rounded-xl bg-slate-100/90 border border-slate-200/60 p-3.5 cursor-pointer transition active:scale-[0.99] hover:bg-slate-200/70"
+              className="mb-4 flex items-center justify-between rounded-xl bg-[#0B101B] border border-amber-500/30 p-3.5 cursor-pointer transition active:scale-[0.99] hover:border-amber-500/60"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <svg
-                  className="h-5 w-5 text-[#6C757D] shrink-0"
+                  className="h-5 w-5 text-amber-400 shrink-0"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1866,37 +1866,37 @@ export default function CustomerHomePage() {
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <span className="truncate text-[15px] font-bold text-[#1A1A1A]">
+                <span className="truncate text-[15px] font-bold text-slate-100">
                   {stage === 'pickup' ? pickupName || DEFAULT_PICKUP_NAME : dropoffName || DEFAULT_DROPOFF_NAME}
                 </span>
               </div>
 
               {stage === 'pickup' ? (
-                <div className="mr-1 h-3.5 w-3.5 shrink-0 rounded-full bg-[#D97706]" />
+                <div className="mr-1 h-3.5 w-3.5 shrink-0 rounded-full bg-amber-500 shadow-xs" />
               ) : (
-                <div className="mr-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-[#1B4965]">
-                  <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                <div className="mr-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-md bg-emerald-500 shadow-xs">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#090D16]" />
                 </div>
               )}
             </div>
 
-            {/* رسالة الخطأ الصفراء التوضيحية تظهر بنعومة وتختفي بعد 5 ثوانٍ */}
+            {/* رسالة الخطأ التوضيحية */}
             {locationError && (
-              <div className="mb-3 overflow-hidden rounded-xl bg-amber-50 border border-amber-300 p-3 text-right shadow-xs animate-slide-down transition-all duration-300">
+              <div className="mb-3 overflow-hidden rounded-xl bg-amber-950/60 border border-amber-500/50 p-3 text-right shadow-xs animate-slide-down transition-all duration-300">
                 <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setLocationError(null)}
-                    className="text-amber-800/70 hover:text-amber-950 text-[12px] p-1 cursor-pointer"
+                    className="text-amber-400/80 hover:text-amber-200 text-[12px] p-1 cursor-pointer"
                     aria-label="إغلاق التنبيه"
                   >
                     ✕
                   </button>
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[12.5px] font-bold text-amber-900 leading-snug break-words">
+                    <span className="text-[12.5px] font-bold text-amber-200 leading-snug break-words">
                       {locationError}
                     </span>
-                    <span className="text-amber-600 text-[15px] shrink-0">⚠️</span>
+                    <span className="text-amber-400 text-[15px] shrink-0">⚠️</span>
                   </div>
                 </div>
               </div>
@@ -1906,7 +1906,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={handleConfirmPickup}
-                className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] hover:bg-[#14364A] cursor-pointer"
+                className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer"
               >
                 تأكيد نقطة الانطلاق
               </button>
@@ -1914,7 +1914,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={handleConfirmDropoff}
-                className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] hover:bg-[#14364A] cursor-pointer"
+                className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer"
               >
                 تأكيد نقطة الوصول
               </button>
@@ -1922,18 +1922,18 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* 7. بطاقة خيارات فئات الرحلة */}
+        {/* 7. بطاقة خيارات فئات الرحلة الفاخرة */}
         {stage === 'ride_options' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-white pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-sheet border-t border-slate-100 animate-fade-in">
+          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-[#161C28]/95 backdrop-blur-md pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in">
             {/* التبويبات العلوية: تكسي و بوكس */}
-            <div className="flex border-b border-slate-100 px-4" dir="rtl">
+            <div className="flex border-b border-slate-800 px-4" dir="rtl">
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('taxi')}
                 className={`flex-1 py-3 text-center text-[15px] font-bold transition relative ${
                   selectedServiceTab === 'taxi'
-                    ? 'text-[#1A1A1A] border-b-2 border-[#1B4965]'
-                    : 'text-[#6C757D] hover:text-[#1A1A1A]'
+                    ? 'text-amber-400 border-b-2 border-amber-500'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 تكسي
@@ -1943,8 +1943,8 @@ export default function CustomerHomePage() {
                 onClick={() => setSelectedServiceTab('box')}
                 className={`flex-1 py-3 text-center text-[15px] font-bold transition relative ${
                   selectedServiceTab === 'box'
-                    ? 'text-[#1A1A1A] border-b-2 border-[#1B4965]'
-                    : 'text-[#6C757D] hover:text-[#1A1A1A]'
+                    ? 'text-amber-400 border-b-2 border-amber-500'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 بوكس
@@ -1953,23 +1953,23 @@ export default function CustomerHomePage() {
 
             {/* شارة الذروة أو الخصم الذكي المفعّل */}
             {dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center justify-between text-amber-950 animate-fade-in shadow-xs">
+              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
-                  <span className="text-[12.5px] font-bold text-amber-950">{dynamicPricingData.surgeBadge.text}</span>
+                  <span className="text-[12.5px] font-bold text-amber-200">{dynamicPricingData.surgeBadge.text}</span>
                 </div>
-                <span className="text-[10.5px] font-bold text-amber-700 bg-white px-2 py-0.5 rounded-md border border-amber-200">
+                <span className="text-[10.5px] font-bold text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded-md border border-amber-500/40">
                   تحديث حي
                 </span>
               </div>
             )}
             {dynamicPricingData.discountBadge && !dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-between text-emerald-950 animate-fade-in shadow-xs">
+              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
-                  <span className="text-[12.5px] font-bold text-emerald-950">{dynamicPricingData.discountBadge.text}</span>
+                  <span className="w-6 h-6 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
+                  <span className="text-[12.5px] font-bold text-emerald-200">{dynamicPricingData.discountBadge.text}</span>
                 </div>
-                <span className="text-[10.5px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                <span className="text-[10.5px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/40">
                   عرض خاص
                 </span>
               </div>
@@ -1991,20 +1991,20 @@ export default function CustomerHomePage() {
                     onClick={() => setSelectedTierId(tier.id)}
                     className={`flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer ${
                       isSelected
-                        ? 'border-[#1B4965] bg-[#1B4965]/5 shadow-card'
-                        : 'border-slate-200/70 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                        : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/30'
                     }`}
                   >
                     {/* السعر على اليسار */}
-                    <div className="text-left font-bold text-[16px] text-[#1A1A1A]">
+                    <div className="text-left font-black text-[16px] text-amber-400">
                       {dynamicPrice.toLocaleString()} دينار
                     </div>
 
                     {/* الاسم والوصف والسيارة الزرقاء على اليمين */}
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-[15px] font-bold text-[#1A1A1A]">{tier.name}</p>
-                        <p className="text-[12px] font-medium text-[#6C757D]">{tier.subtitle}</p>
+                        <p className="text-[15px] font-bold text-white">{tier.name}</p>
+                        <p className="text-[12px] font-medium text-slate-400">{tier.subtitle}</p>
                       </div>
 
                       {/* رسمة السيارة مع الشارة */}
@@ -2016,16 +2016,16 @@ export default function CustomerHomePage() {
             </div>
 
             {/* شريط الإجراءات: خيارات الرحلة وقسيمة */}
-            <div className="my-1 flex items-center justify-around border-t border-b border-slate-100 py-3 px-6">
+            <div className="my-1 flex items-center justify-around border-t border-b border-slate-800 py-3 px-6">
               {/* خيارات الرحلة */}
               <button
                 type="button"
                 onClick={() => setIsTripOptionsOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 text-[#1A1A1A] hover:text-[#1B4965] transition cursor-pointer"
+                className="flex flex-1 items-center justify-center gap-2 text-slate-300 hover:text-amber-400 transition cursor-pointer"
               >
                 <span className="text-[14px] font-bold">خيارات الرحلة</span>
                 <svg
-                  className="h-5 w-5 text-[#6C757D]"
+                  className="h-5 w-5 text-amber-400/80"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -2039,19 +2039,19 @@ export default function CustomerHomePage() {
               </button>
 
               {/* فاصل */}
-              <div className="h-5 w-[1px] bg-slate-200" />
+              <div className="h-5 w-[1px] bg-slate-800" />
 
               {/* قسيمة الخصم */}
               <button
                 type="button"
                 onClick={() => setIsPromoModalOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 text-[#1A1A1A] hover:text-[#1B4965] transition cursor-pointer"
+                className="flex flex-1 items-center justify-center gap-2 text-slate-300 hover:text-amber-400 transition cursor-pointer"
               >
                 <span className="text-[14px] font-bold">
                   {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
                 </span>
                 <svg
-                  className="h-5 w-5 text-[#6C757D]"
+                  className="h-5 w-5 text-amber-400/80"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -2070,7 +2070,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={handleOrderTrip}
-                className="w-full rounded-xl bg-[#1B4965] py-3.5 text-center text-[16px] font-bold text-white shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] hover:bg-[#14364A] cursor-pointer"
+                className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer"
               >
                 طلب {currentTier.name}
               </button>
@@ -2078,32 +2078,32 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* 7. بطاقة البحث — قابلة للتوسيع */}
+        {/* 7. بطاقة البحث الفاخرة — قابلة للتوسيع */}
         {stage === 'searching' && (
-          <div className={`absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.18)] animate-fade-in ${isDriverSheetExpanded ? 'top-0 rounded-none overflow-y-auto' : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)]'}`}>
+          <div className={`absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 shadow-2xl animate-fade-in ${isDriverSheetExpanded ? 'top-0 rounded-none overflow-y-auto' : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)]'}`}>
             {/* مقبض — الضغط يوسّع */}
             <div className="flex justify-center py-3 cursor-pointer" onClick={() => setIsDriverSheetExpanded(v => !v)}>
               {isDriverSheetExpanded
-                ? <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
-                : <div className="h-1 w-10 rounded-full bg-gray-300" />}
+                ? <svg className="h-5 w-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+                : <div className="h-1.5 w-10 rounded-full bg-slate-700" />}
             </div>
             {isDriverSheetExpanded ? (
               <div className="flex flex-col flex-1 px-5 pb-8">
-                <p className="text-center text-[18px] font-black text-gray-900 mb-4">
+                <p className="text-center text-[18px] font-black text-white mb-4">
                   {assignedDriverInfo?.driverVehicle || 'سيارة خصوصي'}
                 </p>
                 <div className="flex items-center justify-between mb-5">
-                  <div className="rounded-xl border-2 border-gray-800 px-3 py-2 text-center min-w-[100px]">
-                    <p className="text-[18px] font-black text-gray-900 tracking-widest">
+                  <div className="rounded-xl border-2 border-amber-500/40 bg-[#0B101B] px-3 py-2 text-center min-w-[100px]">
+                    <p className="text-[18px] font-black text-amber-400 tracking-widest font-mono">
                       {assignedDriverInfo?.driverPlate || '١١٣٤٠ ة'}
                     </p>
-                    <div className="flex justify-between text-[10px] text-gray-500 font-bold mt-0.5"><span>النجف</span><span>خصوصي</span></div>
+                    <div className="flex justify-between text-[10px] text-amber-400/70 font-bold mt-0.5"><span>النجف</span><span>خصوصي</span></div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[16px] font-bold text-gray-800">
+                    <span className="text-[16px] font-bold text-white">
                       {assignedDriverInfo?.driverName || 'كابتن توصيله'}
                     </span>
-                    <div className="h-14 w-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-[24px] border-2 border-blue-300">🧑‍✈️</div>
+                    <div className="h-14 w-14 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 text-[24px] border-2 border-amber-500/40">🧑‍✈️</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 mb-5">
@@ -2113,60 +2113,60 @@ export default function CustomerHomePage() {
                       if (assignedDriverInfo?.driverPhone) window.open(`tel:${assignedDriverInfo.driverPhone}`);
                       else show('رقم الكابتن غير متوفر حالياً', 'info');
                     }}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-500 text-blue-600 shrink-0 hover:bg-blue-50 cursor-pointer"
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-500/40 text-amber-400 shrink-0 hover:bg-amber-500/10 cursor-pointer"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsChatOpen(true)}
-                    className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-blue-50 border border-blue-200/60 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
+                    className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-[#0B101B] border border-amber-500/30 px-4 py-3 text-[14px] font-bold text-amber-300 hover:border-amber-500 transition active:scale-95 cursor-pointer"
                   >
                     <span>مراسلة السائق...</span>
-                    <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   </button>
                 </div>
-                <div className="flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3 mb-3">
-                  <button type="button" className="rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-bold text-white cursor-pointer hover:bg-blue-700">الدفع</button>
+                <div className="flex items-center justify-between rounded-2xl bg-[#0B101B] border border-slate-800 px-4 py-3 mb-3">
+                  <button type="button" className="rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 px-4 py-2 text-[13px] font-black text-[#090D16] cursor-pointer hover:brightness-110">الدفع</button>
                   <div className="text-right">
-                    <p className="text-[13px] font-bold text-red-500">الرصيد غير كاف</p>
-                    <p className="text-[12px] text-gray-500">مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار</p>
+                    <p className="text-[13px] font-bold text-amber-400">الدفع نقداً للكابتن</p>
+                    <p className="text-[12px] text-slate-400">مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار</p>
                   </div>
-                  <svg className="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                  <svg className="h-6 w-6 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 </div>
                 {['تغيير الوجهة','رمز الخصم','خيارات الرحلة'].map(lbl => (
-                  <button key={lbl} type="button" onClick={() => show(lbl,'info')} className="flex items-center justify-between border-b border-gray-100 py-4 cursor-pointer hover:bg-gray-50 w-full">
-                    <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span className="text-[15px] font-bold text-gray-800">{lbl}</span>
+                  <button key={lbl} type="button" onClick={() => show(lbl,'info')} className="flex items-center justify-between border-b border-slate-800 py-4 cursor-pointer hover:bg-slate-800/40 w-full">
+                    <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    <span className="text-[15px] font-bold text-slate-200">{lbl}</span>
                   </button>
                 ))}
                 <div className="flex-1 min-h-[40px]" />
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <button type="button" onClick={() => { setIsCancelTripOpen(true); setCancelReason(null); }} className="text-[15px] font-bold text-red-500 cursor-pointer hover:text-red-700">إلغاء الرحلة</button>
-                  <button type="button" onClick={() => show('ميزة الأمان قريباً 🛡️','info')} className="flex items-center gap-2 text-[15px] font-bold text-blue-600 cursor-pointer">
+                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                  <button type="button" onClick={() => { setIsCancelTripOpen(true); setCancelReason(null); }} className="text-[15px] font-bold text-red-400 cursor-pointer hover:text-red-300">إلغاء الرحلة</button>
+                  <button type="button" onClick={() => show('ميزة الأمان قريباً 🛡️','info')} className="flex items-center gap-2 text-[15px] font-bold text-amber-400 cursor-pointer">
                     <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>أمان
                   </button>
                 </div>
               </div>
             ) : (
               <>
-                <div className="mx-5 mb-4 flex flex-row-reverse overflow-hidden rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.12)]" style={{ minHeight: '130px' }}>
-                  <div className="flex flex-col items-center justify-center bg-[#16a34a] px-5 min-w-[110px]">
-                    <span className="text-[13px] font-bold text-white/80 mb-0.5">اطلب</span>
-                    <span className="text-[26px] font-black text-white leading-tight">{currentTier.name}</span>
+                <div className="mx-5 mb-4 flex flex-row-reverse overflow-hidden rounded-2xl shadow-xl border border-amber-500/20 bg-[#0B101B]" style={{ minHeight: '130px' }}>
+                  <div className="flex flex-col items-center justify-center bg-gradient-to-b from-amber-500 to-amber-600 px-5 min-w-[110px] text-[#090D16]">
+                    <span className="text-[13px] font-black opacity-80 mb-0.5">اطلب</span>
+                    <span className="text-[26px] font-black leading-tight">{currentTier.name}</span>
                     <div className="mt-2"><CarBadgeIllustration badge={currentTier.badge} size="sm" /></div>
                   </div>
-                  <div className="flex flex-1 flex-col items-center justify-center bg-gray-100 gap-1 p-4">
-                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-white text-[28px] shadow-md">
-                      🧑‍✈️<div className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-green-500 border-2 border-white"/>
+                  <div className="flex flex-1 flex-col items-center justify-center bg-[#0B101B] gap-1 p-4">
+                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 text-[28px] border border-amber-500/30 shadow-md">
+                      🧑‍✈️<div className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-emerald-500 border-2 border-[#090D16]"/>
                     </div>
-                    <div className="flex gap-1 mt-1">{[...Array(3)].map((_,i)=><div key={i} className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-bounce" style={{animationDelay:`${i*0.18}s`}}/>)}</div>
-                    <span className="text-[11px] font-bold text-gray-500 mt-1">جاري الاتصال...</span>
+                    <div className="flex gap-1 mt-1">{[...Array(3)].map((_,i)=><div key={i} className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-bounce" style={{animationDelay:`${i*0.18}s`}}/>)}</div>
+                    <span className="text-[11px] font-bold text-amber-300/80 mt-1">جاري الاتصال بأقرب كابتن...</span>
                   </div>
                 </div>
-                <p className="mb-4 px-5 text-center text-[17px] font-black text-gray-900">البحث عن أقرب سائق {currentTier.name}</p>
+                <p className="mb-4 px-5 text-center text-[17px] font-black text-white">البحث عن أقرب سائق {currentTier.name}</p>
                 <div className="px-5 flex flex-col gap-2">
-                  <button type="button" onClick={()=>show('تم إعطاء الأولوية لطلبك 🚖','success',4000)} className="w-full rounded-xl border border-gray-300 bg-white py-3.5 text-center text-[15px] font-bold text-gray-700 transition active:scale-[0.98] hover:bg-gray-50 cursor-pointer">أنا مستعجل كثيراً ⚡</button>
+                  <button type="button" onClick={()=>show('تم إعطاء الأولوية لطلبك 🚖','success',4000)} className="w-full rounded-xl border border-amber-500/40 bg-[#0B101B] py-3.5 text-center text-[15px] font-bold text-amber-300 transition active:scale-[0.98] hover:bg-amber-500/10 cursor-pointer">أنا مستعجل كثيراً ⚡</button>
                 </div>
               </>
             )}
@@ -2175,34 +2175,34 @@ export default function CustomerHomePage() {
 
         {/* 7b. شاشة إلغاء الرحلة */}
         {(stage === 'searching' || stage === 'driver_arriving') && isCancelTripOpen && (
-          <div className="absolute inset-0 z-40 bg-white flex flex-col animate-fade-in" dir="rtl">
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
-              <h2 className="text-[19px] font-black text-gray-900">إلغاء الرحلة</h2>
-              <button type="button" onClick={()=>setIsCancelTripOpen(false)} className="cursor-pointer text-gray-500 hover:text-gray-800">
+          <div className="absolute inset-0 z-40 bg-[#0D131F] text-white flex flex-col animate-fade-in" dir="rtl">
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-800">
+              <h2 className="text-[19px] font-black text-white">إلغاء الرحلة</h2>
+              <button type="button" onClick={()=>setIsCancelTripOpen(false)} className="cursor-pointer text-slate-400 hover:text-white">
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
-            <p className="px-5 pt-5 pb-2 text-[16px] font-bold text-gray-800">اختر سبب لإلغاء الرحلة:</p>
-            <div className="overflow-y-auto flex-1 divide-y divide-gray-100 px-5">
+            <p className="px-5 pt-5 pb-2 text-[16px] font-bold text-slate-200">اختر سبب لإلغاء الرحلة:</p>
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-800 px-5">
               {['أنا في عجلة من أمري والسائق بعيد','غيرت رأيي','السائق لا يتحرك باتجاه نقطة الانطلاق على الخريطة','طلب السائق أموالاً إضافية','السائق طلب إلغاء الرحلة','السائق لا يجيب أو غير متوفر','السائق طلب الدفع نقدي','اريد تعديل تفاصيل الرحلة','سوف أستخدم خدمة أخرى'].map(r=>(
-                <button key={r} type="button" onClick={()=>setCancelReason(r)} className="flex w-full items-center justify-between py-4 cursor-pointer hover:bg-gray-50">
-                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${cancelReason===r?'border-blue-600':'border-gray-300'}`}>{cancelReason===r&&<div className="h-2.5 w-2.5 rounded-full bg-blue-600"/>}</div>
-                  <span className="text-[14px] font-bold text-gray-800 text-right flex-1 mr-3">{r}</span>
+                <button key={r} type="button" onClick={()=>setCancelReason(r)} className="flex w-full items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40">
+                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${cancelReason===r?'border-amber-400':'border-slate-600'}`}>{cancelReason===r&&<div className="h-2.5 w-2.5 rounded-full bg-amber-400"/>}</div>
+                  <span className="text-[14px] font-bold text-slate-200 text-right flex-1 mr-3">{r}</span>
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-4 px-5 pt-4 pb-8 border-t border-gray-100">
+            <div className="flex items-center gap-4 px-5 pt-4 pb-8 border-t border-slate-800">
               <button type="button"
                 onClick={handleConfirmCancelTrip}
-                className={`flex-1 rounded-xl border-2 py-3.5 text-[15px] font-bold transition ${cancelReason?'border-red-500 text-red-500 hover:bg-red-50 cursor-pointer':'border-gray-200 text-gray-300 cursor-not-allowed'}`}>
+                className={`flex-1 rounded-xl border-2 py-3.5 text-[15px] font-bold transition ${cancelReason?'border-red-500 text-red-400 hover:bg-red-950/30 cursor-pointer':'border-slate-800 text-slate-600 cursor-not-allowed'}`}>
                 إلغاء الطلب
               </button>
-              <button type="button" onClick={()=>setIsCancelTripOpen(false)} className="text-[15px] font-bold text-gray-600 cursor-pointer hover:text-gray-900">إلغاء</button>
+              <button type="button" onClick={()=>setIsCancelTripOpen(false)} className="text-[15px] font-bold text-slate-400 cursor-pointer hover:text-white">تراجع</button>
             </div>
           </div>
         )}
 
-        {/* 8. بطاقة تفاصيل الرحلة التفاعلية متعددة الارتفاعات (Interactive Draggable / Collapsible Sheet) */}
+        {/* 8. بطاقة تفاصيل الرحلة التفاعلية متعددة الارتفاعات الفاخرة */}
         {(stage === 'driver_arriving' || Boolean(rideRequestId && ['accepted', 'arrived', 'inprogress', 'in_progress'].includes((rideStatus || '').toLowerCase()))) && (
           <div
             onClick={(e) => {
@@ -2215,9 +2215,9 @@ export default function CustomerHomePage() {
               transform: rideSheetState === 'expanded' ? 'translateY(0)' : 'translateY(calc(100% - 130px))',
               transition: 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-white pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.18)] will-change-transform animate-fade-in"
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl will-change-transform animate-fade-in"
           >
-            {/* مقبض السحب وترويسة الورقة (Drag Handle & Header with touch-action: none) */}
+            {/* مقبض السحب وترويسة الورقة */}
             <div
               onTouchStart={handleSheetTouchStart}
               onTouchMove={handleSheetTouchMove}
@@ -2237,7 +2237,7 @@ export default function CustomerHomePage() {
 
               {/* اسم ونوع السيارة مع سهم المؤشر */}
               <div className="w-full flex items-center justify-between mt-0.5 mb-2 px-1">
-                <p className="text-[17px] font-black text-gray-900 truncate">
+                <p className="text-[17px] font-black text-white truncate">
                   {assignedDriverInfo?.driverVehicle || 'سيارة خصوصي'}
                 </p>
                 <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
@@ -2256,7 +2256,7 @@ export default function CustomerHomePage() {
                 </div>
               </div>
 
-              {/* شريط الحالة الحالي الدائم (يظهر دائماً في الأعلى ليبقى ظاهراً في حالتي expanded و collapsed) */}
+              {/* شريط الحالة الحالي الدائم */}
               <div className="w-full">
                 {(() => {
                   const lowerSt = (rideStatus || '').toLowerCase();
@@ -2267,10 +2267,10 @@ export default function CustomerHomePage() {
                     <div
                       className={`w-full rounded-xl py-2 px-3.5 text-center select-none border transition-colors ${
                         isInProg
-                          ? 'bg-emerald-50 border-emerald-200/80 text-emerald-800'
+                          ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                           : isArr
-                          ? 'bg-amber-50 border-amber-300 text-amber-950 shadow-xs'
-                          : 'bg-slate-100 border-slate-200 text-[#1B4965]'
+                          ? 'bg-amber-950/60 border-amber-500/50 text-amber-200 shadow-xs'
+                          : 'bg-[#0B101B] border-amber-500/30 text-amber-300'
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2">
@@ -2279,8 +2279,8 @@ export default function CustomerHomePage() {
                         ) : isArr ? (
                           <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-1.5 text-right min-w-0">
-                              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping mr-1 shrink-0" />
-                              <span className="text-[13px] md:text-[13.5px] font-black text-amber-900 truncate">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
+                              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400 animate-ping mr-1 shrink-0" />
+                              <span className="text-[13px] md:text-[13.5px] font-black text-amber-200 truncate">السائق بانتظارك، يرجى الصعود للسيارة 🚖</span>
                             </div>
                             <button
                               type="button"
@@ -2289,7 +2289,7 @@ export default function CustomerHomePage() {
                                 playCarHornBeep();
                                 show('بيب بيب! 🚖 تم إطلاق التنبيه الصوتي', 'info', 3000);
                               }}
-                              className="text-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black px-3 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 border border-amber-600/20"
+                              className="text-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-[#090D16] font-black px-3 py-1.5 rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0 border border-amber-600/30"
                               title="إعادة تشغيل صوت الهورن"
                             >
                               <span className="text-sm">📢</span>
@@ -2298,8 +2298,8 @@ export default function CustomerHomePage() {
                           </div>
                         ) : (
                           <>
-                            <span className="inline-block h-2 w-2 rounded-full bg-[#1B4965] animate-pulse mr-1" />
-                            <span className="text-[13.5px] font-bold">الكابتن في طريقه إليك 🚗</span>
+                            <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse mr-1" />
+                            <span className="text-[13.5px] font-bold text-amber-300">الكابتن في طريقه إليك 🚗</span>
                           </>
                         )}
                       </div>
@@ -2319,20 +2319,20 @@ export default function CustomerHomePage() {
             >
               {/* لوحة + اسم السائق + صورة */}
               <div className="flex items-center justify-between">
-                <div className="rounded-xl border-2 border-gray-800 px-3 py-2 text-center min-w-[100px]">
-                  <p className="text-[18px] font-black text-gray-900 tracking-widest font-mono">
+                <div className="rounded-xl border-2 border-amber-500/40 bg-[#0B101B] px-3 py-2 text-center min-w-[100px]">
+                  <p className="text-[18px] font-black text-amber-400 tracking-widest font-mono">
                     {assignedDriverInfo?.driverPlate || '١١٣٤٠ ة'}
                   </p>
-                  <div className="flex justify-between text-[10px] text-gray-500 font-bold mt-0.5">
+                  <div className="flex justify-between text-[10px] text-amber-400/70 font-bold mt-0.5">
                     <span>النجف</span>
                     <span>خصوصي</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[16px] font-bold text-gray-800">
+                  <span className="text-[16px] font-bold text-white">
                     {assignedDriverInfo?.driverName || 'كابتن توصيله'}
                   </span>
-                  <div className="h-14 w-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-[26px] border-2 border-blue-300">
+                  <div className="h-14 w-14 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 text-[26px] border-2 border-amber-500/40">
                     🧑‍✈️
                   </div>
                 </div>
@@ -2347,7 +2347,7 @@ export default function CustomerHomePage() {
                     if (assignedDriverInfo?.driverPhone) window.open(`tel:${assignedDriverInfo.driverPhone}`);
                     else show('رقم الكابتن غير متوفر حالياً', 'info');
                   }}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-500 text-blue-600 shrink-0 hover:bg-blue-50 cursor-pointer"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-500/40 text-amber-400 shrink-0 hover:bg-amber-500/10 cursor-pointer"
                   title="اتصال بالكابتن"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -2360,34 +2360,34 @@ export default function CustomerHomePage() {
                     e.stopPropagation();
                     setIsChatOpen(true);
                   }}
-                  className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-blue-50 border border-blue-200/60 px-4 py-3 text-[14px] font-bold text-blue-600 hover:bg-blue-100 transition active:scale-95 cursor-pointer"
+                  className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-[#0B101B] border border-amber-500/30 px-4 py-3 text-[14px] font-bold text-amber-300 hover:border-amber-500 transition active:scale-95 cursor-pointer"
                 >
                   <span>مراسلة السائق...</span>
-                  <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <svg className="h-5 w-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
                 </button>
               </div>
 
               {/* الدفع */}
-              <div className="flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3">
+              <div className="flex items-center justify-between rounded-2xl bg-[#0B101B] border border-slate-800 px-4 py-3">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     show('الدفع نقداً عند الوصول 💵', 'info');
                   }}
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-[13px] font-bold text-white cursor-pointer hover:bg-blue-700"
+                  className="rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 px-4 py-2 text-[13px] font-black text-[#090D16] cursor-pointer hover:brightness-110"
                 >
                   الدفع
                 </button>
                 <div className="text-right">
-                  <p className="text-[13px] font-bold text-emerald-700">الدفع نقداً</p>
-                  <p className="text-[12px] text-gray-500">
+                  <p className="text-[13px] font-bold text-amber-400">الدفع نقداً للكابتن</p>
+                  <p className="text-[12px] text-slate-400">
                     مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار
                   </p>
                 </div>
-                <svg className="h-6 w-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="h-6 w-6 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="1" y="4" width="22" height="16" rx="2"/>
                   <line x1="1" y1="10" x2="23" y2="10"/>
                 </svg>
@@ -2424,20 +2424,20 @@ export default function CustomerHomePage() {
         )}
       </div>
 
-      {/* 8. نافذة "خيارات الرحلة" (الصورة الثانية بالكامل) */}
+      {/* 8. نافذة "خيارات الرحلة" الفاخرة */}
       {isTripOptionsOpen && (
-        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white overflow-y-auto animate-fade-in" dir="rtl">
+        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-[#0D131F] text-white overflow-y-auto animate-fade-in" dir="rtl">
           {/* الترويسة العلوية: سهم الرجوع وعنوان خيارات الرحلة */}
-          <div className="flex items-center gap-3 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-3 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-slate-800">
             <button
               type="button"
               onClick={() => setIsTripOptionsOpen(false)}
-              className="p-1 text-gray-800 hover:text-black cursor-pointer transition active:scale-95"
+              className="p-1 text-amber-400 hover:text-amber-300 cursor-pointer transition active:scale-95"
               title="رجوع"
             >
-              {/* سهم الرجوع باتجاه اليمين في نمط RTL كما في الصورة 2 */}
+              {/* سهم الرجوع باتجاه اليمين في نمط RTL */}
               <svg
-                className="h-6 w-6 text-gray-800"
+                className="h-6 w-6 text-amber-400"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -2449,27 +2449,27 @@ export default function CustomerHomePage() {
                 <polyline points="12 19 19 12 12 5" />
               </svg>
             </button>
-            <h2 className="text-[20px] font-bold text-gray-900">خيارات الرحلة</h2>
+            <h2 className="text-[20px] font-bold text-white">خيارات الرحلة</h2>
           </div>
 
-          {/* صورة السيارة الزرقاء الكبيرة مع الشارة واسم الفئة */}
+          {/* صورة السيارة مع الشارة واسم الفئة */}
           <div className="flex flex-col items-center justify-center pt-8 pb-6">
             <CarBadgeIllustration badge={currentTier.badge} size="lg" />
-            <h3 className="mt-4 text-[22px] font-black text-gray-900">{currentTier.name}</h3>
+            <h3 className="mt-4 text-[22px] font-black text-white">{currentTier.name}</h3>
           </div>
 
-          {/* تنبيه: لا يمكن تغيير الخيارات أثناء الرحلة مع أيقونة الهاتف الأحمر */}
-          <div className="mx-6 mb-6 flex items-center justify-between rounded-2xl bg-gray-50 border border-gray-100 p-3.5">
+          {/* تنبيه: لا يمكن تغيير الخيارات أثناء الرحلة */}
+          <div className="mx-6 mb-6 flex items-center justify-between rounded-2xl bg-[#0B101B] border border-slate-800 p-3.5">
             <div className="text-right">
-              <p className="text-[13px] font-bold text-gray-500 leading-relaxed">
+              <p className="text-[13px] font-bold text-slate-400 leading-relaxed">
                 ملحوظة: لا يمكن تغيير الخيارات التي اخترتها أثناء الرحلة.
               </p>
             </div>
-            {/* أيقونة الهاتف الأحمر مع أمواج الرنين */}
+            {/* أيقونة الهاتف الأحمر */}
             <div className="mr-2 shrink-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-600 shadow-sm">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-950/60 text-red-400 border border-red-500/30 shadow-sm">
                 <svg
-                  className="h-6 w-6 text-red-500"
+                  className="h-6 w-6 text-red-400"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -2486,14 +2486,14 @@ export default function CustomerHomePage() {
 
           {/* قائمة الخيارات */}
           <div className="px-6 flex-1">
-            <h4 className="text-[16px] font-bold text-gray-700 mb-2">خيارات الرحلة</h4>
-            <div className="divide-y divide-gray-100">
+            <h4 className="text-[16px] font-bold text-slate-300 mb-2">خيارات الرحلة</h4>
+            <div className="divide-y divide-slate-800">
               {/* 1. الوجهة الثانية */}
               <div
                 onClick={() => setIsAddingSecondDest((v) => !v)}
-                className="flex items-center justify-between py-4 cursor-pointer hover:bg-gray-50 transition"
+                className="flex items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40 transition"
               >
-                <div className="text-gray-400">
+                <div className="text-slate-500">
                   <svg
                     className="h-5 w-5"
                     viewBox="0 0 24 24"
@@ -2507,9 +2507,9 @@ export default function CustomerHomePage() {
                   </svg>
                 </div>
                 <div className="text-right">
-                  <span className="text-[16px] font-bold text-gray-800">الوجهة الثانية</span>
+                  <span className="text-[16px] font-bold text-slate-200">الوجهة الثانية</span>
                   {secondDestination && (
-                    <p className="text-xs font-semibold text-blue-600 mt-0.5">{secondDestination}</p>
+                    <p className="text-xs font-semibold text-amber-400 mt-0.5">{secondDestination}</p>
                   )}
                 </div>
               </div>
@@ -2530,7 +2530,7 @@ export default function CustomerHomePage() {
                     value={secondDestination}
                     onChange={(e) => setSecondDestination(e.target.value)}
                     placeholder="حدد اسم الوجهة الإضافية..."
-                    className="w-full rounded-xl border border-blue-200 bg-blue-50/50 p-2.5 text-xs font-bold text-right outline-none"
+                    className="w-full rounded-xl border border-amber-500/30 bg-[#0B101B] p-2.5 text-xs font-bold text-amber-300 text-right outline-none focus:border-amber-500"
                   />
                 </div>
               )}
@@ -2538,9 +2538,9 @@ export default function CustomerHomePage() {
               {/* 2. التوقف في الطريق */}
               <div
                 onClick={() => setIsAddingStop((v) => !v)}
-                className="flex items-center justify-between py-4 cursor-pointer hover:bg-gray-50 transition"
+                className="flex items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40 transition"
               >
-                <div className="text-gray-400">
+                <div className="text-slate-500">
                   <svg
                     className="h-5 w-5"
                     viewBox="0 0 24 24"
@@ -2554,9 +2554,9 @@ export default function CustomerHomePage() {
                   </svg>
                 </div>
                 <div className="text-right">
-                  <span className="text-[16px] font-bold text-gray-800">التوقف في الطريق</span>
+                  <span className="text-[16px] font-bold text-slate-200">التوقف في الطريق</span>
                   {stopDuration && (
-                    <p className="text-xs font-semibold text-blue-600 mt-0.5">
+                    <p className="text-xs font-semibold text-amber-400 mt-0.5">
                       توقف لمدة {stopDuration} دقائق (+500 د.ع)
                     </p>
                   )}
@@ -2571,10 +2571,10 @@ export default function CustomerHomePage() {
                       key={mins}
                       type="button"
                       onClick={() => setStopDuration(mins)}
-                      className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+                      className={`flex-1 rounded-xl py-2 text-xs font-bold transition cursor-pointer ${
                         stopDuration === mins
-                          ? 'bg-[#1B4965] text-white shadow-card'
-                          : 'bg-slate-100 text-[#1A1A1A] hover:bg-slate-200'
+                          ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-[#090D16] font-black shadow-md'
+                          : 'bg-[#0B101B] text-slate-300 hover:bg-slate-800 border border-slate-700'
                       }`}
                     >
                       {mins} دقائق
@@ -2590,7 +2590,7 @@ export default function CustomerHomePage() {
                   type="button"
                   onClick={() => setIsRoundTrip((v) => !v)}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                    isRoundTrip ? 'bg-[#1B4965]' : 'bg-slate-300'
+                    isRoundTrip ? 'bg-amber-500' : 'bg-slate-700'
                   }`}
                   aria-label="تفعيل رحلة ذهاب وإياب"
                 >
@@ -2601,18 +2601,18 @@ export default function CustomerHomePage() {
                   />
                 </button>
 
-                <span className="text-[15px] font-bold text-[#1A1A1A]">رحلة ذهاب وإياب</span>
+                <span className="text-[15px] font-bold text-slate-200">رحلة ذهاب وإياب</span>
               </div>
             </div>
           </div>
 
           {/* الشريط السفلي: مبلغ الرحلة وزر التأكيد وزر الإنهاء */}
-          <div className="border-t border-slate-100 p-6 bg-white">
+          <div className="border-t border-slate-800 p-6 bg-[#0B101B]">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-[16px] font-bold text-[#1A1A1A]">
+              <span className="text-[16px] font-black text-amber-400">
                 {calculatedPrice.toLocaleString()} دينار
               </span>
-              <span className="text-[14px] font-medium text-[#6C757D]">مبلغ الرحلة</span>
+              <span className="text-[14px] font-medium text-slate-400">مبلغ الرحلة</span>
             </div>
 
             <div className="flex items-center gap-4">
@@ -2620,7 +2620,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={() => setIsTripOptionsOpen(false)}
-                className="py-3 px-4 text-center text-sm font-bold text-[#6C757D] hover:text-[#1A1A1A] transition cursor-pointer"
+                className="py-3 px-4 text-center text-sm font-bold text-slate-400 hover:text-white transition cursor-pointer"
               >
                 انهاء
               </button>
@@ -2632,7 +2632,7 @@ export default function CustomerHomePage() {
                   setIsTripOptionsOpen(false);
                   show('تم حفظ وتأكيد خيارات الرحلة بنجاح ✅', 'success');
                 }}
-                className="flex-1 rounded-xl bg-[#1B4965] py-3 text-center text-sm font-bold text-white hover:bg-[#14364A] shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.98] cursor-pointer"
+                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3 text-center text-sm font-black text-[#090D16] hover:brightness-110 shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
               >
                 تأكيد
               </button>
@@ -2680,11 +2680,11 @@ export default function CustomerHomePage() {
         </div>
       )}
 
-      {/* 9. نافذة البحث عن الأماكن */}
+      {/* 9. نافذة البحث الفاخرة عن الأماكن */}
       {isSearchOpen && (
-        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-white">
-          <div className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-slate-100">
-            <h2 className="text-[18px] font-bold text-[#1A1A1A]">
+        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-[#0D131F] text-white">
+          <div className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-slate-800">
+            <h2 className="text-[18px] font-bold text-white">
               {stage === 'pickup' ? 'حدد نقطة الانطلاق' : 'حدد وجهة الوصول'}
             </h2>
             <button
@@ -2694,7 +2694,7 @@ export default function CustomerHomePage() {
                 setSearchQuery('');
                 setSearchResults([]);
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6C757D] hover:text-[#1A1A1A] hover:bg-slate-100 transition-colors cursor-pointer"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
               aria-label="إغلاق"
             >
               <svg
@@ -2714,20 +2714,20 @@ export default function CustomerHomePage() {
 
           {/* مربع البحث العلوي المندمج */}
           <div className="px-4 py-3">
-            <div className="flex items-center rounded-xl bg-slate-50 border border-slate-200/80 px-3 py-2.5 transition-all focus-within:bg-white focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10">
+            <div className="flex items-center rounded-xl bg-[#0B101B] border border-amber-500/30 px-3 py-2.5 transition-all focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20">
               <button
                 type="button"
                 onClick={() => setIsCitySelectorOpen(true)}
-                className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg bg-white border border-slate-200/80 text-[12.5px] font-bold text-[#1A1A1A] hover:border-[#1B4965] transition cursor-pointer"
+                className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg bg-[#161C28] border border-amber-500/30 text-[12.5px] font-bold text-amber-300 hover:border-amber-400 transition cursor-pointer"
                 title="تغيير المدينة"
               >
                 <span>{selectedCity}</span>
-                <svg className="h-3.5 w-3.5 text-[#6C757D]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
 
-              <div className="mx-2.5 h-4 w-[1px] bg-slate-200" />
+              <div className="mx-2.5 h-4 w-[1px] bg-slate-800" />
 
-              <div className="mr-1 text-[#6C757D]">
+              <div className="mr-1 text-amber-400/80">
                 <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -2750,14 +2750,14 @@ export default function CustomerHomePage() {
                 placeholder={
                   stage === 'pickup' ? 'ابحث عن موقع الانطلاق...' : 'ابحث عن وجهة الوصول...'
                 }
-                className="flex-1 bg-transparent text-[14px] font-medium text-[#1A1A1A] outline-none placeholder-[#6C757D] font-map-search"
+                className="flex-1 bg-transparent text-[14px] font-medium text-white outline-none placeholder-slate-500 font-map-search"
               />
 
               <button
                 type="button"
                 onClick={handleMicClick}
                 className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  isListeningMic ? 'text-red-500 bg-red-50 animate-pulse' : 'text-[#6C757D] hover:text-[#1B4965] hover:bg-slate-100'
+                  isListeningMic ? 'text-red-400 bg-red-950/40 animate-pulse' : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
                 }`}
                 title="البحث الصوتي"
               >
@@ -2779,7 +2779,7 @@ export default function CustomerHomePage() {
           </div>
 
           {/* شريط الأماكن السريعة */}
-          <div className="flex items-center gap-2.5 px-4 pb-3 overflow-x-auto no-scrollbar border-b border-slate-100">
+          <div className="flex items-center gap-2.5 px-4 pb-3 overflow-x-auto no-scrollbar border-b border-slate-800">
             {QUICK_CHIPS.map((chip) => (
               <div
                 key={chip.name}
@@ -2788,10 +2788,10 @@ export default function CustomerHomePage() {
                   e.stopPropagation();
                   handleSelectPlace(chip);
                 }}
-                className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 px-3.5 py-2 cursor-pointer transition-all duration-200 active:scale-95 shadow-card shrink-0"
+                className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#161C28] hover:border-amber-500/40 px-3.5 py-2 cursor-pointer transition-all duration-200 active:scale-95 shadow-sm shrink-0"
               >
-                <span className="text-[13px] font-bold text-[#1A1A1A]">{chip.name}</span>
-                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-[#1B4965]/10 text-[#1B4965]">
+                <span className="text-[13px] font-bold text-slate-200">{chip.name}</span>
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/20 text-amber-400">
                   <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
@@ -2803,18 +2803,18 @@ export default function CustomerHomePage() {
           {/* قائمة الأماكن */}
           <div
             onMouseDown={(e) => e.preventDefault()}
-            className="flex-1 overflow-y-auto px-4 py-3 bg-[#F8F9FA]/40"
+            className="flex-1 overflow-y-auto px-4 py-3 bg-[#080E1A]"
           >
             {isSearchingPlaces && (
-              <div className="flex items-center justify-center py-8 text-[#6C757D]">
-                <Spinner className="h-5 w-5 ml-2 text-[#1B4965]" />
+              <div className="flex items-center justify-center py-8 text-slate-400">
+                <Spinner className="h-5 w-5 ml-2 text-amber-400" />
                 <span className="text-xs font-semibold">جاري البحث في الأماكن والمعالم...</span>
               </div>
             )}
 
             {!isSearchingPlaces && searchResults.length > 0 && (
-              <div className="space-y-1">
-                <p className="mb-2 text-[12px] font-bold text-[#6C757D] px-1">
+              <div className="space-y-1.5">
+                <p className="mb-2 text-[12px] font-bold text-slate-400 px-1">
                   {searchQuery.trim().length === 0 ? 'أماكن مقترحة' : `نتائج البحث (${searchResults.length})`}
                 </p>
                 {searchResults.map((place, idx) => (
@@ -2825,20 +2825,20 @@ export default function CustomerHomePage() {
                       e.stopPropagation();
                       handleSelectPlace(place);
                     }}
-                    className="group flex items-center justify-between p-3 rounded-xl border border-transparent bg-white hover:border-slate-200/80 hover:shadow-card transition-all duration-200 cursor-pointer"
+                    className="group flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-[#0B101B] hover:border-amber-500/50 hover:shadow-md transition-all duration-200 cursor-pointer"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] group-hover:bg-[#1B4965]/10 transition-colors">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
                         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                           <circle cx="12" cy="10" r="3" />
                         </svg>
                       </div>
                       <div className="truncate font-map-search">
-                        <p className="text-[14.5px] font-bold text-[#1A1A1A] group-hover:text-[#1B4965] transition-colors truncate">
+                        <p className="text-[14.5px] font-bold text-slate-200 group-hover:text-amber-300 transition-colors truncate">
                           {place.name}
                         </p>
-                        <p className="text-[12px] font-medium text-[#6C757D] mt-0.5 truncate">
+                        <p className="text-[12px] font-medium text-slate-400 mt-0.5 truncate">
                           {place.subName || 'النجف الأشرف'}
                         </p>
                       </div>
@@ -2857,7 +2857,7 @@ export default function CustomerHomePage() {
                         setFavoritePlaces(getFavoritePlaces());
                         show(`تمت إضافة ${place.name} إلى المفضلة ⭐`, 'success');
                       }}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
                       title="إضافة للمفضلة"
                     >
                       <svg
@@ -2969,16 +2969,16 @@ export default function CustomerHomePage() {
 
       {/* 10. نافذة اختيار المدينة */}
       {isCitySelectorOpen && (
-        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-xs">
-          <div className="relative flex h-[82%] w-full flex-col rounded-t-2xl bg-white pt-4 pb-2 shadow-sheet animate-fade-in border-t border-slate-100">
-            <div className="flex items-center justify-between px-5 pb-3 border-b border-slate-100">
-              <h3 className="text-[17px] font-bold text-[#1A1A1A]">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/70 backdrop-blur-xs">
+          <div className="relative flex h-[82%] w-full flex-col rounded-t-2xl bg-[#0D131F] text-white pt-4 pb-2 shadow-2xl animate-fade-in border-t border-slate-800">
+            <div className="flex items-center justify-between px-5 pb-3 border-b border-slate-800">
+              <h3 className="text-[17px] font-bold text-white">
                 {stage === 'pickup' ? 'إختيار مدينة نقطة الانطلاق' : 'إختيار مدينة نقطة الوصول'}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsCitySelectorOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-[#6C757D] hover:text-[#1A1A1A] hover:bg-slate-100 transition-colors cursor-pointer"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 aria-label="إغلاق"
               >
                 <svg
@@ -2997,9 +2997,9 @@ export default function CustomerHomePage() {
             </div>
 
             <div className="px-5 my-3">
-              <div className="flex items-center rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-2.5 focus-within:bg-white focus-within:border-[#1B4965] focus-within:ring-2 focus-within:ring-[#1B4965]/10 transition-all">
+              <div className="flex items-center rounded-xl bg-[#0B101B] border border-amber-500/30 px-4 py-2.5 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20 transition-all">
                 <svg
-                  className="h-5 w-5 text-[#6C757D] shrink-0 ml-2"
+                  className="h-5 w-5 text-amber-400/80 shrink-0 ml-2"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -3023,16 +3023,16 @@ export default function CustomerHomePage() {
                   value={citySearchQuery}
                   onChange={(e) => setCitySearchQuery(e.target.value)}
                   placeholder="البحث في المدن..."
-                  className="w-full bg-transparent text-[14px] font-medium text-[#1A1A1A] outline-none placeholder-[#6C757D] text-right"
+                  className="w-full bg-transparent text-[14px] font-medium text-white outline-none placeholder-slate-500 text-right"
                 />
               </div>
             </div>
 
-            <div className="px-5 py-3 border-b border-slate-100">
+            <div className="px-5 py-3 border-b border-slate-800">
               <button
                 type="button"
                 onClick={handleSelectCurrentCity}
-                className="flex items-center gap-3 text-[#1B4965] hover:text-[#14364A] cursor-pointer transition active:scale-[0.99] font-bold text-[15px]"
+                className="flex items-center gap-3 text-amber-400 hover:text-amber-300 cursor-pointer transition active:scale-[0.99] font-bold text-[15px]"
               >
                 <svg
                   className="h-5 w-5 shrink-0"
@@ -3054,18 +3054,18 @@ export default function CustomerHomePage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 divide-y divide-slate-100">
+            <div className="flex-1 overflow-y-auto px-5 divide-y divide-slate-800">
               {filteredCities.map((city) => (
                 <div
                   key={city.id}
                   onClick={() => handleSelectCity(city)}
-                  className="flex items-center justify-between py-3.5 cursor-pointer hover:bg-slate-50 transition active:scale-[0.99]"
+                  className="flex items-center justify-between py-3.5 cursor-pointer hover:bg-slate-800/40 transition active:scale-[0.99]"
                 >
                   <div className="text-right">
-                    <p className="text-[15px] font-bold text-[#1A1A1A]">{city.name}</p>
-                    <p className="text-[13px] font-semibold text-gray-400 mt-0.5">{city.sub}</p>
+                    <p className="text-[15px] font-bold text-slate-200">{city.name}</p>
+                    <p className="text-[13px] font-semibold text-slate-400 mt-0.5">{city.sub}</p>
                   </div>
-                  <div className="text-gray-400">
+                  <div className="text-amber-400/70">
                     <svg
                       className="h-5 w-5"
                       viewBox="0 0 24 24"
@@ -3107,9 +3107,9 @@ export default function CustomerHomePage() {
 
       {/* نافذة تقييم الراكب للكابتن بنمط بلي (Customer Rating Captain Modal) */}
       {isRatingModalOpen && completedDriverInfo && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in overflow-y-auto">
           <div
-            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-slide-down my-auto"
+            className="w-full max-w-md rounded-3xl bg-[#0D131F] text-white p-6 shadow-2xl border border-amber-500/20 animate-slide-down my-auto"
             dir="rtl"
           >
             {/* رأس النافذة الاحتفالي */}
@@ -3117,7 +3117,7 @@ export default function CustomerHomePage() {
               <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 text-2xl shadow-md shadow-amber-400/20 animate-bounce">
                 🌟
               </div>
-              <h3 className="text-[19px] font-black text-[#1A1A1A]">
+              <h3 className="text-[19px] font-black text-white">
                 تقييم رحلتك مع الكابتن
               </h3>
               <p className="text-[12.5px] font-medium text-slate-500 mt-0.5">
@@ -3126,34 +3126,34 @@ export default function CustomerHomePage() {
             </div>
 
             {/* بطاقة معلومات الكابتن والمركبة */}
-            <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 mb-4 text-right">
+            <div className="rounded-2xl bg-[#0B101B] border border-amber-500/20 p-3.5 mb-4 text-right">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-[22px] border-2 border-blue-200 shadow-xs">
+                  <div className="h-12 w-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 text-[22px] border-2 border-amber-500/40 shadow-xs">
                     🧑‍✈️
                   </div>
                   <div>
-                    <span className="text-[14.5px] font-bold text-slate-900 block">
+                    <span className="text-[14.5px] font-bold text-white block">
                       {completedDriverInfo.driverName || 'كابتن توصيله'}
                     </span>
-                    <span className="text-[12px] font-medium text-slate-500 block">
+                    <span className="text-[12px] font-medium text-slate-400 block">
                       {completedDriverInfo.driverVehicle || 'كيا سيراتو 2022'}
                     </span>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-300 bg-white px-2.5 py-1 text-center shadow-2xs">
-                  <span className="text-[13px] font-black text-slate-800 tracking-wider block font-mono">
+                <div className="rounded-xl border border-amber-500/30 bg-[#161C28] px-2.5 py-1 text-center shadow-2xs">
+                  <span className="text-[13px] font-black text-amber-400 tracking-wider block font-mono">
                     {completedDriverInfo.driverPlate || '١١٣٤٠ ة'}
                   </span>
-                  <span className="text-[9.5px] font-bold text-slate-400 block">النجف</span>
+                  <span className="text-[9.5px] font-bold text-amber-400/70 block">النجف</span>
                 </div>
               </div>
             </div>
 
             {/* تقييم النجوم التفاعلي */}
             <div className="text-center mb-4">
-              <label className="text-[13.5px] font-bold text-slate-800 block mb-2">
+              <label className="text-[13.5px] font-bold text-slate-200 block mb-2">
                 كيف كانت تجربتك مع الكابتن؟
               </label>
               <div className="flex items-center justify-center gap-2 py-1" dir="ltr">
@@ -3168,7 +3168,7 @@ export default function CustomerHomePage() {
                       className={`h-9 w-9 transition-colors ${
                         star <= ratingStars
                           ? 'text-amber-400 fill-amber-400 filter drop-shadow-sm'
-                          : 'text-slate-200 fill-slate-200'
+                          : 'text-slate-700 fill-slate-700'
                       }`}
                       viewBox="0 0 24 24"
                     >
@@ -3177,7 +3177,7 @@ export default function CustomerHomePage() {
                   </button>
                 ))}
               </div>
-              <p className="text-[12px] font-bold text-amber-600 mt-1">
+              <p className="text-[12px] font-bold text-amber-400 mt-1">
                 {ratingStars === 5
                   ? 'ممتاز جداً 🌟 (موصى به)'
                   : ratingStars === 4
@@ -3192,7 +3192,7 @@ export default function CustomerHomePage() {
 
             {/* وسوم التقييم السريعة */}
             <div className="mb-4">
-              <label className="text-[12px] font-bold text-slate-700 block mb-2 text-right">
+              <label className="text-[12px] font-bold text-slate-300 block mb-2 text-right">
                 ما الذي أعجبك في المشوار؟ (اختياري):
               </label>
               <div className="flex flex-wrap gap-1.5 justify-start">
@@ -3211,8 +3211,8 @@ export default function CustomerHomePage() {
                       onClick={() => toggleRatingTag(tag)}
                       className={`px-3 py-1.5 rounded-xl text-[12px] font-bold transition cursor-pointer border ${
                         isSelected
-                          ? 'bg-[#1B4965] text-white border-[#1B4965] shadow-xs'
-                          : 'bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200'
+                          ? 'bg-amber-500 text-[#090D16] border-amber-500 font-black shadow-xs'
+                          : 'bg-[#0B101B] text-slate-300 border-slate-700 hover:border-amber-500/40'
                       }`}
                     >
                       {tag}
@@ -3224,14 +3224,14 @@ export default function CustomerHomePage() {
 
             {/* إذا كان التقييم نجمة أو نجمتين: خانة إجبارية مع تنبيه صريح */}
             {ratingStars <= 2 ? (
-              <div className="mb-4 text-right rounded-2xl bg-red-50/90 border border-red-200 p-3.5 shadow-xs">
-                <div className="flex items-center gap-2 mb-1.5 text-red-700">
+              <div className="mb-4 text-right rounded-2xl bg-red-950/60 border border-red-500/40 p-3.5 shadow-xs">
+                <div className="flex items-center gap-2 mb-1.5 text-red-400">
                   <span className="text-base">⚠️</span>
                   <label className="text-[12.5px] font-black">
-                    نأسف لتجربتك، يرجى توضيح سبب هذا التقييم لمساعدتنا على معالجة الأمر <span className="text-red-500">*</span>
+                    نأسف لتجربتك، يرجى توضيح سبب هذا التقييم لمساعدتنا على معالجة الأمر <span className="text-red-400">*</span>
                   </label>
                 </div>
-                <p className="text-[11px] font-medium text-red-600 mb-2">
+                <p className="text-[11px] font-medium text-red-300 mb-2">
                   يتم تحويل هذا البلاغ فوراً وبشكل آلي إلى قسم المتابعة والشكاوى للتحقيق مع الكابتن.
                 </p>
                 <textarea
@@ -3241,13 +3241,13 @@ export default function CustomerHomePage() {
                   rows={3}
                   maxLength={400}
                   required
-                  className="w-full rounded-xl border border-red-300 bg-white p-2.5 text-[12.5px] text-[#1A1A1A] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full rounded-xl border border-red-500/50 bg-[#0B101B] p-2.5 text-[12.5px] text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
             ) : (
               /* حقل ملاحظات اختياري */
               <div className="mb-5 text-right">
-                <label className="text-[12px] font-bold text-slate-700 block mb-1.5">
+                <label className="text-[12px] font-bold text-slate-300 block mb-1.5">
                   ملاحظات أو تعليق للكابتن (اختياري):
                 </label>
                 <textarea
@@ -3256,7 +3256,7 @@ export default function CustomerHomePage() {
                   placeholder="أضف أي تفاصيل أو ملاحظات حول الكابتن والرحلة..."
                   rows={2}
                   maxLength={300}
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-[12.5px] text-[#1A1A1A] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
+                  className="w-full rounded-xl border border-slate-700 bg-[#0B101B] p-2.5 text-[12.5px] text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
             )}
@@ -3267,8 +3267,8 @@ export default function CustomerHomePage() {
                 type="button"
                 disabled={isSubmittingRating || (ratingStars <= 2 && !ratingComment.trim())}
                 onClick={handleRateDriverSubmit}
-                className={`w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
-                  ratingStars <= 2 ? 'bg-red-600 hover:bg-red-700' : 'bg-[#1B4965] hover:bg-[#14364A]'
+                className={`w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-center text-[15px] font-black shadow-card transition-all duration-200 active:scale-[0.98] cursor-pointer disabled:opacity-50 ${
+                  ratingStars <= 2 ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-[#090D16] hover:brightness-110 shadow-[0_4px_20px_rgba(245,158,11,0.3)]'
                 }`}
               >
                 {isSubmittingRating ? (

@@ -93,17 +93,24 @@ export default function DriverHomePage() {
     const workMode = statusToSync === 'idle' ? 'خمول' : statusToSync === 'permanent' ? 'خط دائمي' : 'مشوار قصير';
 
     const sendPayload = (lat: number, lng: number) => {
+      const modeKey = statusToSync === 'permanent' ? 'commute' : statusToSync === 'taxi' ? 'taxi' : 'idle';
       const payload = {
-        driverId,
+        driverId: driverId || rawPhone,
         phoneNumber: rawPhone,
         isOnline,
+        is_online: isOnline,
         workMode,
+        mode: modeKey,
+        current_mode: modeKey,
         latitude: lat,
         longitude: lng,
+        lat,
+        lng,
         heading: 0,
         tripStatus: isOnline ? 'Online' : 'Offline',
       };
       http.post('/driver/status', payload).catch(() => {});
+      http.post('/driver/mode', payload).catch(() => {});
       http.post('/driver/location', payload).catch(() => {});
     };
 
@@ -175,11 +182,7 @@ export default function DriverHomePage() {
   const mapRef = useRef<MapRef | null>(null);
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number }>({ lat: 32.0298, lng: 44.3285 });
   const [isLocating, setIsLocating] = useState(false);
-  const [driverRouteCoordinates] = useState<[number, number][] | null>([
-    [44.3285, 32.0298],
-    [44.3310, 32.0320],
-    [44.3345, 32.0355],
-  ]);
+  const [driverRouteCoordinates, setDriverRouteCoordinates] = useState<[number, number][] | null>(null);
 
   // تتبع موقع السائق وتوسيط الخريطة
   useEffect(() => {
@@ -742,11 +745,52 @@ export default function DriverHomePage() {
   }
 
   const handleDriverLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('driver');
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    sessionStorage.clear();
+    // 1. مسح أي مسار مرسوم على الخريطة
+    setDriverRouteCoordinates(null);
+    try {
+      const map = mapRef.current?.getMap?.() || mapRef.current;
+      if (map && typeof map.getSource === 'function') {
+        const routeSrc = (map.getSource('driver-route-line') || map.getSource('route')) as any;
+        if (routeSrc && typeof routeSrc.setData === 'function') {
+          routeSrc.setData({ type: 'FeatureCollection', features: [] });
+        }
+      }
+    } catch (_) {}
+
+    // 2. تحديث حالة السائق إلى offline في الباك إند
+    const token = storage.getToken() || localStorage.getItem('token') || '';
+    const currentId = driverId || rawPhone;
+    fetch('/api/driver/status', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        driverId: currentId,
+        is_online: false,
+        isOnline: false,
+        status: 'offline',
+        workMode: 'خمول',
+        mode: 'idle',
+        current_mode: 'idle',
+        tripStatus: 'Offline',
+      }),
+    }).catch(() => {});
+
+    // 3. مسح كامل بيانات التخزين
+    try {
+      authStore.clear();
+      storage.clearAll();
+      localStorage.removeItem('token');
+      localStorage.removeItem('driver');
+      localStorage.removeItem('user');
+      localStorage.removeItem('role');
+      localStorage.removeItem('driver_work_status');
+      sessionStorage.clear();
+    } catch (_) {}
+
+    // 4. توجيه قطعي
     window.location.replace('/login');
   };
 
