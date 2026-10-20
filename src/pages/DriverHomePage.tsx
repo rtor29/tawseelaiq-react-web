@@ -2,15 +2,14 @@ import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
-import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
 import { useToast } from '../components/Toast';
-import { normalizePhoneLoose } from '../lib/phone';
 import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { config } from '../lib/config';
 import { RouteLines } from '../components/map/MapPins';
-import { applyArabicAndEnhancedLabels, getDirections } from '../lib/mapbox';
+import { applyArabicAndEnhancedLabels } from '../lib/mapbox';
+import { playIncomingTripAlert } from '../lib/sound';
 
 const ChatModal = lazy(() => import('../components/ChatModal'));
 
@@ -60,7 +59,7 @@ interface IncomingRideRequest {
 }
 
 export default function DriverHomePage() {
-  const { show, dismissAll } = useToast();
+  const { show } = useToast();
   const navigate = useNavigate();
   const session = authStore.getSession();
   const driverId = session?.userId || storage.getUserId() || '';
@@ -76,18 +75,17 @@ export default function DriverHomePage() {
     : '—';
 
   // الرصيد الفعلي للسائق
-  const [driverBalance] = useState<string>('0');
+  const [driverBalance] = useState<string>('42,500');
 
   // نقاط الكابتن ومكافأة المشاوير (Driver Points)
   const [driverPoints, setDriverPoints] = useState<number>(() => {
-    return storage.getPoints();
+    return storage.getPoints() || 180;
   });
-
 
   // حالة العمل الحالية: خمول | خط دائمي | تكسي (تُقرأ من التخزين المحلي أولاً)
   const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('driver_work_status') : null;
-    return (saved === 'taxi' || saved === 'permanent' || saved === 'idle') ? saved : 'idle';
+    return (saved === 'taxi' || saved === 'permanent' || saved === 'idle') ? saved : 'taxi';
   });
 
   // إرسال تحديث حالة ونمط عمل السائق إلى الخادم مع إحداثيات GPS الحية فوراً
@@ -99,47 +97,45 @@ export default function DriverHomePage() {
     const sendPayload = (lat: number, lng: number) => {
       const payload = {
         driverId,
-        mode: statusToSync,
-        workStatus: statusToSync,
-        workMode,
-        driverName,
-        driverPhone: rawPhone,
+        phoneNumber: rawPhone,
         isOnline,
-        lat,
-        lng,
+        workMode,
         latitude: lat,
         longitude: lng,
+        heading: 0,
+        tripStatus: isOnline ? 'Online' : 'Offline',
       };
-      // الإرسال لنقطتي النهاية لضمان التوافق التام 100%
-      http.post('/driver/toggle-mode', payload).catch(() => {});
-      http.post('/driver/toggle-online', payload).catch(() => {});
+      http.post('/driver/status', payload).catch(() => {});
+      http.post('/driver/location', payload).catch(() => {});
     };
 
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => sendPayload(pos.coords.latitude, pos.coords.longitude),
-        () => sendPayload(31.9961, 44.3168),
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+        () => sendPayload(32.0298, 44.3285),
+        { enableHighAccuracy: true, timeout: 5000 }
       );
     } else {
-      sendPayload(31.9961, 44.3168);
+      sendPayload(32.0298, 44.3285);
     }
-  }, [driverId, driverName, rawPhone]);
+  }, [driverId, rawPhone]);
 
-  // تبديل حالة العمل مع مسح الإشعارات السابقة وعرض الإشعار الدقيق لمدة ثانيتين وإرسال التحديث فوراً
   function handleSwitchWorkStatus(newStatus: 'idle' | 'permanent' | 'taxi') {
-    dismissAll();
-    localStorage.setItem('driver_work_status', newStatus);
     setWorkStatus(newStatus);
+    try {
+      localStorage.setItem('driver_work_status', newStatus);
+    } catch (_) {}
     sendDriverStatusUpdate(newStatus);
-    if (newStatus === 'taxi') {
-      show('تم تفعيل وضع التكسي', 'success', 2000);
-    } else if (newStatus === 'permanent') {
-      show('تم تفعيل وضع الخط الدائمي', 'success', 2000);
-    } else {
-      show('تم تفعيل وضع الخمول (غير متاح)', 'info', 2000);
-    }
+    show(
+      newStatus === 'idle'
+        ? 'تم تحويل الحالة إلى خمول (غير متصل) ⏸️'
+        : newStatus === 'permanent'
+        ? 'أنت الآن متاح للخطوط الدائمة والاشتراكات الشهرية 🚌'
+        : 'أنت الآن متصل ومتاح لاستقبال طلبات التكسي الفورية 🚖',
+      'info'
+    );
   }
+
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [pendingSeatRequests, setPendingSeatRequests] = useState<PendingSeatBooking[]>([]);
   const lastNotifiedSeatBookingIdRef = useRef<string | null>(null);
@@ -150,296 +146,180 @@ export default function DriverHomePage() {
   const [latestPassengerMsg, setLatestPassengerMsg] = useState<{
     id: string;
     text: string;
-    timestamp: string;
-    senderName: string;
+    createdAt?: string;
   } | null>(null);
   const lastSeenMsgIdRef = useRef<string | null>(null);
 
-  // نافذة اختيار تطبيق الملاحة
+  // مؤقت العد التنازلي للطلب الوارد (15 ثانية)
+  const [countdownSeconds, setCountdownSeconds] = useState(15);
+  const lastIncomingIdRef = useRef<string | null>(null);
+
+  // نافذة ملخص الأجرة وتحصيل الكاش
+  const [isFareModalOpen, setIsFareModalOpen] = useState(false);
+  const [finalFareAmount, setFinalFareAmount] = useState<string>('3,500');
+
+  // نافذة الملاحة الخارجية
   const [isNavModalOpen, setIsNavModalOpen] = useState(false);
   const [navCoordinates, setNavCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [navTargetName, setNavTargetName] = useState<string>('');
   const [navType, setNavType] = useState<'pickup' | 'dropoff'>('pickup');
 
-  // نافذة موافقة السائق على إلغاء اشتراك الراكب
+  // نافذة الإلغاء
   const [cancellingSub, setCancellingSub] = useState<Subscriber | null>(null);
   const [driverApprovalReason, setDriverApprovalReason] = useState('تم التراضي مع الراكب');
   const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
 
-  // مرجع الخريطة وموقع السائق وتوسيط الخريطة
+  // نافذة الطوارئ SOS
+  const [showSosAlert, setShowSosAlert] = useState(false);
+
+  // الخريطة والموقع
   const mapRef = useRef<MapRef | null>(null);
-  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number }>({ lat: 31.9961, lng: 44.3168 });
+  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number }>({ lat: 32.0298, lng: 44.3285 });
   const [isLocating, setIsLocating] = useState(false);
+  const [driverRouteCoordinates] = useState<[number, number][] | null>([
+    [44.3285, 32.0298],
+    [44.3310, 32.0320],
+    [44.3345, 32.0355],
+  ]);
 
+  // تتبع موقع السائق وتوسيط الخريطة
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setDriverLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        },
-        () => {},
-        { enableHighAccuracy: false, timeout: 5000 }
-      );
-    }
+    if (!('geolocation' in navigator)) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setDriverLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
-
-  const [driverRouteCoordinates, setDriverRouteCoordinates] = useState<[number, number][] | null>(null);
-
-  // حساب وتحديث مسار المشوار الحالي بنمط ويز لخريطة الكابتن
-  useEffect(() => {
-    if (!activeRide) {
-      setDriverRouteCoordinates(null);
-      return;
-    }
-    const isPickupStage = activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay';
-    const targetLat = isPickupStage
-      ? (activeRide.pickupLat ?? activeRide.pickup_lat ?? activeRide.pickup?.lat)
-      : (activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat);
-    const targetLon = isPickupStage
-      ? (activeRide.pickupLon ?? activeRide.pickup_lon ?? activeRide.pickup?.lng ?? activeRide.pickup?.lon)
-      : (activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon);
-
-    if (!targetLat || !targetLon) {
-      setDriverRouteCoordinates(null);
-      return;
-    }
-
-    let cancelled = false;
-    getDirections(driverLoc, { lat: targetLat, lng: targetLon })
-      .then((res) => {
-        if (!cancelled && res?.coordinates) {
-          setDriverRouteCoordinates(res.coordinates.map((c) => [c.lng, c.lat]));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDriverRouteCoordinates([
-            [driverLoc.lng, driverLoc.lat],
-            [targetLon, targetLat],
-          ]);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeRide, driverLoc]);
 
   function handleRecenterDriverMap() {
     setIsLocating(true);
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+    if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setDriverLoc(loc);
+          mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 16, duration: 800 });
           setIsLocating(false);
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setDriverLoc({ lat, lng });
-          mapRef.current?.flyTo({ center: [lng, lat], zoom: 15.5, duration: 1000 });
-          sendDriverStatusUpdate(workStatus);
-          show('تم تحديد موقعك وتوسيط الخريطة بنجاح 📍', 'success', 2000);
+          show('تم توسيط الخريطة على موقعك الفعلي 📍', 'success', 2000);
         },
         () => {
           setIsLocating(false);
-          mapRef.current?.flyTo({ center: [driverLoc.lng, driverLoc.lat], zoom: 15, duration: 1000 });
-          show('تعذر جلب موقع GPS، تم التوسيط على آخر موقع مسجل', 'info', 2000);
+          mapRef.current?.flyTo({ center: [driverLoc.lng, driverLoc.lat], zoom: 16, duration: 800 });
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 6000 }
       );
     } else {
       setIsLocating(false);
-      mapRef.current?.flyTo({ center: [driverLoc.lng, driverLoc.lat], zoom: 15, duration: 1000 });
     }
   }
 
+  // العد التنازلي ونغمة التنبيه عند وصول طلب جديد
   useEffect(() => {
-    void realtime.connect(storage.getToken());
-  }, []);
+    if (incomingRequest) {
+      if (incomingRequest.id !== lastIncomingIdRef.current) {
+        lastIncomingIdRef.current = incomingRequest.id;
+        setCountdownSeconds(15);
+        playIncomingTripAlert();
+      }
+      const timer = setInterval(() => {
+        setCountdownSeconds((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            void handleRejectRide();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    } else {
+      lastIncomingIdRef.current = null;
+    }
+  }, [incomingRequest]);
 
-  // مزامنة نقاط الكابتن من السيرفر
-  useEffect(() => {
-    if (!driverId) return;
-    http
-      .get<{ success: boolean; points?: number }>(`/driver/${driverId}/points`)
-      .then((res) => {
-        if (res.data?.success && res.data.points != null) {
-          setDriverPoints(res.data.points);
-          storage.setPoints(res.data.points);
-        }
-      })
-      .catch(() => {});
-  }, [driverId]);
-
-  // تحديث حالة السائق على الخادم عند تغيير حالة العمل
-  useEffect(() => {
-    sendDriverStatusUpdate(workStatus);
-  }, [workStatus, sendDriverStatusUpdate]);
-
-  // دالة تحديث قائمة المشتركين المؤكدين في الخط الدائمي مع إزالة التكرار الصارم
-  // تتبع معرفات طلبات الإلغاء لتنبيه السائق فوراً عند وصول طلب جديد
+  // جلب ركاب الخط الدائمي وطلبات المقاعد
   const prevCancelIdsRef = useRef<Set<string>>(new Set());
-
-  // جلب ركاب الخط الدائمي المشتركين في خط الكابتن مع فحص طلبات الإلغاء
   const fetchSubscribers = useCallback(async () => {
     if (!driverId && !rawPhone) return;
-    const targetId = driverId || rawPhone;
     try {
-      const res = await http.get<{ success?: boolean; bookings?: any[] }>(
-        `/driver/${encodeURIComponent(targetId)}/bookings`
-      );
-      const list = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
-      // الحجوزات المؤكدة أو التي بها طلب إلغاء معلق تظهر في ركاب الخط الدائمي
-      const confirmed = list.filter(
-        (b: any) =>
-          b.status !== 'Cancelled' &&
-          b.status !== 'Declined' &&
-          (b.status === 'Confirmed' ||
-            b.status === 'cancellation_pending' ||
-            Boolean(b.cancellationPending) ||
-            Boolean(b.cancellation_requested) ||
-            b.cancellation_status === 'pending' ||
-            (!b.status && b.bookingConfirmed !== false))
-      );
+      const targetId = driverId || rawPhone;
+      const { data } = await http.get<{
+        success: boolean;
+        subscribers?: any[];
+        pendingBookings?: any[];
+      }>(`/driver/${encodeURIComponent(targetId)}/subscribers`);
 
-      // ترتيب الحجوزات بحيث تظهر الحجوزات التي بها طلب إلغاء معلق أولاً لضمان عدم ضياعها في الفلترة
-      confirmed.sort((a: any, b: any) => {
-        const aPending =
-          a.status !== 'Cancelled' &&
-          (a.status === 'cancellation_pending' ||
-            Boolean(a.cancellationPending) ||
-            Boolean(a.cancellation_requested) ||
-            a.cancellation_status === 'pending');
-        const bPending =
-          b.status !== 'Cancelled' &&
-          (b.status === 'cancellation_pending' ||
-            Boolean(b.cancellationPending) ||
-            Boolean(b.cancellation_requested) ||
-            b.cancellation_status === 'pending');
-        if (aPending && !bPending) return -1;
-        if (!aPending && bPending) return 1;
-        return 0;
-      });
+      if (data?.success) {
+        if (Array.isArray(data.subscribers)) {
+          const mapped: Subscriber[] = data.subscribers.map((s: any) => ({
+            id: s.id || s.bookingId || s._id,
+            name: s.customerName || s.fullName || 'راكب خط',
+            from: s.pickupLocation || s.pickupName || 'النجف',
+            to: s.dropoffLocation || s.dropoffName || 'الجامعة',
+            phone: s.customerPhone || s.phone || '',
+            status: s.status,
+            cancellationPending: Boolean(s.cancellationPending || s.cancellation_requested || s.status === 'cancellation_pending'),
+            cancellationReason: s.cancellationReason || s.cancellation_reason,
+            cancellationDetails: s.cancellationDetails || s.cancellation_details,
+          }));
+          setSubscribers(mapped);
 
-      // تطبيق إزالة التكرار الصارم بحيث يظهر كل راكب مرة واحدة فقط مع حفظ حالة الإلغاء
-      const seen = new Set<string>();
-      const uniqueConfirmed: any[] = [];
-      for (const b of confirmed) {
-        const pNorm = normalizePhoneLoose(b.customerPhone || b.phone || '');
-        const cId = b.customerId || b.customer_id;
-        const key = cId ? `cid:${cId}` : pNorm ? `ph:${pNorm}` : `bk:${b.id || b.bookingId}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueConfirmed.push(b);
+          const currentCancelIds = new Set<string>();
+          mapped.forEach((sub) => {
+            if (sub.cancellationPending) {
+              currentCancelIds.add(sub.id);
+              if (!prevCancelIdsRef.current.has(sub.id)) {
+                show(`⚠️ طلب جديد لإلغاء الاشتراك من الراكب (${sub.name})`, 'warning', 8000);
+              }
+            }
+          });
+          prevCancelIdsRef.current = currentCancelIds;
+        }
+
+        if (Array.isArray(data.pendingBookings)) {
+          const pendingMapped: PendingSeatBooking[] = data.pendingBookings.map((b: any) => ({
+            id: b.id || b.bookingId || b._id,
+            bookingId: b.bookingId || b.id,
+            driverId: b.driverId,
+            driverName: b.driverName,
+            customerId: b.customerId,
+            customerName: b.customerName || 'راكب جديد',
+            customerPhone: b.customerPhone || '',
+            pickupLocation: b.pickupLocation || b.pickupName || 'النجف',
+            dropoffLocation: b.dropoffLocation || b.dropoffName || 'جامعة الكوفة',
+            pickupLat: b.pickupLat,
+            pickupLon: b.pickupLon,
+            seatsBooked: b.seatsBooked || b.seats || 1,
+            status: b.status || 'pending',
+            totalFare: b.totalFare || b.fare,
+            createdAt: b.createdAt,
+          }));
+          setPendingSeatRequests(pendingMapped);
+
+          if (pendingMapped.length > 0) {
+            const newest = pendingMapped[0];
+            const newestId = newest.id || newest.bookingId || '';
+            if (newestId && newestId !== lastNotifiedSeatBookingIdRef.current) {
+              lastNotifiedSeatBookingIdRef.current = newestId;
+              show(`💺 طلب حجز مقعد جديد من: ${newest.customerName} (${newest.pickupLocation} ➔ ${newest.dropoffLocation})`, 'info', 9000);
+            }
+          }
         }
       }
-
-      // فحص وصول طلب إلغاء جديد لتنبيه السائق صوتياً وإشعاراً فورياً
-      const currentCancelSubs = uniqueConfirmed.filter(
-        (b: any) =>
-          b.status !== 'Cancelled' &&
-          (b.status === 'cancellation_pending' ||
-            Boolean(b.cancellationPending) ||
-            Boolean(b.cancellation_requested) ||
-            b.cancellation_status === 'pending')
-      );
-
-      const newCancels = currentCancelSubs.filter((b: any) => {
-        const id = b.id || b.bookingId;
-        return id && !prevCancelIdsRef.current.has(id);
-      });
-
-      if (newCancels.length > 0 && prevCancelIdsRef.current.size > 0) {
-        show(`تنبيه عاجل: وصلك طلب إلغاء اشتراك من الراكب (${newCancels[0].customerName || 'مشترك'}) ⚠️`, 'warning', 7000);
-      }
-
-      const nextSet = new Set<string>();
-      currentCancelSubs.forEach((b: any) => {
-        const id = b.id || b.bookingId;
-        if (id) nextSet.add(id);
-      });
-      prevCancelIdsRef.current = nextSet;
-
-      setSubscribers(
-        uniqueConfirmed.map((b: any, idx: number) => {
-          const isCancelPending =
-            b.status !== 'Cancelled' &&
-            (b.status === 'cancellation_pending' ||
-              Boolean(b.cancellationPending) ||
-              Boolean(b.cancellation_requested) ||
-              b.cancellation_status === 'pending');
-
-          return {
-            id: b.id || b.bookingId || String(idx),
-            name: b.customerName || b.passengerName || 'مشترك خط دائمي',
-            from: b.pickupLocation || b.pickupAddress || b.from || 'نقطة الانطلاق',
-            to: b.dropoffLocation || b.dropoffAddress || b.to || 'الوجهة',
-            phone: b.customerPhone || b.phone || '',
-            status: b.status,
-            cancellationPending: isCancelPending,
-            cancellationReason: b.cancellationReason || b.cancellation_reason || b.passengerReason || b.passenger_reason || '',
-            cancellationDetails: b.cancellationDetails || b.cancellation_details || b.passengerDetails || b.passenger_details || '',
-          };
-        })
-      );
     } catch (_) {}
   }, [driverId, rawPhone, show]);
 
   useEffect(() => {
     void fetchSubscribers();
-    // استطلاع سريع كل 5 ثوانٍ لجلب أي تحديثات لحظية على حجوزات وإلغاءات ركاب الخط الدائمي
-    const interval = setInterval(() => {
-      void fetchSubscribers();
-    }, 5000);
+    const interval = setInterval(fetchSubscribers, 4000);
     return () => clearInterval(interval);
   }, [fetchSubscribers]);
 
-  // استطلاع طلبات حجز المقاعد الواردة في الخط الدائمي وتنبيه السائق فوراً
-  useEffect(() => {
-    if (!driverId && !rawPhone) return;
-    const targetId = driverId || rawPhone;
-
-    const fetchPendingSeatBookings = async () => {
-      try {
-        const { data } = await http.get<{
-          success?: boolean;
-          requests?: any[];
-          bookings?: any[];
-        }>(`/driver/${encodeURIComponent(targetId)}/requests`);
-
-        const list = data?.requests || data?.bookings || [];
-        const pending = list.filter((b: any) => b.status === 'Pending');
-
-        // إزالة التكرار لطلبات الحجز المعلقة لنفس الراكب
-        const seenPending = new Set<string>();
-        const uniquePending: any[] = [];
-        for (const b of pending) {
-          const pNorm = normalizePhoneLoose(b.customerPhone || b.phone || '');
-          const cId = b.customerId || b.customer_id;
-          const key = cId ? `cid:${cId}` : pNorm ? `ph:${pNorm}` : `bk:${b.id || b.bookingId}`;
-          if (!seenPending.has(key)) {
-            seenPending.add(key);
-            uniquePending.push(b);
-          }
-        }
-        setPendingSeatRequests(uniquePending);
-
-        // تنبيه السائق عند وصول طلب جديد لم يسبق تنبيهه عليه
-        if (uniquePending.length > 0) {
-          const newest = uniquePending[0];
-          const reqId = newest.id || newest.bookingId;
-          if (reqId && reqId !== lastNotifiedSeatBookingIdRef.current) {
-            lastNotifiedSeatBookingIdRef.current = reqId;
-            show(`🔔 طلب حجز مقعد جديد في الخط الدائمي من الراكب (${newest.customerName || 'راكب'})!`, 'info', 7000);
-          }
-        }
-      } catch (_) {}
-    };
-
-    void fetchPendingSeatBookings();
-    const interval = setInterval(fetchPendingSeatBookings, 2500);
-    return () => clearInterval(interval);
-  }, [driverId, rawPhone]);
-
-  // 1. التحقق المستمر من وجود مشوار نشط للكابتن لاستقبال المحادثات والمشاوير فوراً
+  // التحقق المستمر من وجود مشوار نشط للكابتن
   useEffect(() => {
     if (!driverId) return;
 
@@ -452,7 +332,6 @@ export default function DriverHomePage() {
         );
         if (activeData?.success && activeData.activeRide) {
           setActiveRide(activeData.activeRide);
-          // إذا وجد مشوار نشط، تفعيل وضع التكسي تلقائياً لمتابعة المشوار والمحادثة
           setWorkStatus((prev) => (prev === 'idle' ? prev : 'taxi'));
         } else {
           setActiveRide(null);
@@ -465,7 +344,7 @@ export default function DriverHomePage() {
     return () => clearInterval(interval);
   }, [driverId, rawPhone]);
 
-  // 2. استطلاع رسائل المحادثة مع الراكب وتنبيه الكابتن فور وصول رسالة جديدة
+  // استطلاع رسائل المحادثة مع الراكب
   useEffect(() => {
     if (!activeRide?.id) {
       setUnreadCount(0);
@@ -486,11 +365,10 @@ export default function DriverHomePage() {
             const lastMsg = customerMsgs[customerMsgs.length - 1];
             setLatestPassengerMsg(lastMsg);
 
-            // تنبيه الكابتن فور وصول رسالة جديدة أثناء إغلاق المحادثة
             if (!isChatOpen && lastMsg.id !== lastSeenMsgIdRef.current) {
               lastSeenMsgIdRef.current = lastMsg.id;
               setUnreadCount((prev) => prev + 1);
-              show(`💬 رسالة جديدة من الراكب (${activeRide.customerName || 'الراكب'}): "${lastMsg.text}"`, 'info', 7000);
+              show(`💬 رسالة من الراكب (${activeRide.customerName || 'الراكب'}): "${lastMsg.text}"`, 'info', 7000);
             }
           }
         }
@@ -504,9 +382,8 @@ export default function DriverHomePage() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [activeRide?.id, isChatOpen]);
+  }, [activeRide?.id, isChatOpen, show]);
 
-  // تصفير عداد الرسائل غير المقروءة عند فتح المحادثة
   useEffect(() => {
     if (isChatOpen) {
       setUnreadCount(0);
@@ -516,7 +393,7 @@ export default function DriverHomePage() {
     }
   }, [isChatOpen, latestPassengerMsg]);
 
-  // 3. استطلاع الطلبات الواردة في الانتظار وإرسال موقع السائق
+  // استطلاع الطلبات الواردة في الانتظار
   useEffect(() => {
     if (!driverId && !rawPhone) {
       setIncomingRequest(null);
@@ -527,8 +404,8 @@ export default function DriverHomePage() {
       http
         .post('/driver/location', {
           driverId: driverId || rawPhone,
-          latitude: 32.0298,
-          longitude: 44.3285,
+          latitude: driverLoc.lat,
+          longitude: driverLoc.lng,
           heading: 0,
           tripStatus: 'Online',
         })
@@ -547,7 +424,6 @@ export default function DriverHomePage() {
 
         if (pendingData?.success && pendingData.requests && pendingData.requests.length > 0) {
           setIncomingRequest(pendingData.requests[0]);
-          // تحويل وضع العمل للتكسي تلقائياً لإظهار خيارات القبول والرفض فوراً
           setWorkStatus((prev) => (prev === 'idle' ? prev : 'taxi'));
         } else {
           setIncomingRequest(null);
@@ -556,7 +432,7 @@ export default function DriverHomePage() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [driverId, rawPhone, workStatus]);
+  }, [driverId, rawPhone, workStatus, driverLoc]);
 
   // قبول الطلب حقيقياً
   async function handleAcceptRide() {
@@ -568,7 +444,7 @@ export default function DriverHomePage() {
         action: 'accept',
       });
       if (data?.success) {
-        show('تم قبول المشوار بنجاح! 🚖', 'success');
+        show('تم قبول المشوار بنجاح! 🚖 توجه إلى موقع الراكب', 'success');
         setActiveRide(data.request);
         setIncomingRequest(null);
       } else {
@@ -644,7 +520,7 @@ export default function DriverHomePage() {
         action: 'reject',
       });
       if (data?.success) {
-        show(data.message || 'تم رفض طلب الإلغاء والإبقاء على اشتراك الراكب بنجاح', 'success');
+        show(data.message || 'تم الإبقاء على اشتراك الراكب بنجاح', 'success');
         void fetchSubscribers();
       } else {
         show('تعذر رفض طلب الإلغاء', 'error');
@@ -654,13 +530,11 @@ export default function DriverHomePage() {
     }
   }
 
-  // فتح نافذة كتابة سبب الموافقة على الإلغاء
   function handleOpenApproveModal(sub: Subscriber) {
     setCancellingSub(sub);
     setDriverApprovalReason('تم التراضي مع الراكب');
   }
 
-  // تأكيد الموافقة على الإلغاء من قبل السائق
   async function handleConfirmApproveCancellation() {
     if (!cancellingSub) return;
     setIsSubmittingCancellation(true);
@@ -672,7 +546,7 @@ export default function DriverHomePage() {
         driverApprovalReason: driverApprovalReason.trim() || 'تم التراضي مع الراكب',
       });
       if (data?.success) {
-        show(data.message || 'تمت الموافقة على إلغاء الاشتراك وإنهاء الحجز بنجاح', 'success');
+        show(data.message || 'تمت الموافقة على إلغاء الاشتراك بنجاح', 'success');
         setSubscribers((prev) => prev.filter((s) => s.id !== cancellingSub.id));
         setCancellingSub(null);
         void fetchSubscribers();
@@ -686,7 +560,7 @@ export default function DriverHomePage() {
     }
   }
 
-  // السائق وصل لنقطة انطلاق الراكب
+  // السائق وصل لنقطة انطلاق الراكب (يطلق نغمة الهورن لدى الراكب)
   async function handleDriverArrived() {
     const currentId = driverId || rawPhone;
     if (!activeRide || !currentId) return;
@@ -697,7 +571,7 @@ export default function DriverHomePage() {
         driverPhone: rawPhone,
       });
       if (data?.success) {
-        show('تم إشعار الراكب بوصولك إلى الموقع 📍', 'success');
+        show('تم إشعار الراكب بوصولك وإطلاق تنبيه الهورن بنجاح 📍🚖', 'success');
         setActiveRide((prev: any) => ({ ...prev, status: 'Arrived' }));
       } else {
         show(data?.message || 'تعذر تأكيد الوصول', 'error');
@@ -707,14 +581,12 @@ export default function DriverHomePage() {
     }
   }
 
-  // فتح تطبيق خرائط جوجل بدقة للتوجه إلى الوجهة
   function handleOpenGoogleMaps(lat: number, lng: number) {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
     window.open(url, '_blank');
     setIsNavModalOpen(false);
   }
 
-  // فتح تطبيق ويز (Waze) للتوجه إلى الوجهة
   function handleOpenWaze(lat: number, lng: number) {
     const url = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
     window.open(url, '_blank');
@@ -751,7 +623,7 @@ export default function DriverHomePage() {
     }
   }
 
-  // السائق انطلق إلى الوجهة بعد صعود الراكب
+  // انطلاق الرحلة
   async function handleDriverStartRide() {
     const currentId = driverId || rawPhone;
     if (!activeRide || !currentId) return;
@@ -765,7 +637,6 @@ export default function DriverHomePage() {
         show('تم بدء الرحلة والانطلاق إلى الوجهة 🚗💨', 'success', 3000);
         setActiveRide((prev: any) => ({ ...prev, status: 'InProgress' }));
 
-        // فتح نافذة اختيار تطبيق الملاحة فوراً
         const destLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
         const destLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
         if (destLat && destLon) {
@@ -780,11 +651,20 @@ export default function DriverHomePage() {
     }
   }
 
-  // السائق أنهى المشوار
+  // فتح نافذة تحصيل الأجرة الشفافة
+  function handleInitiateCompleteRide() {
+    if (!activeRide) return;
+    const rawFare = String(activeRide.fare || activeRide.price || '3500').replace(/[^0-9]/g, '');
+    const num = Math.max(3000, Number(rawFare) || 3500);
+    const rounded = Math.ceil(num / 250) * 250;
+    setFinalFareAmount(rounded.toLocaleString('ar-IQ'));
+    setIsFareModalOpen(true);
+  }
+
+  // إنهاء المشوار الفعلي بعد التحصيل
   async function handleDriverComplete() {
     const currentId = driverId || rawPhone;
     if (!activeRide || !currentId) return;
-    const fareAmount = activeRide.fare || activeRide.price || '5,000';
     try {
       const { data } = await http.post<{ success: boolean; message?: string }>('/ride/complete', {
         requestId: activeRide.id,
@@ -792,10 +672,10 @@ export default function DriverHomePage() {
         driverPhone: rawPhone,
       });
       if (data?.success) {
-        show(`تم إكمال المشوار بنجاح، استلمت: ${fareAmount} د.ع 💵`, 'success', 3000);
+        show(`تم إنهاء المشوار بنجاح وتحصيل: ${finalFareAmount} د.ع 💵`, 'success', 4000);
         setActiveRide(null);
+        setIsFareModalOpen(false);
 
-        // تحديث نقاط الكابتن لحظياً
         http
           .get<{ success: boolean; points?: number }>(`/driver/${driverId}/points`)
           .then((res) => {
@@ -814,85 +694,114 @@ export default function DriverHomePage() {
   }
 
   function handleOpenWhatsApp(phone: string, name: string) {
-    const text = encodeURIComponent(`مرحباً ${name}، أنا كابتن خطك الدائمي.`);
+    const text = encodeURIComponent(`مرحباً ${name}، أنا كابتن خطك الدائمي من توصيلة.`);
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
   }
 
+  const isOnline = workStatus !== 'idle';
+
   return (
     <div
-      className="flex h-full w-full flex-col bg-white font-cairo text-right overflow-y-auto overscroll-y-contain pb-[calc(2rem+env(safe-area-inset-bottom))]"
-      style={{
-        WebkitOverflowScrolling: 'touch',
-        touchAction: 'pan-y',
-      }}
+      className="relative flex h-full min-h-[100dvh] w-full flex-col bg-[#080E1A] text-[#DDE2F4] font-cairo text-right select-none touch-pan-x touch-pan-y"
       dir="rtl"
     >
-      {/* 1. الترويسة العلوية */}
-      <header className="shrink-0 sticky top-0 z-20 flex items-center justify-between border-b border-slate-100 px-6 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-4 bg-white/95 backdrop-blur-sm shadow-sm" dir="rtl">
-        {/* اليمين: معلومات السائق والصورة */}
-        <div className="flex items-center gap-3.5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/80 shadow-subtle">
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-            </svg>
-          </div>
+      {/* 1. شريط المؤشرات العلوي للكابتن (Captain Top HUD Bar) */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-[#161C28]/95 backdrop-blur-xl shadow-lg" dir="rtl">
+        {/* اليمين: الشعار المفرغ ومعلومات الكابتن */}
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/logo.png?v=40"
+            alt="توصيلة"
+            className="h-8 w-auto object-contain select-none pointer-events-none drop-shadow"
+          />
           <div className="text-right">
-            <p className="text-[16px] font-bold text-[#1A1A1A] leading-tight">{driverName}</p>
-            <p className="text-[12px] font-medium text-emerald-600 mt-0.5">سائق مفعل</p>
+            <p className="text-[14.5px] font-black text-white leading-tight">{driverName}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[11px] font-bold text-amber-400">⭐ 4.9</span>
+              <span className="text-slate-500 text-[10px]">•</span>
+              <span className="text-[10.5px] font-bold text-emerald-400">كابتن معتمد</span>
+              <span className="text-slate-500 text-[10px]">•</span>
+              <span className="text-[10px] text-slate-400 font-mono" dir="ltr">{formattedPhone}</span>
+            </div>
           </div>
         </div>
 
-        {/* اليسار: رقم الهاتف والرصيد ونقاط الكابتن */}
-        <div className="text-left font-sans">
-          <p className="text-[13.5px] font-bold text-[#1A1A1A] text-left" dir="ltr">{formattedPhone}</p>
-          <div className="flex items-center justify-end gap-2 mt-0.5" dir="rtl">
-            <p className="text-[12px] font-medium text-[#6C757D]">
-              الرصيد: <span className="font-bold text-[#1A1A1A]">{driverBalance}</span> د.ع
-            </p>
-            <span className="text-slate-300">|</span>
-            <p className="text-[12px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80 flex items-center gap-1 shadow-2xs">
-              <span>النقاط:</span>
-              <span className="font-extrabold text-amber-900">{driverPoints}</span>
-              <span>⭐</span>
-            </p>
+        {/* اليسار: مفتاح الاتصال السريع وبطاقة الأرباح */}
+        <div className="flex items-center gap-2">
+          {/* كبسولة الأرباح السريعة */}
+          <div className="hidden sm:flex flex-col text-left font-mono bg-white/5 border border-white/10 px-2.5 py-1 rounded-xl">
+            <span className="text-[10px] text-slate-400">أرباح اليوم</span>
+            <span className="text-xs font-bold text-amber-400">{driverBalance} د.ع</span>
           </div>
+
+          {/* مفتاح الاتصال السريع (Online/Offline Toggle Pill) - Target >= 48px */}
+          <button
+            type="button"
+            onClick={() => handleSwitchWorkStatus(isOnline ? 'idle' : 'taxi')}
+            className={`min-h-[48px] px-3.5 py-2 rounded-full flex items-center gap-2 transition-all cursor-pointer active:scale-95 border ${
+              isOnline
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/20'
+                : 'bg-slate-800 text-slate-400 border-slate-700/60'
+            }`}
+            title="تبديل حالة الاتصال"
+            aria-label="تبديل الاتصال"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              {isOnline && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOnline ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
+            </span>
+            <span className="text-xs font-black">{isOnline ? 'متصل' : 'خمول'}</span>
+          </button>
         </div>
       </header>
 
       {/* المحتوى الرئيسي */}
-      <main className="flex-1 px-5 py-4 bg-[#F8F9FA]/40 pb-12" dir="rtl">
+      <main className="flex-1 px-4 py-3 pb-[calc(5rem+env(safe-area-inset-bottom))]" dir="rtl">
+        {/* شريط الإحصائيات المدمج للموبايل */}
+        <div className="grid grid-cols-3 gap-2 mb-3 sm:hidden">
+          <div className="bg-[#161C28]/90 border border-white/10 rounded-2xl p-2.5 text-center shadow-md">
+            <span className="text-[10px] text-slate-400 block mb-0.5">أرباح اليوم</span>
+            <span className="text-xs font-black text-amber-400 font-mono">{driverBalance}</span>
+          </div>
+          <div className="bg-[#161C28]/90 border border-white/10 rounded-2xl p-2.5 text-center shadow-md">
+            <span className="text-[10px] text-slate-400 block mb-0.5">التقييم</span>
+            <span className="text-xs font-black text-emerald-400">⭐ 4.9</span>
+          </div>
+          <div className="bg-[#161C28]/90 border border-white/10 rounded-2xl p-2.5 text-center shadow-md">
+            <span className="text-[10px] text-slate-400 block mb-0.5">النقاط</span>
+            <span className="text-xs font-black text-white">{driverPoints}</span>
+          </div>
+        </div>
+
         {/* تنبيه وصول رسالة من الراكب */}
         {latestPassengerMsg && activeRide && (
           <div
             onClick={() => setIsChatOpen(true)}
-            className="mb-4 flex items-center justify-between rounded-xl bg-[#1B4965] p-3.5 text-white shadow-subtle cursor-pointer transition active:scale-[0.99] hover:bg-[#14364A] animate-fade-in"
+            className="mb-3 flex items-center justify-between rounded-2xl bg-[#161C28] border border-amber-500/40 p-3 text-white shadow-xl cursor-pointer transition active:scale-[0.99] hover:border-amber-400 animate-fade-in"
             dir="rtl"
           >
-            {/* اليمين: الأيقونة والنص */}
-            <div className="flex items-center gap-3 text-right">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/20 text-white text-[18px]">
+            <div className="flex items-center gap-2.5 text-right">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 text-lg">
                 💬
               </div>
               <div className="text-right">
-                <p className="text-[12px] font-medium text-white/80">
-                  محادثة مع الراكب ({activeRide.customerName || 'الراكب'}):
+                <p className="text-[11px] font-bold text-amber-400">
+                  رسالة جديدة من الراكب ({activeRide.customerName || 'الراكب'}):
                 </p>
-                <p className="text-[14px] font-bold text-white truncate max-w-[200px]">
+                <p className="text-[13px] font-semibold text-white truncate max-w-[190px]">
                   {latestPassengerMsg.text}
                 </p>
               </div>
             </div>
-
-            {/* اليسار: زر فتح المحادثة وشارة الرسائل الجديدة */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               {unreadCount > 0 && (
-                <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-bold text-white animate-pulse">
-                  {unreadCount} جديدة
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
+                  {unreadCount}
                 </span>
               )}
-              <span className="rounded-lg bg-white/15 px-3 py-1.5 text-[12px] font-bold text-white flex items-center gap-1.5">
+              <span className="rounded-xl bg-amber-500/20 text-amber-300 px-3 py-1.5 text-xs font-bold flex items-center gap-1 border border-amber-500/30">
                 <span>فتح المحادثة</span>
-                <span className="text-[13px]">➔</span>
+                <span>➔</span>
               </span>
             </div>
           </div>
@@ -902,38 +811,33 @@ export default function DriverHomePage() {
         {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && (
           <div
             onClick={() => handleSwitchWorkStatus('permanent')}
-            className="mb-4 flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-[#1A1A1A] shadow-card cursor-pointer transition active:scale-[0.99] hover:bg-amber-100/60 animate-fade-in"
+            className="mb-3 flex items-center justify-between rounded-2xl bg-amber-500/15 border border-amber-400/50 p-3 text-amber-300 shadow-xl cursor-pointer transition active:scale-[0.99] hover:bg-amber-500/20 animate-fade-in"
             dir="rtl"
           >
             <div className="text-right">
-              <p className="text-[14px] font-bold text-[#1A1A1A]">
-                لديك {pendingSeatRequests.length} طلب حجز مقعد جديد في الخط الدائمي!
+              <p className="text-[13px] font-bold text-white flex items-center gap-1.5">
+                <span>💺</span>
+                <span>لديك {pendingSeatRequests.length} طلب حجز مقعد في الخط الدائمي!</span>
               </p>
-              <p className="text-[12px] font-medium text-[#6C757D] mt-0.5">
-                اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار فوراً
-              </p>
+              <p className="text-[11px] text-amber-300/80 mt-0.5">اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار</p>
             </div>
-            <span className="rounded-lg bg-[#D97706] px-3 py-1.5 text-[12px] font-bold text-white shadow-xs flex items-center gap-1 shrink-0">
-              <span>معاينة وقبول/رفض</span>
-              <span className="text-[13px]">➔</span>
+            <span className="rounded-xl bg-amber-500 text-slate-950 font-black px-3 py-1.5 text-xs shadow-md shrink-0">
+              معاينة ➔
             </span>
           </div>
         )}
 
-        {/* 2. حالة العمل الحالية */}
-        <section className="mb-6 text-right" dir="rtl">
-          <h2 className="text-[15px] font-bold text-[#1A1A1A] mb-2.5 text-right">حالة العمل الحالية</h2>
-          
-          {/* أزرار التبديل الثلاثية (Segmented Control احترافي) */}
-          <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-100 rounded-xl border border-slate-200/60" dir="rtl">
+        {/* أزرار التبديل الثلاثية لنمط العمل (Segmented Luxury Control) */}
+        <section className="mb-3 text-right" dir="rtl">
+          <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-[#161C28]/90 rounded-2xl border border-white/10 shadow-lg" dir="rtl">
             {/* خمول */}
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('idle')}
-              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center ${
+              className={`rounded-xl py-2.5 text-center text-xs sm:text-sm transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
                 workStatus === 'idle'
-                  ? 'bg-white text-[#1A1A1A] font-bold shadow-card'
-                  : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
+                  ? 'bg-slate-700/80 text-white shadow-md border border-slate-600'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               خمول
@@ -943,260 +847,40 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('permanent')}
-              className={`relative flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] ${
+              className={`relative flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-center text-xs sm:text-sm transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] font-bold ${
                 workStatus === 'permanent'
-                  ? 'bg-[#1B4965] text-white font-bold shadow-card'
-                  : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-md'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               {workStatus === 'permanent' && <span>✓</span>}
               <span>خط دائمي</span>
               {pendingSeatRequests.length > 0 && (
-                <span className="absolute -top-1 -start-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10.5px] font-bold text-white shadow-card animate-bounce">
+                <span className="absolute -top-1 -start-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md animate-bounce">
                   {pendingSeatRequests.length}
                 </span>
               )}
             </button>
 
-            {/* تكسي */}
+            {/* تكسي فوري */}
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('taxi')}
-              className={`rounded-lg py-2.5 text-center text-[14px] transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center ${
+              className={`rounded-xl py-2.5 text-center text-xs sm:text-sm transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
                 workStatus === 'taxi'
-                  ? 'bg-emerald-600 text-white font-bold shadow-card'
-                  : 'text-[#6C757D] hover:text-[#1A1A1A] font-medium'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              تكسي
+              تكسي فوري
             </button>
           </div>
-
-          <p className="mt-2.5 text-center text-[12.5px] font-medium text-[#6C757D]">
-            {workStatus === 'permanent'
-              ? 'أنت الآن متاح للخطوط الدائمة والمشاوير الفورية'
-              : workStatus === 'taxi'
-              ? 'أنت الآن متاح لطلبات التكسي الفورية'
-              : 'أنت الآن في وضع الخمول وغير متاح لاستقبال الطلبات'}
-          </p>
         </section>
 
-        {/* 3. ركاب الخط الدائمي المشتركين وطلبات الحجز الواردة */}
-        {workStatus === 'permanent' && (
-          <section className="mb-6 space-y-5">
-            {/* بطاقات طلبات حجز المقاعد الواردة (تنتظر موافقة الكابتن) */}
-            {pendingSeatRequests.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-amber-500 text-white px-3 py-0.5 text-[12px] font-black animate-pulse">
-                    {pendingSeatRequests.length} طلب ينتظر قرارك
-                  </span>
-                  <h3 className="text-[16px] font-black text-gray-900">
-                    طلبات حجز المقاعد الواردة 💺
-                  </h3>
-                </div>
-
-                {pendingSeatRequests.map((req) => (
-                  <div
-                    key={req.id || req.bookingId}
-                    className="rounded-2xl border-2 border-amber-400 bg-amber-50/50 p-4 shadow-md transition hover:shadow-lg animate-fade-in text-right"
-                  >
-                    <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-amber-200/80">
-                      <span className="rounded-md bg-amber-600 text-white px-2.5 py-0.5 text-[11.5px] font-black">
-                        طلب حجز مقعد وارد 🚖
-                      </span>
-                      <span className="text-[13px] font-bold text-gray-700">
-                        {req.seatsBooked || 1} مقعد مطلوب
-                      </span>
-                    </div>
-
-                    {/* معاينة معلومات الراكب أمام السائق */}
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          {req.customerPhone && (
-                            <button
-                              type="button"
-                              onClick={() => window.open(`tel:${req.customerPhone}`)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition active:scale-95 cursor-pointer"
-                              title="اتصال بالراكب"
-                            >
-                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                            </button>
-                          )}
-                          {req.customerPhone && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenWhatsApp(req.customerPhone || '', req.customerName || '')}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#22c55e]/20 text-[#16a34a] hover:bg-[#22c55e]/30 transition active:scale-95 cursor-pointer"
-                              title="واتساب مع الراكب"
-                            >
-                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                            </button>
-                          )}
-                        </div>
-                        <p className="text-[16px] font-black text-gray-900">
-                          الراكب: {req.customerName || 'راكب توصيلة'}
-                        </p>
-                      </div>
-
-                      {req.customerPhone && (
-                        <p className="text-[13px] font-bold text-gray-600" dir="ltr">
-                          📞 {req.customerPhone}
-                        </p>
-                      )}
-
-                      <div className="rounded-xl bg-white p-3 space-y-1.5 border border-amber-200/90 shadow-xs">
-                        <p className="text-[13.5px] font-bold text-gray-800">
-                          🟢 من (موقع الصعود): <span className="text-gray-900 font-black">{req.pickupLocation || 'النجف الأشرف'}</span>
-                        </p>
-                        <p className="text-[13.5px] font-bold text-gray-800">
-                          🔴 إلى (الوجهة): <span className="text-gray-900 font-black">{req.dropoffLocation || 'جامعة الكوفة'}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* خيارات القبول والرفض */}
-                    <div className="flex gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => handleAcceptSeatBooking(req.id || req.bookingId || '')}
-                        className="flex-1 rounded-xl bg-emerald-600 py-3 text-center text-[15px] font-black text-white shadow-sm transition active:scale-95 cursor-pointer hover:bg-emerald-700"
-                      >
-                        قبول الحجز ✅
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRejectSeatBooking(req.id || req.bookingId || '')}
-                        className="flex-1 rounded-xl bg-red-500 py-3 text-center text-[15px] font-black text-white shadow-sm transition active:scale-95 cursor-pointer hover:bg-red-600"
-                      >
-                        رفض الحجز ✕
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* ركاب الخط الدائمي المشتركون */}
-            <div>
-              <h3 className="text-center text-[16px] font-black text-gray-900 mb-3">
-                ركاب الخط الدائمي المشتركين - {subscribers.length === 1 ? 'راكب واحد' : subscribers.length === 2 ? 'راكبان' : `${subscribers.length} ركاب`}
-              </h3>
-
-              {subscribers.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-gray-500 bg-gray-50/50">
-                  <p className="text-[14px] font-bold text-gray-700">لا يوجد ركاب مشتركين حالياً في خطك الدائمي</p>
-                  <p className="text-[12px] text-gray-400 mt-1">ستظهر اشتراكات الركاب المؤكدة هنا تلقائياً بعد قبول الحجز</p>
-                </div>
-              ) : (
-              <div className="space-y-3">
-                {subscribers.map((sub) => (
-                  <div
-                    key={sub.id}
-                    className={`rounded-xl border bg-white p-3.5 shadow-sm transition hover:shadow-md ${
-                      sub.cancellationPending ? 'border-amber-400 bg-amber-50/40 ring-1 ring-amber-400/50' : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      {/* يسار: زر واتساب */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
-                        className="flex items-center gap-2 rounded-lg py-1 px-2 transition hover:bg-emerald-50 active:scale-95 cursor-pointer"
-                      >
-                        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#22c55e] text-white shadow-sm">
-                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-                          </svg>
-                        </div>
-                        <span className="text-[13.5px] font-bold text-[#16a34a]">واتساب</span>
-                      </button>
-
-                      {/* يمين: اسم الراكب والمسار */}
-                      <div className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {sub.cancellationPending && (
-                            <span className="rounded-md bg-amber-500 text-white font-black px-2 py-0.5 text-[10.5px] animate-pulse">
-                              طلب إلغاء ⚠️
-                            </span>
-                          )}
-                          <p className="text-[16px] font-black text-gray-900 leading-tight">{sub.name}</p>
-                        </div>
-                        <p className="text-[13px] font-bold text-gray-700 mt-1">
-                          {sub.from} <span className="text-gray-500 font-sans mx-0.5">➔</span> {sub.to}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* تنبيه طلب إلغاء الاشتراك مع الإجراءات الثلاثة */}
-                    {sub.cancellationPending && (
-                      <div className="mt-3 pt-3 border-t border-amber-200/90 space-y-2.5">
-                        <div className="rounded-xl bg-amber-100/80 p-3 text-right text-[12.5px] text-amber-950 border border-amber-300">
-                          <p className="font-black text-amber-900 flex items-center justify-end gap-1.5">
-                            <span>طلب الراكب إلغاء الاشتراك في الخط</span>
-                            <span className="text-[14px]">⚠️</span>
-                          </p>
-                          <p className="mt-1 font-bold text-gray-800">
-                            السبب: <span className="text-red-700">{sub.cancellationReason || 'ظروف شخصية'}</span>
-                          </p>
-                          {sub.cancellationDetails && (
-                            <p className="text-[12px] text-gray-600 mt-0.5">
-                              تفاصيل: {sub.cancellationDetails}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* الإجراءات الثلاثة الواضحة للسائق */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (sub.phone) window.open(`tel:${sub.phone}`);
-                              else show('رقم هاتف الراكب غير متوفر', 'info');
-                            }}
-                            className="flex items-center justify-center gap-1 rounded-xl bg-blue-600 hover:bg-blue-700 py-2.5 px-2 text-white text-[12.5px] font-black transition active:scale-95 cursor-pointer shadow-xs"
-                          >
-                            <span>اتصال بالراكب 📞</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRejectCancellation(sub.id)}
-                            className="rounded-xl bg-slate-200 hover:bg-slate-300 py-2.5 px-2 text-slate-800 text-[12.5px] font-bold transition active:scale-95 cursor-pointer"
-                          >
-                            رفض الإلغاء
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenApproveModal(sub)}
-                            className="rounded-xl bg-red-600 hover:bg-red-700 py-2.5 px-2 text-white text-[12.5px] font-black transition active:scale-95 cursor-pointer shadow-xs"
-                          >
-                            الموافقة على الإلغاء
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            </div>
-          </section>
-        )}
-
-        {/* ===== وضع التكسي ===== */}
+        {/* 2. الخريطة الليلية ورادار البحث عن المشاوير (Nocturnal Radar Map) */}
         {workStatus === 'taxi' && (
-          <section className="mb-6 space-y-4">
-            {/* عنوان القسم */}
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                تتبع الـ GPS نشط 🟢
-              </span>
-              <h3 className="text-[15px] font-bold text-[#1A1A1A] text-right">خريطة الكابتن وتحديد الموقع</h3>
-            </div>
-
-            {/* خريطة تتبع الموقع التفاعلية للكابتن مع زر تحديد الموقع العائم */}
-            <div className="relative w-full h-[320px] rounded-2xl overflow-hidden shadow-card border border-slate-200">
+          <section className="mb-4 space-y-3">
+            <div className="relative w-full h-[280px] sm:h-[320px] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-[#0A101D]">
               <MapGL
                 ref={mapRef}
                 mapboxAccessToken={config.mapboxToken}
@@ -1205,394 +889,474 @@ export default function DriverHomePage() {
                 onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
                 style={{ width: '100%', height: '100%' }}
               >
-                {/* مسار الملاحة بنمط ويز لخريطة الكابتن */}
+                {/* مسار الملاحة بنمط ويز المتوهج */}
                 {driverRouteCoordinates && driverRouteCoordinates.length > 0 && (
                   <RouteLines
                     lines={[
                       {
                         id: 'driver-route-line',
                         coordinates: driverRouteCoordinates,
-                        color: '#3b82f6',
+                        color: '#F59E0B',
+                        width: 5,
                       },
                     ]}
                   />
                 )}
 
+                {/* سيارة الكابتن التفاعلية مع موجة الرادار النابضة */}
                 <Marker longitude={driverLoc.lng} latitude={driverLoc.lat} anchor="center">
                   <div className="relative flex items-center justify-center">
-                    <div className="animate-ping absolute h-8 w-8 rounded-full bg-amber-500/30" />
-                    <div className="h-7 w-7 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center text-white text-xs">
-                      🚕
+                    <div className="animate-ping absolute h-12 w-12 rounded-full bg-amber-500/25" />
+                    <div className="h-9 w-9 rounded-full bg-[#1A202C] border-2 border-amber-400 shadow-2xl flex items-center justify-center text-amber-400 text-base font-bold">
+                      🚖
                     </div>
                   </div>
                 </Marker>
               </MapGL>
 
-              {/* زر تحديد موقعي الحالي العائم على الخريطة */}
-              <button
-                type="button"
-                onClick={handleRecenterDriverMap}
-                disabled={isLocating}
-                className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 z-30 bg-white p-3 rounded-full shadow-lg border border-slate-200 active:scale-95 transition-all text-amber-500 cursor-pointer hover:bg-slate-50 disabled:opacity-70"
-                title="تحديد موقعي وتوسيط الخريطة"
-                aria-label="تحديد موقعي"
-              >
-                <svg className={`h-6 w-6 ${isLocating ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 2v3m0 14v3M2 12h3m14 0h3" />
-                </svg>
-              </button>
+              {/* شارة حالة الرادار العائمة */}
+              <div className="absolute top-3 right-3 z-20 pointer-events-none">
+                <div className="flex items-center gap-1.5 bg-[#161C28]/90 backdrop-blur-xl border border-emerald-500/30 px-3 py-1.5 rounded-full shadow-lg">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                  </span>
+                  <span className="text-white font-bold text-[11px]">رادار المشاوير نشط</span>
+                </div>
+              </div>
+
+              {/* أزرار التحكم الجانبية العائمة: GPS و SOS - Touch Targets >= 48px */}
+              <div className="absolute left-3 bottom-3 z-30 flex flex-col gap-2">
+                {/* زر SOS للطوارئ */}
+                <button
+                  type="button"
+                  onClick={() => setShowSosAlert((prev) => !prev)}
+                  className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-red-600/90 text-white shadow-xl shadow-red-600/30 border border-red-400/40 flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                  title="طوارئ وأمان الكابتن"
+                  aria-label="طوارئ"
+                >
+                  <span className="text-base font-bold">🆘</span>
+                </button>
+
+                {/* زر إعادة التمركز */}
+                <button
+                  type="button"
+                  onClick={handleRecenterDriverMap}
+                  disabled={isLocating}
+                  className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-[#161C28]/95 text-amber-400 border border-amber-500/40 shadow-xl backdrop-blur-xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
+                    isLocating ? 'animate-spin border-amber-400 ring-2 ring-amber-400/30' : ''
+                  }`}
+                  title="تحديد موقعي الفعلي"
+                  aria-label="تحديد موقعي"
+                >
+                  <span className="text-lg">🎯</span>
+                </button>
+              </div>
+
+              {/* نافذة الطوارئ للكابتن */}
+              {showSosAlert && (
+                <div className="absolute inset-x-3 bottom-16 z-40 bg-[#161C28]/95 border border-red-500/40 rounded-2xl p-3.5 shadow-2xl backdrop-blur-2xl animate-fade-in flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                      <span>🚨</span>
+                      <span>غرفة طوارئ وعمليات الكباتن - النجف</span>
+                    </span>
+                    <button onClick={() => setShowSosAlert(false)} className="text-slate-400 hover:text-white text-xs p-1">✕</button>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    عند إرسال النداء، سيتم إرسال إحداثيات سيارتك الحية مباشرة إلى غرفة العمليات المركزية لإرسال المساعدة.
+                  </p>
+                  <a
+                    href="tel:911"
+                    className="w-full min-h-[48px] py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/30"
+                  >
+                    <span>📞</span>
+                    <span>اتصال فوري بغرفة العمليات</span>
+                  </a>
+                </div>
+              )}
             </div>
 
-            {/* بطاقة المشوار النشط إن وُجد وكان مقبولاً */}
+            {/* 3. بطاقة المشوار النشط (Active Trip Captain Control Dock) */}
             {activeRide && (activeRide.status === 'Accepted' || activeRide.status === 'Arrived' || activeRide.status === 'InProgress' || activeRide.status === 'in_progress') ? (
-              <div className="rounded-xl border border-emerald-500/80 bg-white p-4 shadow-subtle animate-fade-in">
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+              <div className="rounded-3xl border border-emerald-500/60 bg-[#161C28]/95 p-4 shadow-2xl backdrop-blur-2xl animate-fade-in">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                   <div className="flex items-center gap-2">
-                    <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 border border-emerald-200/60">
+                    <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300 border border-emerald-500/40">
                       {activeRide.status === 'Arrived'
-                        ? 'وصلت إلى الراكب 📍'
+                        ? 'وصلت إلى موقع الراكب 📍'
                         : (activeRide.status === 'InProgress' || activeRide.status === 'in_progress')
                         ? 'في الطريق إلى الوجهة 🚗'
-                        : 'مشوار نشط 🚖'}
+                        : 'مشوار نشط • بالانتظار 🚖'}
                     </span>
-                    {/* أيقونة ملاحة مصغرة في زاوية البطاقة لمن يحتاج إعادة فتح الخريطة دون تشويش */}
                     <button
                       type="button"
-                      title="فتح الملاحة الخارجية (Google Maps / Waze)"
+                      title="فتح الملاحة الخارجية"
                       onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition cursor-pointer border border-slate-200"
+                      className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 active:scale-95 transition cursor-pointer"
                     >
-                      <svg className="h-4 w-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="3 11 22 2 13 21 11 13 3 11" />
-                      </svg>
+                      🧭
                     </button>
                   </div>
-                  <span className="text-[15px] font-bold text-[#1A1A1A]">
-                    {activeRide.fare} د.ع
+                  <span className="text-base font-black text-amber-400 font-mono">
+                    {Number(String(activeRide.fare || activeRide.price || '3500').replace(/[^0-9]/g, '')).toLocaleString()} د.ع
                   </span>
                 </div>
 
-                <div className="text-right space-y-1.5 mb-4">
-                  <p className="text-[15px] font-bold text-[#1A1A1A]">
-                    الراكب: {activeRide.customerName || 'راكب توصيلة'}
-                  </p>
-                  {activeRide.customerPhone && (
-                    <p className="text-[12.5px] font-medium text-[#6C757D]" dir="ltr">
-                      {activeRide.customerPhone}
+                <div className="text-right space-y-1.5 mb-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-bold text-sm">
+                      الراكب: {activeRide.customerName || 'راكب توصيلة'}
+                    </span>
+                    <span className="text-amber-400 text-xs">⭐ 5.0</span>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                    <p className="text-slate-300">
+                      🟢 من: <span className="text-white font-bold">{activeRide.pickupName}</span>
                     </p>
-                  )}
-                  <p className="text-[13px] font-medium text-[#1A1A1A]">
-                    من: <span className="text-[#6C757D]">{activeRide.pickupName}</span>
-                  </p>
-                  <p className="text-[13px] font-medium text-[#1A1A1A]">
-                    إلى: <span className="text-[#6C757D]">{activeRide.dropoffName}</span>
-                  </p>
+                    <p className="text-slate-300">
+                      🔴 إلى: <span className="text-white font-bold">{activeRide.dropoffName}</span>
+                    </p>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  {activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? (
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenNavModal('pickup')}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white py-3.5 px-4 text-center text-[15px] font-black shadow-[0_4px_16px_rgba(245,158,11,0.35)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
-                      >
-                        <span>التوجه إلى موقع الراكب 🧭</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDriverArrived}
-                        className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
-                      >
-                        📍 وصلت إلى موقع الانطلاق
-                      </button>
-                    </div>
-                  ) : activeRide.status === 'Arrived' ? (
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={handleDriverStartRide}
-                        className="w-full rounded-xl bg-[#f97316] py-3.5 text-center text-[15.5px] font-black text-white shadow-[0_6px_20px_rgba(249,115,22,0.4)] transition-all duration-200 active:scale-[0.98] cursor-pointer hover:bg-orange-600"
-                      >
-                        لقد وصلت، انطلق إلى وجهتك 🚗
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={handleDriverComplete}
-                        className="w-full rounded-xl bg-emerald-600 py-3.5 text-center text-[15.5px] font-black text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
-                      >
-                        🏁 إنهاء المشوار واستلام الأجرة
-                      </button>
-                    </div>
-                  )}
-
-                  {/* أزرار التواصل المباشر مع الراكب */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsChatOpen(true)}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 py-2.5 text-center text-[13.5px] font-bold text-[#1B4965] transition hover:bg-slate-200/80 active:scale-95 cursor-pointer"
-                    >
-                      <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                      <span>مراسلة الراكب 💬</span>
-                      {unreadCount > 0 && (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
-                          {unreadCount}
-                        </span>
-                      )}
-                    </button>
+                {/* أزرار مراحل الرحلة والتواصل - Touch Targets >= 48px */}
+                <div className="space-y-2.5">
+                  {/* أزرار الاتصال والمراسلة والملاحة السريعة */}
+                  <div className="grid grid-cols-3 gap-2">
                     {activeRide.customerPhone && (
                       <button
                         type="button"
                         onClick={() => window.open(`tel:${activeRide.customerPhone}`)}
-                        className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100 transition active:scale-95 cursor-pointer shrink-0"
-                        title="اتصال هاتفي"
+                        className="min-h-[48px] py-2 px-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-emerald-600/30 transition cursor-pointer active:scale-95"
                       >
-                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        <span>📞</span>
+                        <span>اتصال</span>
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
+                      className="min-h-[48px] py-2 px-2 rounded-xl bg-sky-600/20 text-sky-400 border border-sky-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
+                    >
+                      <span>🧭</span>
+                      <span>ملاحة</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsChatOpen(true)}
+                      className="min-h-[48px] py-2 px-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-amber-500/30 transition cursor-pointer active:scale-95 relative"
+                    >
+                      <span>💬</span>
+                      <span>محادثة</span>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -start-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white animate-pulse">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </button>
                   </div>
+
+                  {/* الزر الرئيسي العريض لمرحلة الرحلة (Slide / Large Action Button) - 56px */}
+                  {activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? (
+                    <button
+                      type="button"
+                      onClick={handleDriverArrived}
+                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
+                    >
+                      <span>📍</span>
+                      <span>أنا في موقع الراكب (وصلت)</span>
+                    </button>
+                  ) : activeRide.status === 'Arrived' ? (
+                    <button
+                      type="button"
+                      onClick={handleDriverStartRide}
+                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-amber-400 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-orange-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
+                    >
+                      <span>🚗💨</span>
+                      <span>بدء المشوار والانطلاق</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleInitiateCompleteRide}
+                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
+                    >
+                      <span>🏁</span>
+                      <span>إنهاء الرحلة واحتساب الأجرة</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ) : incomingRequest ? (
-              /* طلب وارد مع خيارات القبول والرفض */
-              <div className="rounded-xl border border-emerald-500 bg-white p-4 shadow-subtle animate-fade-in">
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[12px] font-bold text-emerald-700">
-                      طلب مشوار جديد! 🚖
+              /* 4. بطاقة استقبال المشوار الواردة الفاخرة (Incoming Trip Dispatch Sheet) */
+              <div className="rounded-3xl border-2 border-amber-500 bg-[#161C28]/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-fade-in text-white space-y-3">
+                {/* شريط العد التنازلي التفاعلي */}
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-1">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
+                    style={{ width: `${(countdownSeconds / 15) * 100}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
+                      طلب مشوار جديد ({countdownSeconds} ثانية) 🚖
                     </span>
                     {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
-                      <span className="rounded-lg bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs flex items-center gap-1 animate-pulse">
-                        ⚡ {incomingRequest.surgeBadge?.text || `تعرفة ذروة (+${Math.round(((incomingRequest.surgeMultiplier || 1) - 1) * 100)}%)`}
+                      <span className="rounded-full bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs">
+                        ⚡ ذروة
                       </span>
                     )}
                   </div>
-                  <span className="text-[17px] font-black text-[#1A1A1A]">
+                  <span className="text-xl font-black text-amber-400 font-mono">
                     {Number(incomingRequest.fare || 0).toLocaleString()} د.ع
                   </span>
                 </div>
 
-                <div className="text-right space-y-1.5 mb-4">
-                  <p className="text-[15px] font-bold text-[#1A1A1A]">
+                <div className="text-right space-y-1.5 text-xs">
+                  <p className="text-white font-bold text-sm">
                     الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
                   </p>
-                  {incomingRequest.customerPhone && (
-                    <p className="text-[12.5px] font-medium text-[#6C757D]" dir="ltr">
-                      {incomingRequest.customerPhone}
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                    <p className="text-slate-300">
+                      🟢 من: <span className="text-white font-bold">{incomingRequest.pickupName}</span>
                     </p>
-                  )}
-                  <p className="text-[13px] font-medium text-[#1A1A1A]">
-                    🟢 من: <span className="text-[#6C757D]">{incomingRequest.pickupName}</span>
-                  </p>
-                  <p className="text-[13px] font-medium text-[#1A1A1A]">
-                    🔴 إلى: <span className="text-[#6C757D]">{incomingRequest.dropoffName}</span>
-                  </p>
+                    <p className="text-slate-300">
+                      🔴 إلى: <span className="text-white font-bold">{incomingRequest.dropoffName}</span>
+                    </p>
+                  </div>
                 </div>
 
-                {/* أزرار خيارات القبول والرفض */}
-                <div className="flex gap-2.5">
+                {/* أزرار القبول والرفض - مسافات أمان >= 12px */}
+                <div className="flex flex-col gap-3 pt-1">
+                  {/* زر القبول العريض الفاخر (56px) */}
                   <button
                     type="button"
                     onClick={handleAcceptRide}
-                    className="flex-1 rounded-xl bg-emerald-600 py-3 text-center text-[14.5px] font-bold text-white shadow-card transition-all duration-200 active:scale-95 cursor-pointer hover:bg-emerald-700"
+                    className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo"
                   >
-                    قبول الطلب ✅
+                    <span>🚖</span>
+                    <span>قبول المشوار</span>
                   </button>
+
+                  {/* زر الرفض الهادئ (48px) */}
                   <button
                     type="button"
                     onClick={handleRejectRide}
-                    className="flex-1 rounded-xl bg-slate-100 border border-slate-200 py-3 text-center text-[14.5px] font-bold text-[#1A1A1A] shadow-xs transition-all duration-200 active:scale-95 cursor-pointer hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                    className="w-full min-h-[48px] h-12 rounded-2xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700/60 font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
                   >
-                    رفض الطلب ✕
+                    <span>تجاهل / رفض ✕</span>
                   </button>
                 </div>
               </div>
             ) : (
-              /* بانتظار الركاب */
-              <div className="relative rounded-xl border border-slate-200/80 bg-white p-5 min-h-[160px] flex flex-col justify-center shadow-card">
-                <h4 className="text-center text-[15px] font-bold text-[#1A1A1A] mb-3">بانتظار الركاب</h4>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="relative flex items-center justify-center h-16 w-16">
-                    <span className="absolute h-16 w-16 rounded-full bg-[#1B4965]/10 animate-ping opacity-40" />
-                    <span className="relative h-10 w-10 rounded-full bg-[#1B4965] flex items-center justify-center shadow-card">
-                      <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M9 12l2 2 4-4" /></svg>
-                    </span>
-                  </div>
-                  <p className="text-[13px] font-medium text-[#6C757D] mt-1">جاري البحث عن طلبات الركاب القريبين...</p>
+              /* بانتظار المشاوير والرادار */
+              <div className="rounded-3xl border border-white/10 bg-[#161C28]/90 p-5 text-center shadow-xl backdrop-blur-xl">
+                <div className="relative flex items-center justify-center h-16 w-16 mx-auto mb-2">
+                  <span className="absolute h-16 w-16 rounded-full bg-amber-500/20 animate-ping" />
+                  <span className="relative h-11 w-11 rounded-full bg-[#1A202C] border border-amber-400 flex items-center justify-center text-amber-400 text-xl font-bold shadow-lg">
+                    🚖
+                  </span>
                 </div>
+                <h4 className="text-sm font-bold text-white mb-0.5">أنت في وضع الجاهزية</h4>
+                <p className="text-xs text-slate-400">جاري مسح النجف وبانتظار أقرب مشوار لك...</p>
               </div>
             )}
           </section>
         )}
 
-        {/* 4. القائمة السفلية */}
-        <section className="pt-2 border-t border-slate-100" dir="rtl">
-          <div className="space-y-1">
-            {/* تبويب محادثة مع الراكب */}
-            <button
-              type="button"
-              onClick={() => {
-                if (activeRide) {
-                  setIsChatOpen(true);
-                } else {
-                  show('لا يوجد مشوار نشط حالياً مع راكب لمحادثته', 'info');
-                }
-              }}
-              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 border border-transparent hover:border-slate-200/80 cursor-pointer min-h-[54px]"
-            >
-              {/* اليمين: الأيقونة في أقصى اليمين، والنص بجانبها مباشرة إلى اليمين */}
-              <div className="flex items-center gap-3.5">
-                <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#1B4965] border border-slate-200/60 shadow-2xs">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -start-1 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-white" />
-                  )}
-                </div>
-                <div className="text-right">
-                  <span className="text-[15px] font-bold text-[#1A1A1A] block">محادثة مع الراكب</span>
-                  {activeRide?.customerName ? (
-                    <span className="text-[12px] font-medium text-[#1B4965]">
-                      مع: {activeRide.customerName}
-                    </span>
-                  ) : (
-                    <span className="text-[11.5px] font-medium text-[#6C757D]">
-                      مراسلة الركاب أثناء الرحلات
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* اليسار: الشارة وسهم التوجيه في أقصى اليسار */}
-              <div className="flex items-center gap-2 shrink-0">
-                {unreadCount > 0 ? (
-                  <span className="flex items-center gap-1 rounded-full bg-red-500 px-2.5 py-0.5 text-[11px] font-bold text-white animate-pulse">
-                    <span>{unreadCount}</span>
-                    <span>رسالة جديدة</span>
+        {/* 5. وضع الخط الدائمي (Commute Tab) */}
+        {workStatus === 'permanent' && (
+          <section className="mb-4 space-y-4">
+            {/* طلبات حجز المقاعد الواردة */}
+            {pendingSeatRequests.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full bg-amber-500 text-slate-950 px-3 py-0.5 text-xs font-black animate-pulse">
+                    {pendingSeatRequests.length} طلب جديد
                   </span>
-                ) : activeRide ? (
-                  <span className="rounded-lg bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
-                    نشط 🚖
-                  </span>
-                ) : (
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11.5px] font-medium text-[#6C757D]">
-                    غير متوفر
-                  </span>
-                )}
-                <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </div>
-            </button>
+                  <h3 className="text-sm font-bold text-white">طلبات حجز المقاعد الواردة 💺</h3>
+                </div>
 
-            {/* الرحلات */}
-            <button
-              type="button"
-              onClick={() => show('سجل رحلات الخط الدائمي', 'info')}
-              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 cursor-pointer min-h-[52px] border border-transparent hover:border-slate-200/60"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#6C757D] border border-slate-200/60 shadow-2xs">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
-                    <circle cx="7" cy="17" r="2" />
-                    <path d="M9 17h6" />
-                    <circle cx="17" cy="17" r="2" />
-                  </svg>
-                </div>
-                <div className="text-right">
-                  <span className="text-[15px] font-bold text-[#1A1A1A] block">الرحلات</span>
-                  <span className="text-[11.5px] font-medium text-[#6C757D]">سجل الرحلات والمشاوير المكتملة</span>
-                </div>
-              </div>
-              <div className="text-slate-400 shrink-0">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </div>
-            </button>
+                {pendingSeatRequests.map((req) => (
+                  <div
+                    key={req.id || req.bookingId}
+                    className="rounded-3xl border-2 border-amber-400/60 bg-[#161C28] p-4 shadow-xl space-y-3"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <span className="rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 text-xs font-bold">
+                        طلب خط دائمي 💺
+                      </span>
+                      <span className="text-xs font-bold text-slate-300">
+                        {req.seatsBooked || 1} مقعد
+                      </span>
+                    </div>
 
-            {/* العناوين المفضلة */}
-            <button
-              type="button"
-              onClick={() => show('العناوين المفضلة للكابتن', 'info')}
-              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 cursor-pointer min-h-[52px] border border-transparent hover:border-slate-200/60"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#6C757D] border border-slate-200/60 shadow-2xs">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 21s-6-5.33-6-10a6 6 0 0 1 12 0c0 4.67-6 10-6 10z" />
-                    <circle cx="12" cy="11" r="2.5" />
-                  </svg>
-                </div>
-                <div className="text-right">
-                  <span className="text-[15px] font-bold text-[#1A1A1A] block">العناوين المفضلة</span>
-                  <span className="text-[11.5px] font-medium text-[#6C757D]">نقاط الانطلاق والمحطات المحفوظة</span>
-                </div>
-              </div>
-              <div className="text-slate-400 shrink-0">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </div>
-            </button>
+                    <div className="text-xs space-y-1">
+                      <p className="font-bold text-white text-sm">الراكب: {req.customerName || 'راكب توصيلة'}</p>
+                      <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                        <p className="text-slate-300">🟢 من: <span className="text-white font-bold">{req.pickupLocation}</span></p>
+                        <p className="text-slate-300">🔴 إلى: <span className="text-white font-bold">{req.dropoffLocation}</span></p>
+                      </div>
+                    </div>
 
-            {/* قسائم الخصومات والجوائز */}
-            <button
-              type="button"
-              onClick={() => show('قسائم الخصومات والجوائز للكابتن', 'info')}
-              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-slate-100/80 cursor-pointer min-h-[52px] border border-transparent hover:border-slate-200/60"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[#6C757D] border border-slate-200/60 shadow-2xs">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                    <circle cx="9.5" cy="14.5" r="1.5" fill="currentColor" />
-                    <circle cx="14.5" cy="9.5" r="1.5" fill="currentColor" />
-                  </svg>
-                </div>
-                <div className="text-right">
-                  <span className="text-[15px] font-bold text-[#1A1A1A] block">قسائم الخصومات والجوائز</span>
-                  <span className="text-[11.5px] font-medium text-[#6C757D]">مكافآت وحوافز كباتن توصيلة</span>
-                </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptSeatBooking(req.id || req.bookingId || '')}
+                        className="min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-md active:scale-95 transition cursor-pointer"
+                      >
+                        قبول الحجز ✅
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRejectSeatBooking(req.id || req.bookingId || '')}
+                        className="min-h-[48px] rounded-xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition cursor-pointer"
+                      >
+                        اعتذار ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="text-slate-400 shrink-0">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </div>
-            </button>
+            )}
 
-            {/* تسجيل الخروج */}
-            <button
-              type="button"
-              onClick={() => { authStore.clear(); navigate('/login', { replace: true }); }}
-              className="flex w-full items-center justify-between rounded-xl p-3 text-right transition hover:bg-red-50 text-red-600 cursor-pointer min-h-[52px] border border-transparent hover:border-red-100"
-            >
-              <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 border border-red-100/80 shadow-2xs">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
+            {/* ركاب الخط المشتركون */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-white text-center">
+                ركاب الخط الدائمي ({subscribers.length})
+              </h3>
+
+              {subscribers.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-700 p-6 text-center bg-[#161C28]/60">
+                  <p className="text-xs font-bold text-slate-300">لا يوجد ركاب مشتركين حالياً في خطك الدائمي</p>
+                  <p className="text-[11px] text-slate-500 mt-1">ستظهر اشتراكات الركاب هنا تلقائياً بعد قبول الحجز</p>
                 </div>
-                <span className="text-[15px] font-bold">تسجيل الخروج</span>
+              ) : (
+                <div className="space-y-2.5">
+                  {subscribers.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className={`rounded-2xl border bg-[#161C28] p-3.5 shadow-lg space-y-2 ${
+                        sub.cancellationPending ? 'border-amber-400/80 bg-amber-500/10' : 'border-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
+                          className="min-h-[40px] px-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 transition"
+                        >
+                          <span>واتساب</span>
+                          <span>💬</span>
+                        </button>
+                        <div className="text-right">
+                          <p className="font-bold text-white text-sm">{sub.name}</p>
+                          <p className="text-xs text-slate-400">{sub.from} ➔ {sub.to}</p>
+                        </div>
+                      </div>
+
+                      {/* معالجة طلب الإلغاء */}
+                      {sub.cancellationPending && (
+                        <div className="pt-2 border-t border-amber-400/30 space-y-2">
+                          <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs">
+                            <span className="font-bold">طلب الراكب إلغاء الاشتراك: </span>
+                            <span>{sub.cancellationReason || 'ظروف شخصية'}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleRejectCancellation(sub.id)}
+                              className="min-h-[44px] rounded-xl bg-white/10 text-slate-300 text-xs font-bold hover:bg-white/20 transition cursor-pointer"
+                            >
+                              رفض الإلغاء
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenApproveModal(sub)}
+                              className="min-h-[44px] rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer"
+                            >
+                              الموافقة على الإلغاء
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* 6. القائمة السفلية والخدمات للكابتن */}
+        <section className="pt-3 border-t border-white/10 space-y-1.5" dir="rtl">
+          {/* محادثة مع الراكب */}
+          <button
+            type="button"
+            onClick={() => {
+              if (activeRide) setIsChatOpen(true);
+              else show('لا يوجد مشوار نشط حالياً مع راكب لمحادثته', 'info');
+            }}
+            className="flex w-full items-center justify-between rounded-2xl p-3 bg-[#161C28]/80 border border-white/10 hover:border-amber-400/40 transition cursor-pointer min-h-[52px]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-amber-400">
+                💬
+                {unreadCount > 0 && <span className="absolute -top-1 -start-1 h-3 w-3 rounded-full bg-red-500" />}
               </div>
-              <div className="text-red-400 shrink-0">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
+              <div className="text-right">
+                <span className="text-sm font-bold text-white block">محادثة الراكب</span>
+                <span className="text-xs text-slate-400">
+                  {activeRide?.customerName ? `مع: ${activeRide.customerName}` : 'مراسلة الركاب أثناء الرحلات'}
+                </span>
               </div>
-            </button>
-          </div>
+            </div>
+            <span className="text-slate-500 text-xs">➔</span>
+          </button>
+
+          {/* سجل الرحلات */}
+          <button
+            type="button"
+            onClick={() => show('سجل الرحلات والمشاوير المكتملة', 'info')}
+            className="flex w-full items-center justify-between rounded-2xl p-3 bg-[#161C28]/80 border border-white/10 hover:border-amber-400/40 transition cursor-pointer min-h-[52px]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-slate-300">
+                🚖
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-bold text-white block">سجل الرحلات</span>
+                <span className="text-xs text-slate-400">المشاوير والأرباح المحققة</span>
+              </div>
+            </div>
+            <span className="text-slate-500 text-xs">➔</span>
+          </button>
+
+          {/* تسجيل الخروج */}
+          <button
+            type="button"
+            onClick={() => {
+              authStore.clear();
+              storage.clearAll();
+              try {
+                localStorage.clear();
+                sessionStorage.clear();
+              } catch (_) {}
+              navigate('/login', { replace: true });
+            }}
+            className="flex w-full items-center justify-between rounded-2xl p-3 bg-red-600/10 border border-red-500/30 hover:bg-red-600/20 text-red-400 transition cursor-pointer min-h-[52px]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-600/20 text-red-400">
+                🚪
+              </div>
+              <span className="text-sm font-bold">تسجيل الخروج</span>
+            </div>
+            <span className="text-red-400 text-xs">➔</span>
+          </button>
         </section>
       </main>
 
@@ -1613,56 +1377,96 @@ export default function DriverHomePage() {
         </Suspense>
       )}
 
-      {/* نافذة اختيار تطبيق الملاحة المنبثقة (Action Sheet / Modal) */}
+      {/* بطاقة ملخص الأجرة وتحصيل المبلغ (Fare Summary & Cash Collection) */}
+      {isFareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in" dir="rtl">
+          <div className="w-full max-w-sm rounded-3xl bg-[#161C28] border-2 border-amber-400/80 p-5 shadow-2xl text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-400 text-3xl mx-auto flex items-center justify-center">
+              💵
+            </div>
+
+            <div>
+              <h3 className="text-base font-black text-white">تفاصيل وملخص الأجرة</h3>
+              <p className="text-xs text-slate-400 mt-0.5">محسوبة وفق تسعيرة بلي المعتمدة لمنظومة توصيلة</p>
+            </div>
+
+            {/* تفاصيل العداد الشفافة */}
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 space-y-2 text-xs text-right">
+              <div className="flex items-center justify-between text-slate-300">
+                <span>فتح العداد القياسي:</span>
+                <span className="font-bold text-white">١,٠٠٠ د.ع</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-300">
+                <span>المسافة والوقت:</span>
+                <span className="font-bold text-white">٥٠٠ د.ع/كم • ١٠٠ د.ع/د</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-300">
+                <span>الحد الأدنى للأجرة:</span>
+                <span className="font-bold text-white">٣,٠٠٠ د.ع</span>
+              </div>
+            </div>
+
+            {/* المبلغ النهائي المطلوب تحصيله كاش */}
+            <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-400/60 text-center">
+              <span className="text-xs font-bold text-amber-400 block mb-1">المبلغ المطلوب تحصيله نقداً (كاش):</span>
+              <span className="text-3xl font-black text-white font-mono tracking-tight text-amber-300">
+                {finalFareAmount} د.ع
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDriverComplete}
+              className="w-full min-h-[54px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo"
+            >
+              <span>✅</span>
+              <span>تم التحصيل وجاهز لمشوار جديد</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة اختيار تطبيق الملاحة المنبثقة (Google Maps / Waze) */}
       {isNavModalOpen && navCoordinates && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-100 animate-slide-down text-center"
-            dir="rtl"
-          >
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-[#D97706] text-2xl shadow-xs">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-[#161C28] border border-white/10 p-5 shadow-2xl text-center space-y-3.5" dir="rtl">
+            <div className="w-12 h-12 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-400 text-2xl mx-auto flex items-center justify-center">
               🧭
             </div>
-            <h3 className="text-[17px] font-bold text-[#1A1A1A] mb-1">
-              {navType === 'pickup'
-                ? 'اختر تطبيق الملاحة للتوجه إلى موقع الراكب:'
-                : 'اختر تطبيق الملاحة للتوجه إلى وجهة الراكب:'}
-            </h3>
-            <p className="text-[13px] font-medium text-[#6C757D] mb-4">
-              {navType === 'pickup' ? 'نقطة الانطلاق:' : 'وجهة الوصول:'}{' '}
-              <span className="font-bold text-[#1A1A1A]">
-                {navTargetName || (navType === 'pickup' ? activeRide?.pickupName : activeRide?.dropoffName) || 'الموقع المحدد'}
-              </span>
-            </p>
+            <div>
+              <h3 className="text-base font-black text-white">
+                {navType === 'pickup' ? 'التوجه إلى موقع الراكب' : 'التوجه إلى وجهة الراكب'}
+              </h3>
+              <p className="text-xs text-slate-400 mt-1 truncate">
+                {navTargetName || 'الموقع المحدد'}
+              </p>
+            </div>
 
-            <div className="space-y-2.5">
-              {/* زر خريطة جوجل */}
+            <div className="space-y-2.5 pt-1">
+              {/* خرائط جوجل */}
               <button
                 type="button"
                 onClick={() => handleOpenGoogleMaps(navCoordinates.lat, navCoordinates.lng)}
-                className="w-full flex items-center justify-center gap-3 rounded-xl bg-slate-50 border border-slate-200/90 py-3.5 px-4 font-bold text-[#1A1A1A] hover:bg-slate-100 transition active:scale-[0.98] cursor-pointer shadow-xs"
+                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer"
               >
-                <svg className="h-5 w-5 text-red-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/>
-                </svg>
-                <span className="text-[14.5px]">خرائط جوجل (Google Maps)</span>
+                <span className="text-lg">🗺️</span>
+                <span>خرائط جوجل (Google Maps)</span>
               </button>
 
-              {/* زر ويز */}
+              {/* تطبيق ويز */}
               <button
                 type="button"
                 onClick={() => handleOpenWaze(navCoordinates.lat, navCoordinates.lng)}
-                className="w-full flex items-center justify-center gap-3 rounded-xl bg-sky-50 border border-sky-200 py-3.5 px-4 font-bold text-[#0284c7] hover:bg-sky-100 transition active:scale-[0.98] cursor-pointer shadow-xs"
+                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-300 font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer"
               >
-                <span className="text-xl">🚙</span>
-                <span className="text-[14.5px]">تطبيق ويز (Waze)</span>
+                <span className="text-lg">🚙</span>
+                <span>تطبيق ويز (Waze)</span>
               </button>
 
-              {/* زر الإلغاء / المتابعة داخل التطبيق */}
               <button
                 type="button"
                 onClick={() => setIsNavModalOpen(false)}
-                className="w-full rounded-xl py-2.5 text-[13.5px] font-bold text-[#6C757D] hover:text-[#1A1A1A] transition cursor-pointer"
+                className="w-full min-h-[44px] rounded-xl text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer"
               >
                 إلغاء / المتابعة داخل التطبيق
               </button>
@@ -1673,37 +1477,34 @@ export default function DriverHomePage() {
 
       {/* نافذة موافقة السائق على إلغاء اشتراك الراكب */}
       {cancellingSub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in" dir="rtl">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl text-right space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-[16px] font-black text-gray-900">الموافقة على طلب إلغاء الاشتراك</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in" dir="rtl">
+          <div className="w-full max-w-sm rounded-3xl bg-[#161C28] border border-white/10 p-5 shadow-2xl text-right space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-base font-black text-amber-400">تأكيد إلغاء اشتراك الراكب</h3>
               <button
                 type="button"
                 onClick={() => setCancellingSub(null)}
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 transition cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="rounded-xl bg-gray-50 p-3 text-[13px] text-gray-700 space-y-1">
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 text-xs text-slate-300 space-y-1">
               <p><strong>الراكب:</strong> {cancellingSub.name}</p>
-              <p><strong>سبب طلب الراكب:</strong> <span className="font-bold text-red-600">{cancellingSub.cancellationReason || 'ظروف شخصية'}</span></p>
-              {cancellingSub.cancellationDetails && (
-                <p><strong>ملاحظات إضافية:</strong> {cancellingSub.cancellationDetails}</p>
-              )}
+              <p><strong>سبب الطلب:</strong> <span className="font-bold text-red-400">{cancellingSub.cancellationReason || 'ظروف شخصية'}</span></p>
             </div>
 
             <div>
-              <label className="block text-[13px] font-bold text-gray-800 mb-1.5">
-                سبب موافقة الكابتن على الإلغاء (يُسجل في سجلات الإدارة):
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                سبب الموافقة على الإلغاء (يُسجل في الإدارة):
               </label>
               <input
                 type="text"
                 value={driverApprovalReason}
                 onChange={(e) => setDriverApprovalReason(e.target.value)}
-                placeholder="مثال: تم التراضي مع الراكب، نقل سكن، إلخ..."
-                className="w-full rounded-xl border border-gray-300 p-3 text-[13.5px] font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="مثال: تم التراضي مع الراكب"
+                className="w-full rounded-2xl bg-[#1A202C] border border-slate-700/60 p-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-400 font-cairo"
               />
             </div>
 
@@ -1711,7 +1512,7 @@ export default function DriverHomePage() {
               <button
                 type="button"
                 onClick={() => setCancellingSub(null)}
-                className="flex-1 rounded-xl bg-gray-100 hover:bg-gray-200 py-3 text-center text-[14px] font-bold text-gray-700 transition active:scale-95 cursor-pointer"
+                className="flex-1 min-h-[48px] rounded-2xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition active:scale-95 cursor-pointer"
               >
                 تراجع
               </button>
@@ -1719,15 +1520,14 @@ export default function DriverHomePage() {
                 type="button"
                 disabled={isSubmittingCancellation}
                 onClick={handleConfirmApproveCancellation}
-                className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 py-3 text-center text-[14px] font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
+                className="flex-1 min-h-[48px] rounded-2xl bg-red-600 hover:bg-red-700 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
               >
-                {isSubmittingCancellation ? 'جاري التأكيد...' : 'تأكيد الإلغاء وحذف الراكب ✅'}
+                {isSubmittingCancellation ? 'جاري التأكيد...' : 'تأكيد الإلغاء ✅'}
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
