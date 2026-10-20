@@ -9,6 +9,8 @@ import { config } from '../lib/config';
 import { RouteLines } from '../components/map/MapPins';
 import { applyArabicAndEnhancedLabels, enhanceDarkMapRoads } from '../lib/mapbox';
 import { playIncomingTripAlert } from '../lib/sound';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeToggleButton } from '../components/ThemeToggleButton';
 
 const ChatModal = lazy(() => import('../components/ChatModal'));
 
@@ -59,6 +61,7 @@ interface IncomingRideRequest {
 
 export default function DriverHomePage() {
   const { show } = useToast();
+  const { mapStyle } = useTheme();
   const session = authStore.getSession();
   const driverId = session?.userId || storage.getUserId() || '';
 
@@ -683,9 +686,17 @@ export default function DriverHomePage() {
     }
   }
 
-  // إرسال تنبيه الهورن للراكب (بيب بيب 📢) عبر الباك إند
+  // إرسال تنبيه الهورن للراكب (بيب بيب 📢) عبر الباك إند مع تغذية حسية فورية للسائق
   async function handleTriggerHorn() {
     if (!activeRide) return;
+
+    // 1. تشغيل اهتزاز فوري في هاتف السائق كتغذية راجعة حسية فورية (نبضتان سريعتان)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate([120, 60, 120]);
+      } catch (_) {}
+    }
+
     setIsTriggeringHorn(true);
     const tripId = activeRide.id;
     const currentId = driverId || rawPhone;
@@ -697,9 +708,6 @@ export default function DriverHomePage() {
       });
       if (data?.success) {
         show('تم إرسال تنبيه الهورن للراكب بنجاح (بيب بيب 📢)', 'success');
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate([100, 50, 100]);
-        }
       } else {
         show(data?.message || 'تعذر إرسال تنبيه الهورن', 'error');
       }
@@ -712,14 +720,11 @@ export default function DriverHomePage() {
         });
         if (data?.success) {
           show('تم إرسال تنبيه الهورن للراكب بنجاح (بيب بيب 📢)', 'success');
-          if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]);
-          }
         } else {
           show(data?.message || 'تعذر إرسال تنبيه الهورن', 'error');
         }
       } catch (err2: any) {
-        console.error('فشل إرسال تنبيه الهورن:', err2);
+        console.warn('فشل إرسال تنبيه الهورن:', err2);
         show(err2?.response?.data?.error || 'تعذر إرسال تنبيه الهورن', 'error');
       }
     } finally {
@@ -919,13 +924,16 @@ export default function DriverHomePage() {
           </div>
         </div>
 
-        {/* اليسار: مفتاح الاتصال السريع وبطاقة الأرباح */}
+        {/* اليسار: مفتاح الاتصال السريع، زر تبديل الثيم، وبطاقة الأرباح */}
         <div className="flex items-center gap-2">
           {/* كبسولة الأرباح السريعة */}
           <div className="hidden sm:flex flex-col text-left font-mono bg-white/5 border border-white/10 px-2.5 py-1 rounded-xl">
             <span className="text-[10px] text-slate-400">أرباح اليوم</span>
             <span className="text-xs font-bold text-amber-400">{driverBalance} د.ع</span>
           </div>
+
+          {/* زر تبديل الوضع النهاري والليلي الشامل */}
+          <ThemeToggleButton />
 
           {/* مفتاح الاتصال السريع (Online/Offline Toggle Pill) - Target >= 48px */}
           <button
@@ -1094,7 +1102,7 @@ export default function DriverHomePage() {
               <MapGL
                 ref={mapRef}
                 mapboxAccessToken={config.mapboxToken}
-                mapStyle="mapbox://styles/mapbox/dark-v11"
+                mapStyle={mapStyle}
                 initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
                 cooperativeGestures={true}
                 onLoad={(e) => {

@@ -19,6 +19,8 @@ import { RouteLines } from '../components/map/MapPins';
 import { applyArabicAndEnhancedLabels, enhanceDarkMapRoads, getDirections, searchPlaces, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeToggleButton } from '../components/ThemeToggleButton';
 
 const USER_LOC = { lat: 32.0298, lng: 44.3285 };
 
@@ -61,6 +63,7 @@ function CarSVG({ color }: { color: string }) {
 export default function DailyRoutePage() {
   const navigate = useNavigate();
   const { show } = useToast();
+  const { mapStyle } = useTheme();
   const mapRef = useRef<MapRef | null>(null);
   const hasAutoLocatedRef = useRef(false);
   const [userLoc, setUserLoc] = useState(USER_LOC);
@@ -559,8 +562,9 @@ export default function DailyRoutePage() {
           </div>
         </div>
 
-        {/* زر الحساب والقائمة */}
-        <div className="pointer-events-auto">
+        {/* أزرار التحكم: تبديل الوضع والحساب */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <ThemeToggleButton />
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
@@ -666,7 +670,7 @@ export default function DailyRoutePage() {
       <MapGL
         ref={mapRef}
         mapboxAccessToken={config.mapboxToken}
-        mapStyle="mapbox://styles/mapbox/dark-v11"
+        mapStyle={mapStyle}
         initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
         onClick={handleMapClick}
         onLoad={(e) => {

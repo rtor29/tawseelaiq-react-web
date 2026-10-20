@@ -33,17 +33,26 @@
   --app-font-size: 14px;
 }
 
-/* إزالة أي قيود ارتفاع أو تمرير مزدوج عن وسم html */
+/* إزالة أي قيود ارتفاع أو تمرير مزدوج عن وسم html ودعم الوضعين الليلي والنهاري */
 html {
   margin: 0;
   padding: 0;
   width: 100%;
   height: -webkit-fill-available;
-  background-color: #080E1A !important;
   overflow-x: hidden !important;
   overflow-y: visible !important;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+
+html.dark, html:not(.light) {
+  background-color: #080E1A !important;
+  color-scheme: dark;
+}
+
+html.light {
+  background-color: #F8FAFC !important;
+  color-scheme: light;
 }
 
 /* body هو كائن التمرير الوحيد لكامل التطبيق مع دعم كامل لإيماءات السحب على أندرويد */
@@ -57,12 +66,21 @@ body {
   overflow-y: auto !important;
   touch-action: pan-y !important;
   -webkit-overflow-scrolling: touch;
-  background-color: #080E1A !important;
-  color: #0F172A;
   font-family: var(--font-family);
   font-size: var(--app-font-size);
   line-height: 1.6;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark body, html:not(.light) body {
+  background-color: #080E1A !important;
+  color: #F8FAFC;
+}
+
+html.light body {
+  background-color: #F8FAFC !important;
+  color: #0F172A;
 }
 
 /* تحرير الحاوية الجذرية #root */
@@ -71,9 +89,16 @@ body {
   padding: 0;
   width: 100%;
   min-height: 100%;
-  background-color: #080E1A !important;
   display: block !important;
   overflow: visible !important;
+}
+
+html.dark #root, html:not(.light) #root {
+  background-color: #080E1A !important;
+}
+
+html.light #root {
+  background-color: #F8FAFC !important;
 }
 
 /* منع ابتلاع كانفاس خريطة Mapbox للسكرول على الهواتف */

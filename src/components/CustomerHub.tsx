@@ -13,6 +13,7 @@ import { http } from '../lib/api';
 import { useSession, authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { playCarHornBeep } from '../lib/sound';
+import { ThemeToggleButton } from './ThemeToggleButton';
 import TermsPrivacyModal from './TermsPrivacyModal';
 
 interface CustomerHubProps {
@@ -48,6 +49,11 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
               if (hornSeq > 0 && hornSeq > lastHeardHubHornRef.current) {
                 lastHeardHubHornRef.current = hornSeq;
                 playCarHornBeep();
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                  try {
+                    navigator.vibrate([250, 100, 250, 100, 400]);
+                  } catch (_) {}
+                }
               }
               if (req.status === 'Completed' || req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
                 setActiveTaxiRide(null);
@@ -176,13 +182,15 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
 
               <div className="flex items-center gap-2 z-10">
                 {/* كبسولة الشعار الرسمي الجديد الشفاف */}
-                <div className="w-11 h-11 rounded-xl bg-[#080E1A] flex items-center justify-center p-1 shadow-sm border border-slate-700/50">
+                <div className="w-11 h-11 rounded-xl bg-[#080E1A] dark:bg-[#080E1A] flex items-center justify-center p-1 shadow-sm border border-slate-700/50">
                   <img 
                     alt="شعار توصيلة" 
                     className="w-full h-full object-contain drop-shadow" 
                     src="/logo.png?v=40" 
                   />
                 </div>
+                {/* زر تبديل الوضع النهاري والليلي الشامل */}
+                <ThemeToggleButton />
                 <button 
                   onClick={() => setActiveTab('notifications')}
                   aria-label="الإشعارات" 

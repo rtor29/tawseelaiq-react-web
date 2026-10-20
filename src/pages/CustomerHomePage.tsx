@@ -34,6 +34,8 @@ import {
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { storage } from '../lib/storage';
 import { playCarHornBeep, initAudioUnlock } from '../lib/sound';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, type RouteLineData } from '../components/map/MapPins';
@@ -186,6 +188,7 @@ function CarBadgeIllustration({
 export default function CustomerHomePage() {
   const navigate = useNavigate();
   const { show } = useToast();
+  const { mapStyle } = useTheme();
   const mapRef = useRef<MapRef>(null);
   const hasAutoLocatedRef = useRef(false);
 
@@ -1271,7 +1274,12 @@ export default function CustomerHomePage() {
           if (incomingHornSeq > 0 && incomingHornSeq > lastHeardHornSeqRef.current) {
             lastHeardHornSeqRef.current = incomingHornSeq;
             playCarHornBeep();
-            show('الكابتن ينبهك لوصوله بالهورن! 🚖', 'success', 6000);
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try {
+                navigator.vibrate([250, 100, 250, 100, 400]);
+              } catch (_) {}
+            }
+            show('الكابتن وصل وينبهك بالهورن! 🚖', 'success', 7000);
           }
           if (status === 'accepted') {
             setRideStatus('Accepted');
@@ -1585,12 +1593,14 @@ export default function CustomerHomePage() {
           />
         </div>
 
-        {/* اليسار: ترحيب المستخدم وزر الحساب الموحد الذي يفتح AppDrawer */}
-        <div className="flex items-center gap-2.5">
+        {/* اليسار: ترحيب المستخدم وزر تبديل الوضع وزر الحساب الموحد الذي يفتح AppDrawer */}
+        <div className="flex items-center gap-2">
           <div className="text-left hidden sm:block">
             <div className="text-[12px] font-bold text-slate-400">مرحباً بك 👋</div>
             <div className="text-[15px] font-black text-white truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
           </div>
+          {/* زر تبديل الوضع النهاري والليلي الشامل */}
+          <ThemeToggleButton />
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
@@ -1655,7 +1665,7 @@ export default function CustomerHomePage() {
         <MapGL
           ref={mapRef}
           mapboxAccessToken={config.mapboxToken}
-          mapStyle="mapbox://styles/mapbox/dark-v11"
+          mapStyle={mapStyle}
           initialViewState={{
             longitude: DEFAULT_PICKUP.lng,
             latitude: DEFAULT_PICKUP.lat,

@@ -44,53 +44,41 @@ export function initAudioUnlock(): void {
   window.addEventListener('keydown', unlock, { passive: true });
 }
 
-// تشغيل نغمة هورن السيارة الواقعية ("بيب بيب 🚖")
-export function playCarHornBeep(): void {
+// تشغيل نغمة هورن السيارة الواقعية ("بيب بيب 🚖") بالتزامن مع الاهتزاز القوي
+export function playRealisticHorn(): void {
   try {
-    // 1. الاهتزاز التفاعلي في أجهزة الموبايل (Haptic Vibration) بنبضتين متتاليتين
+    // 1. تشغيل اهتزاز قوي ومميز لهاتف الراكب
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       try {
-        navigator.vibrate([140, 90, 200]);
+        navigator.vibrate([250, 100, 250, 100, 400]);
       } catch (_) {}
     }
 
-    // 2. خط الدفاع الأساسي: توليد نغمة ثنائية واقعية برمجياً عبر Web Audio API
-    const ctx = getAudioContext();
-    if (ctx) {
+    // 2. توليف نغمة هورن ثنائية واقعية "بيب بيب" عبر Web Audio API (F4 @ 415Hz و G#4 @ 495Hz)
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
       if (ctx.state === 'suspended') {
         ctx.resume().catch(() => {});
       }
 
-      const now = ctx.currentTime;
-
-      // دالة لتوليد نبضة هورن واحدة بتردد مزدوج (Dual Tone F4 @ 415Hz + G#4 @ 495Hz)
-      const playPulse = (startTime: number, duration: number, peakGain = 0.35) => {
+      const playBeep = (startTime: number, duration: number) => {
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        const biquadFilter = ctx.createBiquadFilter();
+        const gain = ctx.createGain();
 
-        // الترددات الحقيقية لهورن سيارات الأجرة الحديثة (تويوتا / هيونداي)
+        // توليف ترددي مزدوج يعطي صوت هورن السيارة الواقعي (F4 و G#4)
         osc1.type = 'sawtooth';
         osc1.frequency.setValueAtTime(415, startTime);
-
         osc2.type = 'triangle';
         osc2.frequency.setValueAtTime(495, startTime);
 
-        // فلتر لتقليل الحدة ومحاكاة الصندوق الصوتي الخارجي للسيارة
-        biquadFilter.type = 'lowpass';
-        biquadFilter.frequency.setValueAtTime(2600, startTime);
+        gain.gain.setValueAtTime(0.35, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
 
-        // تشكيل الغلاف الصوتي (Envelope: هجوم فوري + استقرار + إخماد سريع)
-        gainNode.gain.setValueAtTime(0.0001, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(peakGain, startTime + 0.015);
-        gainNode.gain.setValueAtTime(peakGain, startTime + duration - 0.02);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-
-        osc1.connect(biquadFilter);
-        osc2.connect(biquadFilter);
-        biquadFilter.connect(gainNode);
-        gainNode.connect(ctx.destination);
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
 
         osc1.start(startTime);
         osc2.start(startTime);
@@ -98,24 +86,24 @@ export function playCarHornBeep(): void {
         osc2.stop(startTime + duration);
       };
 
-      // نبضة أولى: "بيب" (140 مللي ثانية)
-      playPulse(now + 0.04, 0.14, 0.35);
-      // نبضة ثانية: "بيب" (200 مللي ثانية) بعد فاصل 90 مللي ثانية
-      playPulse(now + 0.27, 0.20, 0.38);
+      // نغمة مزدوجة واقعية "بيب بيب"
+      playBeep(ctx.currentTime, 0.18);
+      playBeep(ctx.currentTime + 0.24, 0.22);
     }
 
-    // 3. خط الدفاع الاحتياطي: محاولة تشغيل ملف صوتي خارجي إن وُجد
+    // 3. خط الدفاع الاحتياطي: تشغيل ملف الصوت في الخلفية
     try {
       const audio = new Audio('/sounds/car-horn.mp3');
-      audio.volume = 0.75;
-      audio.play().catch(() => {
-        // يتم تجاهل الخطأ في حال حجب الـ Autoplay لأن المولد البرمجي أعلاه تكفل بالصوت
-      });
+      audio.volume = 0.8;
+      audio.play().catch(() => {});
     } catch (_) {}
   } catch (err) {
     console.warn('[Sound] Car horn playback notice:', err);
   }
 }
+
+// دالة التوافق العامة
+export const playCarHornBeep = playRealisticHorn;
 
 // تشغيل نغمة تنبيه طلب الرحلة الجديد للكابتن
 export function playIncomingTripAlert(): void {

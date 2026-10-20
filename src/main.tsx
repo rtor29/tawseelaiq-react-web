@@ -3,18 +3,22 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { ToastProvider } from './components/Toast';
+import { ThemeProvider, getInitialTheme, applyThemeToDom } from './context/ThemeContext';
 import { applyTheme, getCachedTheme } from './lib/theme';
 import './index.css';
 
-// تطبيق المظهر المخزن فوراً لمنع الوميض قبل رندر React
+// تطبيق المظهر والوضع المخزن فوراً لمنع الوميض قبل رندر React
 applyTheme(getCachedTheme());
+applyThemeToDom(getInitialTheme());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,
 );
