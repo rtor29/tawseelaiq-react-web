@@ -249,66 +249,73 @@ export default function DriverHomePage() {
     if (!driverId && !rawPhone) return;
     try {
       const targetId = driverId || rawPhone;
-      const { data } = await http.get<{
-        success: boolean;
-        subscribers?: any[];
-        pendingBookings?: any[];
-      }>(`/driver/${encodeURIComponent(targetId)}/subscribers`);
+      const { data } = await http.get<any>(`/driver/${encodeURIComponent(targetId)}/subscribers`);
 
-      if (data?.success) {
-        if (Array.isArray(data.subscribers)) {
-          const mapped: Subscriber[] = data.subscribers.map((s: any) => ({
-            id: s.id || s.bookingId || s._id,
-            name: s.customerName || s.fullName || 'راكب خط',
-            from: s.pickupLocation || s.pickupName || 'النجف',
-            to: s.dropoffLocation || s.dropoffName || 'الجامعة',
-            phone: s.customerPhone || s.phone || '',
-            status: s.status,
-            cancellationPending: Boolean(s.cancellationPending || s.cancellation_requested || s.status === 'cancellation_pending'),
-            cancellationReason: s.cancellationReason || s.cancellation_reason,
-            cancellationDetails: s.cancellationDetails || s.cancellation_details,
-          }));
-          setSubscribers(mapped);
+      const rawData = data;
+      const isSuccess = rawData?.success === true || Array.isArray(rawData);
+      if (isSuccess) {
+        const rawSubs = Array.isArray(rawData?.subscribers)
+          ? rawData.subscribers
+          : (Array.isArray(rawData) ? rawData.filter((b: any) => b.status === 'Confirmed' || b.status === 'Active' || b.cancellationPending) : []);
+        const rawPending = Array.isArray(rawData?.pendingBookings)
+          ? rawData.pendingBookings
+          : (Array.isArray(rawData) ? rawData.filter((b: any) => b.status === 'Pending' || b.status === 'pending_approval' || b.status === 'pending') : []);
 
-          const currentCancelIds = new Set<string>();
-          mapped.forEach((sub) => {
-            if (sub.cancellationPending) {
-              currentCancelIds.add(sub.id);
-              if (!prevCancelIdsRef.current.has(sub.id)) {
-                show(`⚠️ طلب جديد لإلغاء الاشتراك من الراكب (${sub.name})`, 'warning', 8000);
-              }
+        const mapped: Subscriber[] = rawSubs.map((s: any) => ({
+          id: s.id || s.bookingId || s._id,
+          name: s.customerName || s.fullName || 'راكب خط',
+          from: s.pickupLocation || s.pickupName || 'النجف',
+          to: s.dropoffLocation || s.dropoffName || 'الجامعة',
+          phone: s.customerPhone || s.phone || '',
+          status: s.status,
+          cancellationPending: Boolean(s.cancellationPending || s.cancellation_requested || s.status === 'cancellation_pending'),
+          cancellationReason: s.cancellationReason || s.cancellation_reason,
+          cancellationDetails: s.cancellationDetails || s.cancellation_details,
+        }));
+        setSubscribers(mapped);
+
+        const currentCancelIds = new Set<string>();
+        mapped.forEach((sub) => {
+          if (sub.cancellationPending) {
+            currentCancelIds.add(sub.id);
+            if (!prevCancelIdsRef.current.has(sub.id)) {
+              show(`⚠️ طلب جديد لإلغاء الاشتراك من الراكب (${sub.name})`, 'warning', 8000);
             }
-          });
-          prevCancelIdsRef.current = currentCancelIds;
-        }
+          }
+        });
+        prevCancelIdsRef.current = currentCancelIds;
 
-        if (Array.isArray(data.pendingBookings)) {
-          const pendingMapped: PendingSeatBooking[] = data.pendingBookings.map((b: any) => ({
-            id: b.id || b.bookingId || b._id,
-            bookingId: b.bookingId || b.id,
-            driverId: b.driverId,
-            driverName: b.driverName,
-            customerId: b.customerId,
-            customerName: b.customerName || 'راكب جديد',
-            customerPhone: b.customerPhone || '',
-            pickupLocation: b.pickupLocation || b.pickupName || 'النجف',
-            dropoffLocation: b.dropoffLocation || b.dropoffName || 'جامعة الكوفة',
-            pickupLat: b.pickupLat,
-            pickupLon: b.pickupLon,
-            seatsBooked: b.seatsBooked || b.seats || 1,
-            status: b.status || 'pending',
-            totalFare: b.totalFare || b.fare,
-            createdAt: b.createdAt,
-          }));
-          setPendingSeatRequests(pendingMapped);
+        const pendingMapped: PendingSeatBooking[] = rawPending.map((b: any) => ({
+          id: b.id || b.bookingId || b._id,
+          bookingId: b.bookingId || b.id,
+          driverId: b.driverId,
+          driverName: b.driverName,
+          customerId: b.customerId,
+          customerName: b.customerName || 'راكب جديد',
+          customerPhone: b.customerPhone || '',
+          pickupLocation: b.pickupLocation || b.pickupName || 'النجف',
+          dropoffLocation: b.dropoffLocation || b.dropoffName || 'جامعة الكوفة',
+          pickupLat: b.pickupLat,
+          pickupLon: b.pickupLon,
+          seatsBooked: b.seatsBooked || b.seats || 1,
+          status: b.status || 'pending',
+          totalFare: b.totalFare || b.fare,
+          createdAt: b.createdAt,
+        }));
+        setPendingSeatRequests(pendingMapped);
 
-          if (pendingMapped.length > 0) {
-            const newest = pendingMapped[0];
-            const newestId = newest.id || newest.bookingId || '';
-            if (newestId && newestId !== lastNotifiedSeatBookingIdRef.current) {
-              lastNotifiedSeatBookingIdRef.current = newestId;
-              show(`💺 طلب حجز مقعد جديد من: ${newest.customerName} (${newest.pickupLocation} ➔ ${newest.dropoffLocation})`, 'info', 9000);
+        if (pendingMapped.length > 0) {
+          const newest = pendingMapped[0];
+          const newestId = newest.id || newest.bookingId || '';
+          if (newestId && newestId !== lastNotifiedSeatBookingIdRef.current) {
+            lastNotifiedSeatBookingIdRef.current = newestId;
+            playIncomingTripAlert();
+            if ('vibrate' in navigator) {
+              try {
+                navigator.vibrate([200, 100, 200, 100, 350]);
+              } catch (_) {}
             }
+            show(`💺 طلب حجز مقعد جديد من: ${newest.customerName} (${newest.pickupLocation} ➔ ${newest.dropoffLocation})`, 'info', 9000);
           }
         }
       }
@@ -1246,16 +1253,16 @@ export default function DriverHomePage() {
                     className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo"
                   >
                     <span>🚖</span>
-                    <span>قبول المشوار</span>
+                    <span>{`قبول المشوار 🚖 (${Number(incomingRequest.fare || 0).toLocaleString()} د.ع)`}</span>
                   </button>
 
-                  {/* زر الرفض الهادئ (48px) */}
+                  {/* زر الرفض والتجاهل (48px) */}
                   <button
                     type="button"
                     onClick={handleRejectRide}
                     className="w-full min-h-[48px] h-12 rounded-2xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700/60 font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
                   >
-                    <span>تجاهل / رفض ✕</span>
+                    <span>رفض وتجاهل ✕</span>
                   </button>
                 </div>
               </div>
@@ -1291,39 +1298,50 @@ export default function DriverHomePage() {
                 {pendingSeatRequests.map((req) => (
                   <div
                     key={req.id || req.bookingId}
-                    className="rounded-3xl border-2 border-amber-400/60 bg-[#161C28] p-4 shadow-xl space-y-3"
+                    className="rounded-3xl border-2 border-emerald-500/60 bg-[#161C28]/95 p-5 shadow-2xl backdrop-blur-xl space-y-3 animate-fade-in"
                   >
                     <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                      <span className="rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 text-xs font-bold">
-                        طلب خط دائمي 💺
+                      <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-3 py-1 text-xs font-bold flex items-center gap-1.5 animate-pulse">
+                        <span>📢</span>
+                        <span>طلب اشتراك خط دائمي جديد</span>
                       </span>
                       <span className="text-xs font-bold text-slate-300">
                         {req.seatsBooked || 1} مقعد
                       </span>
                     </div>
 
-                    <div className="text-xs space-y-1">
-                      <p className="font-bold text-white text-sm">الراكب: {req.customerName || 'راكب توصيلة'}</p>
-                      <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                        <p className="text-slate-300">🟢 من: <span className="text-white font-bold">{req.pickupLocation}</span></p>
-                        <p className="text-slate-300">🔴 إلى: <span className="text-white font-bold">{req.dropoffLocation}</span></p>
+                    <div className="text-xs space-y-1.5 text-right">
+                      <p className="font-bold text-white text-sm">
+                        الطالب / الموظف: <span className="text-amber-400">{req.customerName || 'راكب خط دائمي'}</span>
+                      </p>
+                      <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5 text-slate-300">
+                        <p>🟢 منطقة الانطلاق: <span className="text-white font-bold">{req.pickupLocation}</span></p>
+                        <p>🔴 الكلية / الدائرة: <span className="text-white font-bold">{req.dropoffLocation}</span></p>
+                        <div className="flex items-center justify-between pt-1 border-t border-white/10 text-xs">
+                          <span className="text-slate-400">نوع الوردية: <span className="text-white font-bold">صباحي</span></span>
+                          <span className="text-emerald-400 font-bold font-mono text-sm">{Number(req.totalFare || 30000).toLocaleString()} د.ع / شهرياً</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-1">
+                    {/* أزرار الموافقة والاعتذار - مسافات أمان 12px */}
+                    <div className="flex flex-col gap-3 pt-1">
+                      {/* زر القبول الأخضر الزمردي 54px */}
                       <button
                         type="button"
                         onClick={() => handleAcceptSeatBooking(req.id || req.bookingId || '')}
-                        className="min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-md active:scale-95 transition cursor-pointer"
+                        className="w-full min-h-[54px] h-[54px] rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 active:scale-[0.98] transition cursor-pointer"
                       >
-                        قبول الحجز ✅
+                        <span>📅</span>
+                        <span>موافقة على إضافة الراكب للخط</span>
                       </button>
+                      {/* زر الاعتذار 48px */}
                       <button
                         type="button"
                         onClick={() => handleRejectSeatBooking(req.id || req.bookingId || '')}
-                        className="min-h-[48px] rounded-xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700 font-bold text-xs flex items-center justify-center gap-1 active:scale-95 transition cursor-pointer"
+                        className="w-full min-h-[48px] h-12 rounded-2xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700 font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
                       >
-                        اعتذار ✕
+                        <span>اعتذار (المقاعد ممتلئة) ✕</span>
                       </button>
                     </div>
                   </div>
@@ -1623,6 +1641,73 @@ export default function DriverHomePage() {
                 className="flex-1 min-h-[48px] rounded-2xl bg-red-600 hover:bg-red-700 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
               >
                 {isSubmittingCancellation ? 'جاري التأكيد...' : 'تأكيد الإلغاء ✅'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* بطاقة استقبال المشوار الواردة الفاخرة العائمة (Incoming Trip Dispatch Sheet - z-[999]) */}
+      {incomingRequest && !activeRide && (
+        <div className="fixed inset-x-0 bottom-0 z-[999] p-4 max-w-lg mx-auto pointer-events-auto animate-slide-up" dir="rtl">
+          <div className="rounded-3xl border-2 border-amber-500 bg-[#161C28]/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.9)] backdrop-blur-2xl text-white space-y-3">
+            {/* شريط العد التنازلي التفاعلي */}
+            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-1">
+              <div
+                className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
+                style={{ width: `${(countdownSeconds / 15) * 100}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
+                  طلب مشوار جديد ({countdownSeconds} ثانية) 🚖
+                </span>
+                {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
+                  <span className="rounded-full bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs">
+                    ⚡ ذروة
+                  </span>
+                )}
+              </div>
+              <span className="text-xl font-black text-amber-400 font-mono">
+                {Number(incomingRequest.fare || 0).toLocaleString()} د.ع
+              </span>
+            </div>
+
+            <div className="text-right space-y-1.5 text-xs">
+              <p className="text-white font-bold text-sm">
+                الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
+              </p>
+              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <p className="text-slate-300">
+                  🟢 من: <span className="text-white font-bold">{incomingRequest.pickupName}</span>
+                </p>
+                <p className="text-slate-300">
+                  🔴 إلى: <span className="text-white font-bold">{incomingRequest.dropoffName}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* أزرار القبول والرفض - مسافات أمان >= 12px */}
+            <div className="flex flex-col gap-3 pt-1">
+              {/* زر القبول العريض الفاخر (56px) */}
+              <button
+                type="button"
+                onClick={handleAcceptRide}
+                className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo"
+              >
+                <span>🚖</span>
+                <span>{`قبول المشوار 🚖 (${Number(incomingRequest.fare || 0).toLocaleString()} د.ع)`}</span>
+              </button>
+
+              {/* زر الرفض والتجاهل (48px) */}
+              <button
+                type="button"
+                onClick={handleRejectRide}
+                className="w-full min-h-[48px] h-12 rounded-2xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700/60 font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
+              >
+                <span>رفض وتجاهل ✕</span>
               </button>
             </div>
           </div>

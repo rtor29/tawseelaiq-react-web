@@ -240,7 +240,6 @@ export default function CustomerHomePage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCitySelectorOpen, setIsCitySelectorOpen] = useState(false);
-  const [isDriverSheetExpanded, setIsDriverSheetExpanded] = useState(false);
   const [isCancelTripOpen, setIsCancelTripOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -462,6 +461,7 @@ export default function CustomerHomePage() {
                 } else if (s === 'pending') {
                   setStage('searching');
                   setRideStatus('Pending');
+                  setAssignedDriverInfo(null);
                 } else if (
                   req.status === 'Completed' ||
                   req.status === 'Cancelled' ||
@@ -474,7 +474,7 @@ export default function CustomerHomePage() {
                   setAssignedDriverInfo(null);
                 }
 
-                if (req.assignedDriverName || req.assignedDriverPhone) {
+                if (s !== 'pending' && (req.assignedDriverName || req.assignedDriverPhone)) {
                   setAssignedDriverInfo((prev) => ({
                     ...prev,
                     driverId: req.acceptedDriverId || req.assignedDriverId || prev?.driverId,
@@ -513,13 +513,15 @@ export default function CustomerHomePage() {
                 setDropoff({ lat: parseFloat(r.dropoffLat), lng: parseFloat(r.dropoffLon) });
               }
               if (r.dropoffName) setDropoffName(r.dropoffName);
-              if (r.assignedDriverName || r.assignedDriverPhone) {
+              if (curStage === 'driver_arriving' && (r.assignedDriverName || r.assignedDriverPhone)) {
                 setAssignedDriverInfo({
                   driverId: r.acceptedDriverId || r.assignedDriverId,
                   driverName: r.assignedDriverName,
                   driverPhone: r.assignedDriverPhone,
                   driverVehicle: r.assignedDriverVehicle,
                 });
+              } else if (curStage === 'searching') {
+                setAssignedDriverInfo(null);
               }
             }
           })
@@ -1051,20 +1053,7 @@ export default function CustomerHomePage() {
         hasTriggeredRatingRef.current = false;
         setRideRequestId(data.request.id);
         setRideStatus('Pending');
-        let assignedDriverData = null;
-        if (data.assignedDriver) {
-          assignedDriverData = {
-            driverId: data.assignedDriver.driverId,
-            driverName: data.assignedDriver.fullName || data.assignedDriver.driverName,
-            driverPhone: data.assignedDriver.phoneNumber || data.assignedDriver.phone,
-            driverVehicle: data.assignedDriver.vehicleInfo || data.assignedDriver.carModel || 'تويوتا كورولا',
-            driverPlate: data.assignedDriver.plateNumber || 'النجف',
-            driverRating: data.assignedDriver.rating || 5.0,
-            driverLat: data.assignedDriver.latitude,
-            driverLon: data.assignedDriver.longitude,
-          };
-          setAssignedDriverInfo(assignedDriverData);
-        }
+        setAssignedDriverInfo(null); // Strictly null until driver accepts!
         setStage('searching');
         try {
           localStorage.setItem('TAWSEELA_ACTIVE_TAXI_RIDE', JSON.stringify({
@@ -1076,11 +1065,11 @@ export default function CustomerHomePage() {
             dropoff,
             dropoffName,
             selectedTierId,
-            assignedDriverInfo: assignedDriverData,
+            assignedDriverInfo: null,
             routeCoordinates,
           }));
         } catch (_) {}
-        show('تم إرسال طلبك للبحث عن أقرب كابتن 🚖', 'info');
+        show('تم إرسال طلبك! جاري البحث عن كابتن بانتظار الموافقة 🚖', 'info');
       } else {
         show(data.error || 'تعذر إرسال الطلب، يرجى المحاولة لاحقاً', 'error');
       }
@@ -1327,14 +1316,24 @@ export default function CustomerHomePage() {
             setRouteCoordinates(null);
           }
 
-          if (req.assignedDriverName || req.assignedDriverPhone) {
-            setAssignedDriverInfo((prev) => ({
-              ...prev,
-              driverId: req.acceptedDriverId || req.assignedDriverId || prev?.driverId,
-              driverName: req.assignedDriverName || prev?.driverName,
-              driverPhone: req.assignedDriverPhone || prev?.driverPhone,
-              driverVehicle: req.assignedDriverVehicle || prev?.driverVehicle,
-            }));
+          if (status === 'accepted' || status === 'arrived' || status === 'inprogress' || status === 'in_progress') {
+            if (req.assignedDriverName || req.assignedDriverPhone) {
+              setAssignedDriverInfo((prev) => ({
+                ...prev,
+                driverId: req.acceptedDriverId || req.assignedDriverId || prev?.driverId,
+                driverName: req.assignedDriverName || prev?.driverName,
+                driverPhone: req.assignedDriverPhone || prev?.driverPhone,
+                driverVehicle: req.assignedDriverVehicle || prev?.driverVehicle,
+                driverPlate: (req as any).driverPlate || prev?.driverPlate || '١١٣٤٠ ة - النجف',
+                driverRating: (req as any).driverRating || prev?.driverRating || 5.0,
+              }));
+            }
+          } else if (status === 'pending') {
+            if (stage !== 'searching') {
+              setStage('searching');
+            }
+            setRideStatus('Pending');
+            setAssignedDriverInfo(null);
           }
         }
       } catch (_) {}
@@ -1509,7 +1508,6 @@ export default function CustomerHomePage() {
     }
     setStage('ride_options');
     setIsCancelTripOpen(false);
-    setIsDriverSheetExpanded(false);
     setRideRequestId(null);
     setAssignedDriverInfo(null);
     setLiveDriverPosition(null);
@@ -2078,98 +2076,71 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* 7. بطاقة البحث الفاخرة — قابلة للتوسيع */}
+        {/* 7. بطاقة البحث الفاخرة — جاري انتظار موافقة الكابتن */}
         {stage === 'searching' && (
-          <div className={`absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 shadow-2xl animate-fade-in ${isDriverSheetExpanded ? 'top-0 rounded-none overflow-y-auto' : 'pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)]'}`}>
-            {/* مقبض — الضغط يوسّع */}
-            <div className="flex justify-center py-3 cursor-pointer" onClick={() => setIsDriverSheetExpanded(v => !v)}>
-              {isDriverSheetExpanded
-                ? <svg className="h-5 w-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="18 15 12 9 6 15"/></svg>
-                : <div className="h-1.5 w-10 rounded-full bg-slate-700" />}
+          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-xl text-white border-t border-amber-500/30 shadow-[0_-12px_40px_rgba(0,0,0,0.85)] animate-fade-in pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)]" dir="rtl">
+            {/* مقبض علوي */}
+            <div className="flex justify-center py-3">
+              <div className="h-1.5 w-10 rounded-full bg-slate-700" />
             </div>
-            {isDriverSheetExpanded ? (
-              <div className="flex flex-col flex-1 px-5 pb-8">
-                <p className="text-center text-[18px] font-black text-white mb-4">
-                  {assignedDriverInfo?.driverVehicle || 'سيارة خصوصي'}
-                </p>
-                <div className="flex items-center justify-between mb-5">
-                  <div className="rounded-xl border-2 border-amber-500/40 bg-[#0B101B] px-3 py-2 text-center min-w-[100px]">
-                    <p className="text-[18px] font-black text-amber-400 tracking-widest font-mono">
-                      {assignedDriverInfo?.driverPlate || '١١٣٤٠ ة'}
-                    </p>
-                    <div className="flex justify-between text-[10px] text-amber-400/70 font-bold mt-0.5"><span>النجف</span><span>خصوصي</span></div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[16px] font-bold text-white">
-                      {assignedDriverInfo?.driverName || 'كابتن توصيله'}
-                    </span>
-                    <div className="h-14 w-14 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 text-[24px] border-2 border-amber-500/40">🧑‍✈️</div>
-                  </div>
+
+            <div className="px-5 space-y-4">
+              {/* رادار البحث النابض */}
+              <div className="flex flex-row-reverse overflow-hidden rounded-2xl shadow-xl border border-amber-500/30 bg-[#0B101B]" style={{ minHeight: '120px' }}>
+                <div className="flex flex-col items-center justify-center bg-gradient-to-b from-amber-400 via-amber-500 to-amber-600 px-5 min-w-[110px] text-slate-950 font-black">
+                  <span className="text-[12px] opacity-80 mb-0.5">طلب تكسي</span>
+                  <span className="text-[22px] font-black leading-tight">{currentTier.name}</span>
+                  <div className="mt-1"><CarBadgeIllustration badge={currentTier.badge} size="sm" /></div>
                 </div>
-                <div className="flex items-center gap-3 mb-5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (assignedDriverInfo?.driverPhone) window.open(`tel:${assignedDriverInfo.driverPhone}`);
-                      else show('رقم الكابتن غير متوفر حالياً', 'info');
-                    }}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-500/40 text-amber-400 shrink-0 hover:bg-amber-500/10 cursor-pointer"
-                  >
-                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsChatOpen(true)}
-                    className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-[#0B101B] border border-amber-500/30 px-4 py-3 text-[14px] font-bold text-amber-300 hover:border-amber-500 transition active:scale-95 cursor-pointer"
-                  >
-                    <span>مراسلة السائق...</span>
-                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-[#0B101B] border border-slate-800 px-4 py-3 mb-3">
-                  <button type="button" className="rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 px-4 py-2 text-[13px] font-black text-[#090D16] cursor-pointer hover:brightness-110">الدفع</button>
-                  <div className="text-right">
-                    <p className="text-[13px] font-bold text-amber-400">الدفع نقداً للكابتن</p>
-                    <p className="text-[12px] text-slate-400">مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار</p>
+                <div className="flex flex-1 flex-col items-center justify-center bg-[#0B101B] gap-1.5 p-4 text-center">
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 text-[26px] border border-amber-400/40 shadow-md">
+                    <span className="animate-ping absolute h-12 w-12 rounded-full bg-amber-500/30" />
+                    <span>🚖</span>
                   </div>
-                  <svg className="h-6 w-6 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                </div>
-                {['تغيير الوجهة','رمز الخصم','خيارات الرحلة'].map(lbl => (
-                  <button key={lbl} type="button" onClick={() => show(lbl,'info')} className="flex items-center justify-between border-b border-slate-800 py-4 cursor-pointer hover:bg-slate-800/40 w-full">
-                    <svg className="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-                    <span className="text-[15px] font-bold text-slate-200">{lbl}</span>
-                  </button>
-                ))}
-                <div className="flex-1 min-h-[40px]" />
-                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-                  <button type="button" onClick={() => { setIsCancelTripOpen(true); setCancelReason(null); }} className="text-[15px] font-bold text-red-400 cursor-pointer hover:text-red-300">إلغاء الرحلة</button>
-                  <button type="button" onClick={() => show('ميزة الأمان قريباً 🛡️','info')} className="flex items-center gap-2 text-[15px] font-bold text-amber-400 cursor-pointer">
-                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>أمان
-                  </button>
+                  <div className="flex gap-1 mt-1">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
+                    ))}
+                  </div>
+                  <span className="text-xs font-bold text-amber-300">جاري البحث عن كابتن بانتظار الموافقة...</span>
                 </div>
               </div>
-            ) : (
-              <>
-                <div className="mx-5 mb-4 flex flex-row-reverse overflow-hidden rounded-2xl shadow-xl border border-amber-500/20 bg-[#0B101B]" style={{ minHeight: '130px' }}>
-                  <div className="flex flex-col items-center justify-center bg-gradient-to-b from-amber-500 to-amber-600 px-5 min-w-[110px] text-[#090D16]">
-                    <span className="text-[13px] font-black opacity-80 mb-0.5">اطلب</span>
-                    <span className="text-[26px] font-black leading-tight">{currentTier.name}</span>
-                    <div className="mt-2"><CarBadgeIllustration badge={currentTier.badge} size="sm" /></div>
-                  </div>
-                  <div className="flex flex-1 flex-col items-center justify-center bg-[#0B101B] gap-1 p-4">
-                    <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 text-[28px] border border-amber-500/30 shadow-md">
-                      🧑‍✈️<div className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-emerald-500 border-2 border-[#090D16]"/>
-                    </div>
-                    <div className="flex gap-1 mt-1">{[...Array(3)].map((_,i)=><div key={i} className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-bounce" style={{animationDelay:`${i*0.18}s`}}/>)}</div>
-                    <span className="text-[11px] font-bold text-amber-300/80 mt-1">جاري الاتصال بأقرب كابتن...</span>
-                  </div>
+
+              {/* تفاصيل المسار والأجرة */}
+              <div className="rounded-2xl bg-[#0B101B] border border-white/10 p-3.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="text-slate-400">الأجرة التقديرية</span>
+                  <span className="text-base font-black text-amber-400 font-mono">
+                    {calculatedPrice.toLocaleString()} د.ع
+                  </span>
                 </div>
-                <p className="mb-4 px-5 text-center text-[17px] font-black text-white">البحث عن أقرب سائق {currentTier.name}</p>
-                <div className="px-5 flex flex-col gap-2">
-                  <button type="button" onClick={()=>show('تم إعطاء الأولوية لطلبك 🚖','success',4000)} className="w-full rounded-xl border border-amber-500/40 bg-[#0B101B] py-3.5 text-center text-[15px] font-bold text-amber-300 transition active:scale-[0.98] hover:bg-amber-500/10 cursor-pointer">أنا مستعجل كثيراً ⚡</button>
+                <div className="space-y-1 text-slate-300 text-start">
+                  <p className="truncate">🟢 من: <span className="text-white font-bold">{pickupName}</span></p>
+                  <p className="truncate">🔴 إلى: <span className="text-white font-bold">{dropoffName}</span></p>
                 </div>
-              </>
-            )}
+              </div>
+
+              {/* أزرار الإجراءات في مرحلة البحث */}
+              <div className="flex flex-col gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => show('تم إعطاء الأولوية لطلبك في بث الرادار 🚖', 'success', 4000)}
+                  className="w-full min-h-[48px] rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 py-3 text-center text-sm font-bold text-amber-300 transition active:scale-[0.98] cursor-pointer"
+                >
+                  أنا مستعجل كثيراً ⚡
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCancelTripOpen(true);
+                    setCancelReason(null);
+                  }}
+                  className="w-full min-h-[48px] rounded-xl border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 py-2.5 text-center text-sm font-bold text-red-400 transition active:scale-[0.98] cursor-pointer"
+                >
+                  إلغاء الطلب ✕
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

@@ -137,7 +137,7 @@ export default function DailyRoutePage() {
             notifiedRejectedBookingIdsRef.current.add(bId);
             newlyRejectedDetected = true;
           }
-        } else if (['pending', 'confirmed', 'active', 'cancellation_pending'].includes(status) || !b.status) {
+        } else if (['confirmed', 'active'].includes(status)) {
           if (b.driverId) activeSet.add(String(b.driverId));
           if (b.driver_id) activeSet.add(String(b.driver_id));
           if (b.driverPhone) activeSet.add(normalizePhoneLoose(b.driverPhone));
@@ -224,13 +224,6 @@ export default function DailyRoutePage() {
     };
   }, [selectedDriver, userLoc]);
 
-  const isAlreadySubscribed = Boolean(
-    selectedDriver &&
-      (subscribedDriverIds.has(String(selectedDriver.driverId)) ||
-        subscribedDriverIds.has(String(selectedDriver.id)) ||
-        (selectedDriver.phone && subscribedDriverIds.has(normalizePhoneLoose(selectedDriver.phone))))
-  );
-
   const matchingBooking = selectedDriver
     ? customerBookings.find((b: any) => {
         const sDriverId = String(selectedDriver.driverId || selectedDriver.id);
@@ -243,6 +236,24 @@ export default function DailyRoutePage() {
         return !['rejected', 'declined', 'cancelled_by_driver'].includes(status);
       })
     : null;
+
+  const isBookingPending = Boolean(
+    matchingBooking &&
+      (matchingBooking.status === 'Pending' ||
+        matchingBooking.status === 'pending_approval' ||
+        matchingBooking.status === 'pending')
+  );
+
+  const isAlreadySubscribed = Boolean(
+    (matchingBooking &&
+      (matchingBooking.status === 'Confirmed' ||
+        matchingBooking.status === 'Active' ||
+        matchingBooking.status === 'active')) ||
+    (selectedDriver &&
+      (subscribedDriverIds.has(String(selectedDriver.driverId)) ||
+        subscribedDriverIds.has(String(selectedDriver.id)) ||
+        (selectedDriver.phone && subscribedDriverIds.has(normalizePhoneLoose(selectedDriver.phone)))))
+  );
 
   const isCancellationPending = Boolean(
     matchingBooking &&
@@ -367,7 +378,7 @@ export default function DailyRoutePage() {
 
   // إرسال طلب حجز مقعد في الخط الدائمي للكابتن
   async function handleBookSeat() {
-    if (!selectedDriver || isBooking || isAlreadySubscribed) return;
+    if (!selectedDriver || isBooking || isAlreadySubscribed || isBookingPending) return;
     setIsBooking(true);
     try {
       const session = authStore.getSession();
@@ -375,7 +386,7 @@ export default function DailyRoutePage() {
       const customerName = session?.fullName || storage.getFullName() || 'راكب توصيلة';
       const customerPhone = storage.getPhone() || '';
 
-      const { data } = await http.post<{ success: boolean; message?: string; error?: string }>('/bookings', {
+      const { data } = await http.post<{ success: boolean; message?: string; error?: string; booking?: any }>('/bookings', {
         driverId: String(selectedDriver.driverId || selectedDriver.id),
         driverName: selectedDriver.name,
         driverPhone: selectedDriver.phone,
@@ -391,15 +402,21 @@ export default function DailyRoutePage() {
       });
 
       if (data?.success) {
-        show('تم إرسال طلب حجز المقعد للكابتن بنجاح! 🚖 بانتظار موافقة الكابتن لتأكيد الحجز.', 'success', 6000);
+        show('تم إرسال طلب حجز المقعد للكابتن بنجاح! 🚖 طلبك قيد انتظار موافقة الكابتن.', 'success', 6000);
         const dId = String(selectedDriver.driverId || selectedDriver.id);
-        setSubscribedDriverIds((prev) => {
-          const next = new Set(prev);
-          next.add(dId);
-          if (selectedDriver.phone) next.add(normalizePhoneLoose(selectedDriver.phone));
-          return next;
-        });
-        setSelectedDriver(null);
+        const newBooking = {
+          id: data.booking?.id || 'bk-' + Date.now(),
+          bookingId: data.booking?.id || 'bk-' + Date.now(),
+          driverId: dId,
+          driverPhone: selectedDriver.phone,
+          customerName,
+          customerPhone,
+          status: 'Pending',
+          pickupLocation: selectedDriver.from || 'موقع الراكب',
+          dropoffLocation: selectedDriver.to || 'الوجهة',
+          createdAt: new Date().toISOString(),
+        };
+        setCustomerBookings((prev) => [newBooking, ...prev]);
       } else {
         show(data?.error || 'تعذر إرسال طلب الحجز', 'error');
       }
@@ -412,12 +429,17 @@ export default function DailyRoutePage() {
         );
         if (selectedDriver) {
           const dId = String(selectedDriver.driverId || selectedDriver.id);
-          setSubscribedDriverIds((prev) => {
-            const next = new Set(prev);
-            next.add(dId);
-            if (selectedDriver.phone) next.add(normalizePhoneLoose(selectedDriver.phone));
-            return next;
-          });
+          const newBooking = {
+            id: 'bk-existing-' + Date.now(),
+            bookingId: 'bk-existing-' + Date.now(),
+            driverId: dId,
+            driverPhone: selectedDriver.phone,
+            status: 'Pending',
+            pickupLocation: selectedDriver.from || 'موقع الراكب',
+            dropoffLocation: selectedDriver.to || 'الوجهة',
+            createdAt: new Date().toISOString(),
+          };
+          setCustomerBookings((prev) => [newBooking, ...prev]);
         }
       } else {
         const msg = err?.response?.data?.error || 'حدث خطأ في الاتصال أثناء إرسال طلب الحجز';
@@ -808,6 +830,16 @@ export default function DailyRoutePage() {
                   </div>
                   <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-semibold text-amber-200">
                     تم إرسال طلبك ({matchingBooking?.cancellationReason || cancelReason}) وبانتظار مراجعة الكابتن.
+                  </p>
+                </div>
+              ) : isBookingPending ? (
+                <div className="space-y-2">
+                  <div className="w-full rounded-xl bg-amber-500/20 border border-amber-400/40 py-3.5 text-center text-[15px] font-black text-amber-300 flex items-center justify-center gap-2 shadow-xs">
+                    <span>طلبك قيد انتظار موافقة الكابتن</span>
+                    <span className="text-[17px] animate-pulse">⏳</span>
+                  </div>
+                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-300">
+                    تم إرسال طلب حجز المقعد للكابتن. بانتظار موافقة صاحب الخط لتأكيد مقعدك.
                   </p>
                 </div>
               ) : isAlreadySubscribed ? (
