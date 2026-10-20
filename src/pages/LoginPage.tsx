@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore, useSession } from '../lib/auth';
@@ -7,6 +7,7 @@ import type { Session } from '../types';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import TermsPrivacyModal from '../components/TermsPrivacyModal';
+import { OtpVerificationView } from '../components/OtpVerificationView';
 import { normalizeArabicDigits } from '../lib/utils';
 
 const CustomerHub = lazy(() => import('../components/CustomerHub').then((m) => ({ default: m.CustomerHub })));
@@ -22,7 +23,6 @@ export default function LoginPage() {
   // Auth flow steps
   const [step, setStep] = useState<'phone' | 'otp' | 'profile' | 'telegram_link' | 'service_select'>('phone');
   const [phone, setPhone] = useState('');
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [fullName, setFullName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,7 +40,6 @@ export default function LoginPage() {
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showIosPrompt, setShowIosPrompt] = useState(false);
-  const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     const handleBeforeInstall = (e: Event) => {
@@ -237,67 +236,11 @@ export default function LoginPage() {
       }
 
       setStep('otp');
-      setOtpDigits(['', '', '', '', '', '']);
-      setTimeout(() => otpInputsRef.current[0]?.focus(), 250);
     } catch (err: any) {
       const serverErr = err?.response?.data?.error;
       setErrorMessage(serverErr || 'تعذر الاتصال بالخادم. تأكد من اتصال الإنترنت.');
     } finally {
       setIsLoading(false);
-    }
-  }
-
-  function handleOtpDigitChange(val: string, index: number) {
-    const normalized = normalizeArabicDigits(val).replace(/[^0-9]/g, '');
-    if (!normalized) {
-      const newDigits = [...otpDigits];
-      newDigits[index] = '';
-      setOtpDigits(newDigits);
-      return;
-    }
-
-    if (normalized.length > 1) {
-      const chars = normalized.slice(0, 6).split('');
-      const newDigits = [...otpDigits];
-      for (let i = 0; i < chars.length; i++) {
-        if (index + i < 6) {
-          newDigits[index + i] = chars[i];
-        }
-      }
-      setOtpDigits(newDigits);
-      setErrorMessage(null);
-      const nextFocus = Math.min(index + chars.length, 5);
-      otpInputsRef.current[nextFocus]?.focus();
-      if (newDigits.every((d) => d !== '')) {
-        handleVerifyOtp(newDigits.join(''));
-      }
-      return;
-    }
-
-    const digit = normalized.slice(-1);
-    const newDigits = [...otpDigits];
-    newDigits[index] = digit;
-    setOtpDigits(newDigits);
-    setErrorMessage(null);
-
-    if (digit && index < 5) {
-      otpInputsRef.current[index + 1]?.focus();
-    }
-
-    if (newDigits.every((d) => d !== '')) {
-      const fullCode = newDigits.join('');
-      handleVerifyOtp(fullCode);
-    }
-  }
-
-  function handleOtpKeyDown(e: React.KeyboardEvent<HTMLInputElement>, index: number) {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpInputsRef.current[index - 1]?.focus();
-    } else if (e.key === 'Enter') {
-      const fullCode = otpDigits.join('');
-      if (fullCode.length >= 4) {
-        handleVerifyOtp(fullCode);
-      }
     }
   }
 
@@ -378,8 +321,6 @@ export default function LoginPage() {
     } catch (err: any) {
       const serverErr = err?.response?.data?.error;
       setErrorMessage(serverErr || 'رمز التحقق غير صحيح أو منتهي الصلاحية');
-      setOtpDigits(['', '', '', '', '', '']);
-      otpInputsRef.current[0]?.focus();
     } finally {
       setIsLoading(false);
     }
@@ -461,6 +402,29 @@ export default function LoginPage() {
       <Suspense fallback={<div className="min-h-[100dvh] flex items-center justify-center bg-[#080E1A]"><Spinner className="w-8 h-8 text-amber-400" /></div>}>
         <CustomerHub onSelectService={handleSelectService} />
       </Suspense>
+    );
+  }
+
+  // واجهة تأكيد رمز التحقق (OTP) الفاخرة
+  if (step === 'otp') {
+    return (
+      <div className="relative w-full min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 bg-[#080E1A] text-[#DDE2F4] overflow-x-hidden font-cairo" dir="rtl">
+        {/* هالات التوهج الضبابية المحيطية في الخلفية */}
+        <div className="absolute top-1/4 -right-24 w-96 h-96 rounded-full bg-amber-500/10 blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-orange-600/10 blur-[100px] pointer-events-none"></div>
+
+        <OtpVerificationView
+          phone={phone}
+          onBack={() => {
+            setStep('phone');
+            setErrorMessage(null);
+          }}
+          onVerify={handleVerifyOtp}
+          onResend={handleResendOtp}
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+        />
+      </div>
     );
   }
 
@@ -625,91 +589,6 @@ export default function LoginPage() {
                     </p>
                   </div>
                 </form>
-              )}
-
-              {/* الخطوة 2: كود التحقق OTP */}
-              {step === 'otp' && (
-                <div className="flex flex-col gap-4 animate-fade-in text-right">
-                  <div className="text-center mb-2 flex justify-center">
-                    <div className="w-16 h-16 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl flex items-center justify-center shadow-sm">
-                      <span className="text-3xl">📲</span>
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <h2 className="text-lg font-bold text-white mb-1">
-                      أدخل رمز التفعيل
-                    </h2>
-                    <p className="text-xs text-slate-300 mb-0.5">
-                      تم إرسال رمز التفعيل إلى الواتساب على الرقم{' '}
-                      <span dir="ltr" className="font-mono font-bold text-amber-400">
-                        {phone}
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      الرجاء إدخال الرمز المكون من 6 أرقام
-                    </p>
-                  </div>
-
-                  {/* خانات الـ OTP الست */}
-                  <div className="flex justify-center gap-2 my-2" dir="ltr">
-                    {[0, 1, 2, 3, 4, 5].map((idx) => (
-                      <input
-                        key={idx}
-                        ref={(el) => (otpInputsRef.current[idx] = el)}
-                        type="tel"
-                        maxLength={6}
-                        value={otpDigits[idx]}
-                        onChange={(e) => handleOtpDigitChange(e.target.value, idx)}
-                        onKeyDown={(e) => handleOtpKeyDown(e, idx)}
-                        onPaste={(e) => {
-                          e.preventDefault();
-                          const pasted = e.clipboardData.getData('text');
-                          handleOtpDigitChange(pasted, idx);
-                        }}
-                        className="w-11 h-13 bg-[#242A37] border border-slate-700/80 rounded-xl text-center text-[22px] font-bold text-white outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition-all font-mono"
-                      />
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <button
-                      type="button"
-                      onClick={handleResendOtp}
-                      disabled={isResending}
-                      className="text-amber-400 hover:text-amber-300 font-bold disabled:opacity-50 cursor-pointer"
-                    >
-                      {isResending ? 'جاري الإرسال...' : 'إعادة إرسال كود الواتساب 💬'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep('phone');
-                        setErrorMessage(null);
-                      }}
-                      className="text-slate-400 hover:text-white cursor-pointer"
-                    >
-                      تغيير رقم الهاتف
-                    </button>
-                  </div>
-
-                  {/* زر تأكيد رمز التحقق */}
-                  <button
-                    type="button"
-                    onClick={() => handleVerifyOtp(otpDigits.join(''))}
-                    disabled={isLoading || otpDigits.join('').length < 4}
-                    className="w-full min-h-[52px] mt-2 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
-                  >
-                    {isLoading ? (
-                      <span className="animate-pulse">جاري التحقق...</span>
-                    ) : (
-                      <>
-                        <span>تأكيد رمز التحقق</span>
-                        <span>✅</span>
-                      </>
-                    )}
-                  </button>
-                </div>
               )}
 
               {/* الخطوة 3: إدخال اسم الراكب الجديد */}
