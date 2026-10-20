@@ -38,7 +38,7 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
-import { RouteLines, type RouteLineData } from '../components/map/MapPins';
+import { RouteLines, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { AppDrawer } from '../components/AppDrawer';
@@ -1734,27 +1734,31 @@ export default function CustomerHomePage() {
             </Marker>
           )}
 
-          {/* علامة نقطة الوصول المثبتة على الخريطة (في شاشة خيارات الرحلة كالصورة 1) */}
+          {/* راية الوجهة «جامعة الكوفة» المثبتة على الخريطة */}
           {stage === 'ride_options' && (
-            <Marker longitude={dropoff.lng} latitude={dropoff.lat} anchor="bottom">
-              <div
-                onClick={() => {
-                  setStage('dropoff');
-                  mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 15.2, duration: 600 });
-                }}
-                className="flex flex-col items-center select-none cursor-pointer group"
-                title="تعديل نقطة الوصول"
-              >
-                <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 px-3.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.5)] border border-emerald-500/40 transition-transform group-hover:scale-105">
-                  <span className="text-[13px] font-bold text-emerald-300 font-cairo">الوصول</span>
-                  <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500">
-                    <div className="h-2 w-2 rounded-full bg-[#090D16]" />
-                  </div>
-                </div>
-                <div className="h-3 w-0.5 bg-emerald-500/80 -mt-0.5" />
-                <div className="h-1.5 w-4 rounded-full bg-black/40 blur-[1px]" />
-              </div>
-            </Marker>
+            <DestinationFlagPin
+              point={dropoff}
+              name={dropoffName || 'جامعة الكوفة'}
+              onClick={() => {
+                setStage('dropoff');
+                mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 15.2, duration: 600 });
+              }}
+            />
+          )}
+
+          {/* دبابيس الكباتن المحيطة وأقرب كابتن (٣ دقيقة) المعتمدة في التصميم */}
+          {!assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && (
+            <>
+              {/* أقرب كابتن مع كبسولة «٣ دقيقة» النطاطة bg-[#FFC174] */}
+              <NearestDriverPin
+                point={{ lng: (pickup?.lng || DEFAULT_PICKUP.lng) + 0.0055, lat: (pickup?.lat || DEFAULT_PICKUP.lat) + 0.0042 }}
+                duration="٣ دقيقة"
+              />
+              {/* دبابيس الكباتن المحيطة باللون الرمادي والذهبي #FFB77D */}
+              <SurroundingDriverPin point={{ lng: (pickup?.lng || DEFAULT_PICKUP.lng) - 0.0062, lat: (pickup?.lat || DEFAULT_PICKUP.lat) + 0.0051 }} />
+              <SurroundingDriverPin point={{ lng: (pickup?.lng || DEFAULT_PICKUP.lng) + 0.0078, lat: (pickup?.lat || DEFAULT_PICKUP.lat) - 0.0045 }} />
+              <SurroundingDriverPin point={{ lng: (pickup?.lng || DEFAULT_PICKUP.lng) - 0.0049, lat: (pickup?.lat || DEFAULT_PICKUP.lat) - 0.0060 }} />
+            </>
           )}
 
 
@@ -1804,27 +1808,65 @@ export default function CustomerHomePage() {
           )}
         </MapGL>
 
-        {/* 4. دبوس المركز في منتصف الشاشة (يختفي في مرحلة خيارات الرحلة أو البحث) */}
+        {/* 4. دبوس المركز في منتصف الشاشة (دبوس موقعك الحالي الزمردي #56E5A9 مع رادار نابض) */}
         {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             {stage === 'pickup' ? (
-              <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in">
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#D97706] shadow-subtle">
-                  <div className="h-3.5 w-3.5 rounded-full bg-white shadow-inner" />
+              <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in select-none">
+                <div className="px-2.5 py-0.5 rounded-full bg-[#161C28]/95 border border-[#56E5A9]/50 text-[#56E5A9] text-[11px] font-bold mb-1 shadow-lg backdrop-blur-md">
+                  موقعك الحالي
+                </div>
+                <div className="relative flex items-center justify-center">
+                  <span className="absolute w-12 h-12 rounded-full bg-[#56E5A9]/30 animate-ping"></span>
+                  <div className="w-9 h-9 rounded-full bg-[#56E5A9] border-2 border-[#080E1A] shadow-[0_0_16px_#56E5A9] flex items-center justify-center text-slate-950 font-bold">
+                    📍
+                  </div>
                 </div>
                 <div className="h-3.5 w-1 rounded-full bg-slate-700/80 -mt-0.5" />
-                <div className="h-1.5 w-4 rounded-full bg-black/25 blur-[1px] mt-0.5" />
+                <div className="h-1.5 w-4 rounded-full bg-black/40 blur-[1px] mt-0.5" />
               </div>
             ) : (
-              <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in">
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[#1B4965] shadow-subtle">
-                  <div className="h-3.5 w-3.5 rounded-full bg-white shadow-inner" />
+              <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in select-none">
+                <div className="px-2.5 py-0.5 rounded-full bg-[#161C28]/95 border border-amber-500/50 text-amber-300 text-[11px] font-bold mb-1 shadow-lg backdrop-blur-md">
+                  نقطة الوصول
+                </div>
+                <div className="relative flex items-center justify-center">
+                  <span className="absolute w-10 h-10 rounded-full bg-amber-400/25 animate-ping"></span>
+                  <div className="w-9 h-9 rounded-full bg-amber-500 border-2 border-[#080E1A] shadow-xl flex items-center justify-center text-slate-950 font-bold">
+                    🎓
+                  </div>
                 </div>
                 <div className="h-3.5 w-1 rounded-full bg-slate-700/80 -mt-0.5" />
-                <div className="h-1.5 w-4 rounded-full bg-black/25 blur-[1px] mt-0.5" />
+                <div className="h-1.5 w-4 rounded-full bg-black/40 blur-[1px] mt-0.5" />
               </div>
             )}
           </div>
+        )}
+
+        {/* شارة: «٤ كباتن متوفرين قربك الآن ⚡» في أعلى اليمين وأدوات الطوارئ في أعلى اليسار */}
+        {stage !== 'searching' && stage !== 'driver_arriving' && (
+          <>
+            <div className="pointer-events-auto absolute top-3.5 right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-2 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              <span>٤ كباتن متوفرين قربك الآن</span>
+              <span className="text-amber-400 text-sm">⚡</span>
+            </div>
+
+            <div className="pointer-events-auto absolute top-3.5 left-4 z-20 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => show('خدمة الطوارئ والأمان 🛡️', 'info')}
+                className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/10 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                title="طوارئ وأمان"
+                aria-label="طوارئ"
+              >
+                <span className="text-base">🛡️</span>
+              </button>
+            </div>
+          </>
         )}
 
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
@@ -1943,17 +1985,19 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={handleConfirmPickup}
-                className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer"
+                className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-[#F59E0B] via-[#D97707] to-[#F59E0B] py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_24px_rgba(245,158,11,0.35)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer flex items-center justify-center gap-2"
               >
-                تأكيد نقطة الانطلاق
+                <span>تثبيت نقطة الانطلاق</span>
+                <span className="text-lg">🚖</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleConfirmDropoff}
-                className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer"
+                className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-[#F59E0B] via-[#D97707] to-[#F59E0B] py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_24px_rgba(245,158,11,0.35)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer flex items-center justify-center gap-2"
               >
-                تأكيد نقطة الوصول
+                <span>تثبيت نقطة الوصول</span>
+                <span className="text-lg">🎓</span>
               </button>
             )}
           </div>

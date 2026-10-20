@@ -137,80 +137,6 @@ export default function LoginPage() {
     return () => clearTimeout(timer);
   }, [phone]);
 
-  // Smart PWA prompt dismissal & Native Install/Share
-  const [isPwaDismissed, setIsPwaDismissed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-    if (isStandalone) return true;
-    return sessionStorage.getItem('tawseela_pwa_dismissed') === 'true';
-  });
-
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showIosPrompt, setShowIosPrompt] = useState(false);
-
-  useEffect(() => {
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-  }, []);
-
-  const dismissPwa = () => {
-    setIsPwaDismissed(true);
-    try {
-      sessionStorage.setItem('tawseela_pwa_dismissed', 'true');
-    } catch (_) {}
-  };
-
-  async function handleShareApp() {
-    const shareData = {
-      title: 'تطبيق توصيلة | Tawseela IQ',
-      text: 'تطبيق توصيلة الرسمي لحجز التكسي والخطوط اليومية في النجف الأشرف 🚖',
-      url: window.location.origin,
-    };
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch (err: any) {
-        if (err.name === 'AbortError') return;
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(window.location.origin);
-      show('تم نسخ رابط تطبيق توصيلة للحافظة بنجاح 📋', 'success');
-    } catch (_) {
-      show(`رابط المنصة: ${window.location.origin}`, 'info');
-    }
-  }
-
-  async function handleInstallApp() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice?.outcome === 'accepted') {
-        show('شكراً لتثبيت تطبيق توصيلة! 🚖', 'success');
-        setDeferredPrompt(null);
-        dismissPwa();
-      }
-      return;
-    }
-
-    const isIos =
-      typeof navigator !== 'undefined' &&
-      (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        ((navigator as any).platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-
-    if (isIos) {
-      setShowIosPrompt(true);
-      return;
-    }
-
-    show('اضغط على خيارات المتصفح (⋮) ثم اختر "تثبيت التطبيق" أو "إضافة إلى الشاشة الرئيسية"', 'info');
-  }
-
   const navigateAfterLogin = (userRole: string) => {
     navigate(userRole?.toLowerCase() === 'driver' ? '/drive' : '/hub', { replace: true });
   };
@@ -569,38 +495,36 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative w-full min-h-[100dvh] flex items-center justify-center p-3 sm:p-6 bg-[#080E1A] text-[#DDE2F4] overflow-x-hidden font-cairo" dir="rtl">
+    <div 
+      className="w-full min-h-[100dvh] bg-[#080E1A] text-[#DDE2F4] flex flex-col justify-center items-center px-4 py-6 font-cairo relative overflow-x-hidden" 
+      style={{ touchAction: 'pan-y' }}
+      dir="rtl"
+    >
       {/* هالات التوهج الضبابية المحيطية في الخلفية */}
       <div className="absolute top-1/4 -right-24 w-96 h-96 rounded-full bg-amber-500/10 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-10 -left-20 w-80 h-80 rounded-full bg-orange-600/10 blur-[100px] pointer-events-none"></div>
 
       {/* الحاوية المركزية الفاخرة */}
-      <div className="relative z-10 w-full max-w-[430px] mx-auto flex flex-col gap-4">
+      <div className="relative z-10 w-full max-w-md mx-auto flex flex-col items-center gap-4">
         
-        {/* البطاقة الزجاجية المعتمة */}
-        <div className="w-full bg-[#161C28]/90 backdrop-blur-2xl rounded-3xl border border-white/5 shadow-2xl p-6 flex flex-col gap-5 relative overflow-hidden">
+        {/* البطاقة الزجاجية الأوبسيديانية الفاخرة */}
+        <div className="w-full bg-[#161C28]/95 backdrop-blur-2xl p-6 rounded-3xl border border-amber-500/20 shadow-2xl flex flex-col gap-5 relative overflow-hidden">
           {/* خط التوهج الذهبي العلوي */}
           <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-80"></div>
 
-          {/* ترويسة الشعار المحصورة بحاوية مقيدة بدقة لمنع أي تمدد أو تداخل */}
+          {/* ترويسة الشعار المحصورة بحاوية محكمة ومقيدة بدقة */}
           <div className="flex flex-col items-center text-center pt-1">
-            <div className="relative w-full flex items-center justify-center my-2 overflow-hidden">
+            <div className="w-full flex items-center justify-center my-3 overflow-hidden">
               <img 
                 src="/logo.png?v=40" 
                 alt="شعار توصيلة" 
-                className="h-16 sm:h-20 w-auto max-w-[190px] object-contain mx-auto drop-shadow-md select-none animate-logo-entrance"
+                className="h-14 sm:h-16 w-auto max-w-[160px] object-contain drop-shadow-md select-none" 
+                style={{ maxHeight: '64px', maxWidth: '160px', width: 'auto' }}
               />
             </div>
             
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 text-amber-400 text-xs font-semibold mb-2 shadow-sm border border-amber-500/15">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>النسخة الحصرية • النجف الأشرف</span>
-            </div>
-            
-            <h1 className="text-2xl font-bold text-white tracking-tight font-alexandria">
-              أهلاً بك في <span className="text-amber-400">توصيلة</span>
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">ياهلا بيكم وين تردون نوديكم</p>
+            <h1 className="text-xl font-bold text-white mb-1">أهلاً بك في توصيلة</h1>
+            <p className="text-xs text-slate-400 mb-2">خدمة النقل الذكية في النجف الأشرف</p>
           </div>
 
           {/* محدد الأدوار: أنا راكب / أنا كابتن */}
@@ -1093,56 +1017,8 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* شريط تثبيت ومشاركة التطبيق الفوري الذكي (PWA Smart Install & Share) */}
-        {!isPwaDismissed && (
-          <div className="w-full bg-[#161C28]/95 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-amber-500/20 flex flex-col gap-3 relative">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-bold text-base shadow-sm">
-                  ⚡
-                </div>
-                <div className="flex flex-col text-right">
-                  <h4 className="text-xs font-bold text-white">تثبيت ومشاركة التطبيق الفوري (PWA)</h4>
-                  <p className="text-[11px] text-slate-400">يعمل كأي تطبيق أصلي بدون الحاجة للمتجر وبسرعة فائقة</p>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={dismissPwa}
-                className="min-h-[48px] min-w-[48px] flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer rounded-xl active:scale-95"
-                title="إغلاق التنبيه"
-                aria-label="إغلاق التنبيه"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2.5 pt-0.5">
-              {/* زر مشاركة الرابط عبر Web Share API */}
-              <button
-                type="button"
-                onClick={handleShareApp}
-                className="min-h-[48px] w-full px-3 py-2.5 rounded-xl bg-[#080E1A] hover:bg-[#1A202C] active:scale-[0.98] border border-slate-700/60 text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
-              >
-                <span className="text-base text-sky-400">⎋</span>
-                <span>مشاركة الرابط</span>
-              </button>
-
-              {/* زر إضافة للشاشة عبر Native PWA Prompt / iOS Guidance */}
-              <button
-                type="button"
-                onClick={handleInstallApp}
-                className="min-h-[48px] w-full px-3 py-2.5 rounded-xl bg-gradient-to-l from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 active:scale-[0.98] text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-500/10"
-              >
-                <span className="text-sm">➕</span>
-                <span>إضافة للشاشة</span>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* شارات الأمان والترخيص السفلي */}
-        <div className="flex items-center justify-center gap-4 text-slate-500 text-[11px] pb-6">
+        <div className="flex items-center justify-center gap-3 text-slate-500 text-[11px] pt-1 pb-4 select-none">
           <span>🔒 تشفير كامل للبيانات</span>
           <span>•</span>
           <span>🚖 ترخيص رسمي</span>
@@ -1150,56 +1026,6 @@ export default function LoginPage() {
           <span>النجف • الكوفة</span>
         </div>
       </div>
-
-      {/* نافذة إرشاد التثبيت لـ iOS */}
-      {showIosPrompt && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-fade-in font-cairo"
-          onClick={() => setShowIosPrompt(false)}
-        >
-          <div 
-            className="w-full max-w-sm bg-[#161C28] rounded-3xl p-5 border border-amber-500/30 text-white flex flex-col gap-4 text-right shadow-2xl animate-sheet-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-slate-700/50">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🍎</span>
-                <h3 className="font-bold text-sm text-white">تثبيت التطبيق على آيفون (iOS)</h3>
-              </div>
-              <button 
-                onClick={() => setShowIosPrompt(false)} 
-                className="min-h-[48px] min-w-[48px] rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer"
-                aria-label="إغلاق"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-3 text-xs leading-relaxed text-slate-300">
-              <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#080E1A]/80 border border-slate-700/50">
-                <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">١</span>
-                <p>اضغط على زر المشاركة <span className="text-sky-400 font-bold">⎋ (Share)</span> في شريط سفاري السفلي.</p>
-              </div>
-              <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#080E1A]/80 border border-slate-700/50">
-                <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold shrink-0">٢</span>
-                <p>مرر للأسفل بالقائمة واختر <span className="text-amber-400 font-bold">«إضافة إلى الصفحة الرئيسية ➕»</span>.</p>
-              </div>
-              <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#080E1A]/80 border border-slate-700/50">
-                <span className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">٣</span>
-                <p>اضغط على <span className="text-emerald-400 font-bold">«إضافة (Add)»</span> أعلى اليمين ليظهر التطبيق في شاشتك الرئيسية فوراً!</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowIosPrompt(false)}
-              className="w-full min-h-[48px] rounded-xl bg-gradient-to-l from-amber-400 to-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center cursor-pointer shadow-md"
-            >
-              فهمت ذلك 👍
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* نافذة شروط الاستخدام وسياسة الخصوصية المنبثقة */}
       <TermsPrivacyModal
