@@ -1,9 +1,10 @@
-// الموجّه الرئيسي — بديل main.dart (جلسة تلقائية + توجيه حسب الدور)
-// تم تطبيق التحميل الكسول (Lazy Loading) لجميع الصفحات والمكونات لتقليص حجم الحزم وتحسين سرعة الفتح
+// الموجّه الرئيسي — بديل main.dart (جلسة تلقائية متزامنة + توجيه دقيق حسب الدور مع الحفاظ على المسار)
+// تم تطبيق التحميل الكسول (Lazy Loading) لجميع الصفحات لتقليص الحجم وتحقيق أقصى سرعة استجابة
 
 import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { useSession } from './lib/auth';
+import { useSession, authStore } from './lib/auth';
+import { storage } from './lib/storage';
 import { consumeLoginTokenFromUrl } from './lib/googleAuth';
 import { fetchAndApplyTheme } from './lib/theme';
 import { initAudioUnlock } from './lib/sound';
@@ -36,16 +37,58 @@ function PageLoader() {
   );
 }
 
-function RequireAuth({ children, role }: { children: ReactNode; role?: 'Driver' }) {
-  const session = useSession();
-  if (!session) return <Navigate to="/login" replace />;
-  if (role && session.role !== role) return <Navigate to="/" replace />;
+// حارس المسارات المحمي: قراءة متزامنة فورية للجلسة لمنع التحويل القسري للداش بورد عند الـ Refresh
+interface ProtectedRouteProps {
+  children: ReactNode;
+  allowedRoles?: ('driver' | 'customer' | 'admin')[];
+}
+
+function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+  const token = storage.getToken() || localStorage.getItem('token') || localStorage.getItem('auth_token');
+  const rawRole = (storage.getUserRole() || localStorage.getItem('role') || localStorage.getItem('user_role') || 'customer').toLowerCase();
+  const currentRole = rawRole === 'driver' ? 'driver' : rawRole === 'admin' ? 'admin' : 'customer';
+
+  // إذا لم يكن المستخدم مسجلاً، يتم تحويله لشاشة تسجيل الدخول
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // إذا كانت الصلاحيات محددة والمستخدم لا يملك الصلاحية المناسبة، يتم توجيهه لمساره الصحيح
+  if (allowedRoles && !allowedRoles.includes(currentRole)) {
+    if (currentRole === 'driver') {
+      return <Navigate to="/drive" replace />;
+    }
+    if (currentRole === 'admin') {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <Navigate to="/hub" replace />;
+  }
+
+  // المستخدم مصادق عليه ومساره مسموح -> يبقى في صفحته الحالية بدون أي تحويل
   return <>{children}</>;
 }
 
 export default function App() {
   const session = useSession();
   const [ready, setReady] = useState(false);
+
+  // القراءة المتزامنة لبيانات الجلسة (Synchronous Session Hydration)
+  const [token, setToken] = useState(() => storage.getToken() || localStorage.getItem('token') || localStorage.getItem('auth_token') || null);
+  const [role, setRole] = useState(() => {
+    const r = storage.getUserRole() || localStorage.getItem('role') || localStorage.getItem('user_role') || null;
+    return r ? r.toLowerCase() : null;
+  });
+
+  // مزامنة فورية لتغيرات الجلسة (تسجيل دخول / خروج)
+  useEffect(() => {
+    const unsubscribe = authStore.subscribe(() => {
+      const currentToken = storage.getToken() || localStorage.getItem('token') || localStorage.getItem('auth_token') || null;
+      const currentRawRole = storage.getUserRole() || localStorage.getItem('role') || localStorage.getItem('user_role') || null;
+      setToken(currentToken);
+      setRole(currentRawRole ? currentRawRole.toLowerCase() : null);
+    });
+    return unsubscribe;
+  }, []);
 
   // جلب وتطبيق المظهر المعتمد من لوحة التحكم والخادم مع المزامنة اللحظية
   useEffect(() => {
@@ -71,20 +114,16 @@ export default function App() {
     };
   }, []);
 
-  // معالجة login_token من رابط العودة (OAuth/تليجرام) وفك قفل الصوت عند أول تحميل — بديل main.dart
+  // معالجة login_token من رابط العودة وفك قفل الصوت عند أول تحميل
   useEffect(() => {
     initAudioUnlock();
     consumeLoginTokenFromUrl();
     setReady(true);
   }, []);
 
-  // الاتصال اللحظي يتبع الجلسة عند تغيير المسار (يتم تحميله ديناميكياً فقط عند وجود جلسة نشطة)
+  // الاتصال اللحظي يتبع الجلسة عند وجود جلسة نشطة (باستثناء لوحة الإدارة لتفادي التحويل القسري)
   useEffect(() => {
-    if (ready && session?.role === 'Admin') {
-      window.location.replace('/dashboard/');
-      return;
-    }
-    if (ready && session) {
+    if (ready && session && session.role !== 'Admin') {
       let active = true;
       void import('./lib/realtime').then(({ realtime }) => {
         if (active) void realtime.connect(session.token);
@@ -108,86 +147,144 @@ export default function App() {
           dir="rtl"
         >
           <Routes>
+            {/* مسارات المصادقة العامة */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<Navigate to="/login" replace />} />
             <Route path="/otp" element={<Navigate to="/login" replace />} />
-            <Route path="/daily" element={<RequireAuth><DailyRoutePage /></RequireAuth>} />
-            <Route path="/hub" element={<RequireAuth>{session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHub />}</RequireAuth>} />
 
+            {/* مسارات الراكب الأساسية — حماية المسار والبقاء في نفس الصفحة عند الـ Refresh */}
             <Route
-              path="/"
+              path="/hub"
               element={
-                <RequireAuth>
-                  {session?.role === 'Driver' ? <Navigate to="/driver" replace /> : <CustomerHomePage />}
-                </RequireAuth>
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerHub />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/taxi"
+              element={
+                <ProtectedRoute allowedRoles={['customer']}>
+                  <CustomerHomePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/daily"
+              element={
+                <ProtectedRoute allowedRoles={['customer', 'driver']}>
+                  <DailyRoutePage />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/track/:bookingId"
               element={
-                <RequireAuth>
+                <ProtectedRoute allowedRoles={['customer', 'driver']}>
                   <LiveTrackingPage />
-                </RequireAuth>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* مسارات السائق — دعم كامل للمسارين /drive و /driver مع البقاء عند الـ Refresh */}
+            <Route
+              path="/drive"
+              element={
+                <ProtectedRoute allowedRoles={['driver']}>
+                  <DriverHomePage />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/driver"
               element={
-                <RequireAuth role="Driver">
+                <ProtectedRoute allowedRoles={['driver']}>
                   <DriverHomePage />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/driver/routes/new"
               element={
-                <RequireAuth role="Driver">
+                <ProtectedRoute allowedRoles={['driver']}>
                   <CreateRoutePage />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/driver/requests"
               element={
-                <RequireAuth role="Driver">
+                <ProtectedRoute allowedRoles={['driver']}>
                   <DriverRequestsPage />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/driver/documents"
               element={
-                <RequireAuth role="Driver">
+                <ProtectedRoute allowedRoles={['driver']}>
                   <DocumentUploadPage />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
+
+            {/* مسارات الإعلانات والدعم */}
             <Route
               path="/ads"
               element={
-                <RequireAuth>
+                <ProtectedRoute allowedRoles={['customer', 'driver']}>
                   <VacancyAdsPage />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/ads/new"
               element={
-                <RequireAuth role="Driver">
+                <ProtectedRoute allowedRoles={['driver']}>
                   <CreateVacancyAdPage />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/support"
               element={
-                <RequireAuth>
+                <ProtectedRoute allowedRoles={['customer', 'driver']}>
                   <SupportPage />
-                </RequireAuth>
+                </ProtectedRoute>
               }
             />
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* المسار الجذري / يتم توجيهه حسب الرول الحقيقي للمستخدم */}
+            <Route
+              path="/"
+              element={
+                !token ? (
+                  <Navigate to="/login" replace />
+                ) : role === 'driver' ? (
+                  <Navigate to="/drive" replace />
+                ) : role === 'admin' ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Navigate to="/hub" replace />
+                )
+              }
+            />
+
+            {/* أي مسار غير معروف يُعاد توجيهه حسب الرول وليس للداش بورد أبداً */}
+            <Route
+              path="*"
+              element={
+                !token ? (
+                  <Navigate to="/login" replace />
+                ) : role === 'driver' ? (
+                  <Navigate to="/drive" replace />
+                ) : role === 'admin' ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Navigate to="/hub" replace />
+                )
+              }
+            />
           </Routes>
         </main>
       </Suspense>

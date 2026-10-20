@@ -13,10 +13,12 @@ const listeners = new Set<Listener>();
 function readSession(): Session | null {
   const token = storage.getToken();
   if (!token) return null;
+  const rawRole = (storage.getUserRole() ?? 'Customer').toLowerCase();
+  const role = (rawRole === 'driver' ? 'Driver' : rawRole === 'admin' ? 'Admin' : 'Customer') as AppRole;
   return {
     token,
     userId: storage.getUserId() ?? '',
-    role: (storage.getUserRole() ?? 'Customer') as AppRole,
+    role,
     fullName: storage.getFullName() ?? 'مستخدم توصيله',
   };
 }
@@ -27,6 +29,8 @@ export const authStore = {
   getSession(): Session | null {
     if (!storage.getToken()) {
       currentSession = null;
+    } else if (!currentSession) {
+      currentSession = readSession();
     }
     return currentSession;
   },

@@ -27,22 +27,27 @@ export const storage = {
     localStorage.setItem(KEYS.userRole, session.role);
     localStorage.setItem(KEYS.fullName, session.fullName);
     if (session.phone) localStorage.setItem(KEYS.phone, session.phone);
+
+    // مزامنة المفاتيح القياسية لضمان التوافق المطلق
+    localStorage.setItem('token', session.token);
+    localStorage.setItem('role', session.role);
+    localStorage.setItem('user', JSON.stringify(session));
   },
 
   getToken(): string | null {
-    return clean(localStorage.getItem(KEYS.token));
+    return clean(localStorage.getItem(KEYS.token)) || clean(localStorage.getItem('token'));
   },
   getUserId(): string | null {
-    return clean(localStorage.getItem(KEYS.userId));
+    return clean(localStorage.getItem(KEYS.userId)) || clean(localStorage.getItem('user_id')) || clean(localStorage.getItem('userId')) || clean(localStorage.getItem('id'));
   },
   getUserRole(): string | null {
-    return clean(localStorage.getItem(KEYS.userRole));
+    return clean(localStorage.getItem(KEYS.userRole)) || clean(localStorage.getItem('role')) || clean(localStorage.getItem('user_role'));
   },
   getFullName(): string | null {
-    return clean(localStorage.getItem(KEYS.fullName));
+    return clean(localStorage.getItem(KEYS.fullName)) || clean(localStorage.getItem('user_fullname')) || clean(localStorage.getItem('fullName')) || clean(localStorage.getItem('name'));
   },
   getPhone(): string | null {
-    return clean(localStorage.getItem(KEYS.phone));
+    return clean(localStorage.getItem(KEYS.phone)) || clean(localStorage.getItem('user_phone')) || clean(localStorage.getItem('phone'));
   },
 
   getAvatar(): string | null {
@@ -67,12 +72,21 @@ export const storage = {
     localStorage.removeItem(KEYS.fullName);
     localStorage.removeItem(KEYS.phone);
     localStorage.removeItem('user_points');
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('user');
   },
 
   clearAll(): void {
     localStorage.removeItem(KEYS.token);
     localStorage.removeItem(KEYS.userId);
     localStorage.removeItem(KEYS.userRole);
+    localStorage.removeItem(KEYS.fullName);
+    localStorage.removeItem(KEYS.avatar);
+    localStorage.removeItem(KEYS.phone);
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('user');
     localStorage.removeItem(KEYS.fullName);
     localStorage.removeItem(KEYS.avatar);
     localStorage.removeItem(KEYS.phone);

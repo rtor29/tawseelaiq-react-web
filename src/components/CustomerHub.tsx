@@ -105,7 +105,7 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
       return;
     }
     localStorage.setItem('selected_trip_type', 'taxi');
-    navigate('/', { state: { serviceType: 'taxi' } });
+    navigate('/taxi', { state: { serviceType: 'taxi' } });
   }
 
   function handleOpenMonthlyBooking() {
@@ -220,7 +220,7 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
             {/* بطاقة متابعة المشوار الجاري إن وجد */}
             {activeTaxiRide && (
               <div 
-                onClick={() => onSelectService ? onSelectService('taxi') : navigate('/')}
+                onClick={() => onSelectService ? onSelectService('taxi') : navigate('/taxi')}
                 className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/20 via-[#161C28] to-[#161C28] border-2 border-amber-400 p-4 shadow-xl flex items-center justify-between gap-3 cursor-pointer animate-fade-in group"
               >
                 <div className="flex items-center gap-3 min-w-0">

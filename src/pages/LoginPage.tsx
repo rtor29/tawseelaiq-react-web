@@ -108,7 +108,7 @@ export default function LoginPage() {
   }
 
   const navigateAfterLogin = (userRole: string) => {
-    navigate(userRole === 'Driver' ? '/driver' : '/hub', { replace: true });
+    navigate(userRole?.toLowerCase() === 'driver' ? '/drive' : '/hub', { replace: true });
   };
 
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function LoginPage() {
     if (type === 'permanent') {
       navigate('/daily', { replace: true });
     } else {
-      navigate('/', { replace: true, state: { serviceType: type } });
+      navigate('/taxi', { replace: true, state: { serviceType: type } });
     }
   }
 

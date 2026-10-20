@@ -145,7 +145,7 @@ export default function LiveTrackingPage() {
               📞
             </a>
           </div>
-          <Button variant="dark" className="mt-4 w-full" onClick={() => navigate('/')}>
+          <Button variant="dark" className="mt-4 w-full" onClick={() => navigate('/hub')}>
             العودة للرئيسية
           </Button>
         </div>
