@@ -50,7 +50,7 @@ export default function LoginPage() {
     message: '',
   });
 
-  // التحقق التلقائي الذكي عند الإدخال (Debounced Phone Check - 400ms)
+  // التحقق التلقائي الذكي عند الإدخال (Debounced Phone Check - 350ms)
   useEffect(() => {
     const cleanPhone = normalizeArabicDigits(phone).replace(/[^0-9]/g, '');
     if (!cleanPhone || cleanPhone.length < 10) {
@@ -87,7 +87,7 @@ export default function LoginPage() {
           exists: !!data?.exists,
           role: normRole,
           name: data?.name || null,
-          message: data?.message || (data?.exists ? (normRole === 'driver' ? 'هذا الرقم مسجل مسبقاً ككابتن معتمد 🚖' : 'هذا الرقم مسجل مسبقاً كراكب 👋') : 'رقم جديد (سيتم تسجيلك كحساب جديد ✨)'),
+          message: data?.message || (data?.exists ? (normRole === 'driver' ? 'هذا الرقم مسجل مسبقاً ككابتن معتمد 🚖' : 'هذا الرقم مسجل مسبقاً كراكب 👋') : 'رقم جديد.. أهلاً بك في عائلة توصيلة ✨'),
         });
 
         if (normRole === 'driver') {
@@ -95,7 +95,6 @@ export default function LoginPage() {
           setRole('driver');
         } else if (normRole === 'passenger') {
           setDetectedRole('Customer');
-          setRole('passenger');
         }
       } catch (_) {
         // Fallback: حاول عبر GET
@@ -118,7 +117,7 @@ export default function LoginPage() {
             exists: !!data?.exists,
             role: normRole,
             name: data?.name || null,
-            message: data?.message || (data?.exists ? (normRole === 'driver' ? 'هذا الرقم مسجل مسبقاً ككابتن معتمد 🚖' : 'هذا الرقم مسجل مسبقاً كراكب 👋') : 'رقم جديد (سيتم تسجيلك كحساب جديد ✨)'),
+            message: data?.message || (data?.exists ? (normRole === 'driver' ? 'هذا الرقم مسجل مسبقاً ككابتن معتمد 🚖' : 'هذا الرقم مسجل مسبقاً كراكب 👋') : 'رقم جديد.. أهلاً بك في عائلة توصيلة ✨'),
           });
 
           if (normRole === 'driver') {
@@ -126,13 +125,12 @@ export default function LoginPage() {
             setRole('driver');
           } else if (normRole === 'passenger') {
             setDetectedRole('Customer');
-            setRole('passenger');
           }
         } catch (__) {
           setPhoneStatus((prev) => ({ ...prev, checking: false }));
         }
       }
-    }, 400);
+    }, 350);
 
     return () => clearTimeout(timer);
   }, [phone]);
@@ -176,6 +174,73 @@ export default function LoginPage() {
     }
   }
 
+  // الدخول الفوري والمباشر للمستخدمين المسجلين (كابتن أو راكب) دون إرسال كود واتساب
+  async function handleDirectLogin() {
+    if (isLoading) return;
+    setErrorMessage(null);
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone || cleanPhone.replace(/[^0-9]/g, '').length < 10) {
+      setErrorMessage('يرجى إدخال رقم هاتف عراقي صالح (مثال: 07701234567)');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const targetRole = (phoneStatus.role === 'driver' || role === 'driver') ? 'driver' : 'passenger';
+      const { data } = await http.post<{
+        success: boolean;
+        direct: boolean;
+        token: string;
+        role: string;
+        userId?: string;
+        fullName?: string;
+        user?: any;
+        redirect?: string;
+        error?: string;
+      }>('/auth/direct-login', {
+        phone: cleanPhone,
+        phoneNumber: cleanPhone,
+        requestedRole: targetRole,
+      });
+
+      if (data.success && data.token) {
+        const finalRole = (data.role === 'Driver' || data.role === 'driver') ? 'Driver' : 'Customer';
+        authStore.save(
+          {
+            token: data.token,
+            userId: data.userId || data.user?.id || (finalRole === 'Driver' ? 'drv-' : 'usr-') + Date.now(),
+            role: finalRole,
+            fullName: data.fullName || data.user?.fullName || phoneStatus.name || (finalRole === 'Driver' ? 'كابتن توصيلة' : 'مستخدم توصيلة'),
+          },
+          cleanPhone
+        );
+
+        show(
+          finalRole === 'Driver'
+            ? `أهلاً بك يا كابتن ${data.fullName || phoneStatus.name || ''} 🚖`
+            : `مرحباً بك مجدداً ${data.fullName || phoneStatus.name || ''} 👋`,
+          'success'
+        );
+
+        if (finalRole === 'Driver') {
+          navigate('/drive', { replace: true });
+        } else {
+          navigate('/hub', { replace: true });
+        }
+        return;
+      }
+
+      if (data.error) {
+        setErrorMessage(data.error);
+      }
+    } catch (err: any) {
+      const serverErr = err?.response?.data?.error;
+      setErrorMessage(serverErr || 'تعذر تسجيل الدخول المباشر. يرجى المحاولة لاحقاً.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function handleSubmitPhone(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (isLoading) return;
@@ -185,6 +250,19 @@ export default function LoginPage() {
     if (!cleanPhone || cleanPhone.replace(/[^0-9]/g, '').length < 10) {
       setErrorMessage('يرجى إدخال رقم هاتف عراقي صالح (مثال: 07701234567)');
       return;
+    }
+
+    // إذا كان الرقم مسجلاً مسبقاً (سائق أو راكب): دخول فوري ومباشر دون إرسال كود
+    if (phoneStatus.checked && phoneStatus.exists) {
+      return handleDirectLogin();
+    }
+
+    // إذا كان المستخدم في تبويب الكابتن والرقم غير مسجل: حظر فوري ومنع إرسال كود الواتساب
+    if (role === 'driver' || phoneStatus.role === 'driver') {
+      if (phoneStatus.checked && (!phoneStatus.exists || phoneStatus.role !== 'driver')) {
+        setErrorMessage('عذراً، هذا الرقم غير مسجل ككابتن معتمد. يرجى مراجعة إدارة المنصة للتسجيل والتدريب.');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -217,10 +295,23 @@ export default function LoginPage() {
         } catch (_) {}
       }
 
-      const activeUserRole: 'Driver' | 'Customer' = (currentCheck.role === 'driver' || role === 'driver') ? 'Driver' : 'Customer';
+      // إذا تبين بعد الفحص أنه مسجل مسبقاً: دخول مباشر فوري
+      if (currentCheck.exists) {
+        setIsLoading(false);
+        return handleDirectLogin();
+      }
+
+      // إذا كان في وضع الكابتن وهو غير مسجل: حظر فوري
+      if (role === 'driver') {
+        setIsLoading(false);
+        setErrorMessage('عذراً، هذا الرقم غير مسجل ككابتن معتمد. يرجى مراجعة إدارة المنصة للتسجيل والتدريب.');
+        return;
+      }
+
+      const activeUserRole: 'Driver' | 'Customer' = 'Customer';
       setDetectedRole(activeUserRole);
 
-      // 2. إرسال رمز التحقق عبر واتساب
+      // 2. إرسال رمز التحقق عبر واتساب حصراً للركاب الجدد
       try {
         await http.post('/auth/send-whatsapp-otp', {
           phone: cleanPhone,
@@ -228,7 +319,11 @@ export default function LoginPage() {
           role: activeUserRole,
         });
         show('تم إرسال رمز التحقق إلى واتساب 📲', 'success');
-      } catch (_) {
+      } catch (err: any) {
+        if (err?.response?.data?.alreadyRegistered) {
+          setIsLoading(false);
+          return handleDirectLogin();
+        }
         await http.post('/auth/send-otp', {
           phoneNumber: cleanPhone,
           role: activeUserRole,
@@ -527,15 +622,15 @@ export default function LoginPage() {
             <p className="text-xs text-slate-400 mb-2">خدمة النقل الذكية في النجف الأشرف</p>
           </div>
 
-          {/* محدد الأدوار: أنا راكب / أنا كابتن */}
-          <div className="relative w-full p-1 bg-[#1A202C] rounded-2xl flex items-center justify-between shadow-inner">
+          {/* محدد الأدوار: أنا راكب / أنا كابتن (معايير Google Material 3 لمساحات اللمس) */}
+          <div className="relative w-full p-1 bg-[#1A202C] rounded-2xl flex items-center justify-between shadow-inner gap-1">
             <button 
               type="button"
               onClick={() => {
                 setRole('passenger');
                 setErrorMessage(null);
               }}
-              className={`relative z-10 flex-1 py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`relative z-10 flex-1 min-h-[48px] py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
                 role === 'passenger' 
                   ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
                   : 'text-slate-400 hover:text-white'
@@ -551,7 +646,7 @@ export default function LoginPage() {
                 setRole('driver');
                 setErrorMessage(null);
               }}
-              className={`relative z-10 flex-1 py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`relative z-10 flex-1 min-h-[48px] py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
                 role === 'driver' 
                   ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
                   : 'text-slate-400 hover:text-white'
@@ -614,71 +709,118 @@ export default function LoginPage() {
                       )}
                     </div>
 
-                    {/* شارة حالة وتصنيف الرقم الفورية (Real-time Phone Status Pill) */}
+                    {/* شارات حالة وتصنيف الرقم الفورية وفق مصفوفة التوثيق الذكية */}
                     {phoneStatus.checking && (
-                      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-slate-300 text-xs font-semibold animate-pulse shadow-sm">
+                      <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-slate-300 text-xs font-semibold animate-pulse shadow-sm">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0"></span>
                         <span>جاري التحقق ومطابقة الرقم في المنظومة...</span>
                       </div>
                     )}
 
                     {!phoneStatus.checking && phoneStatus.checked && phoneStatus.exists && phoneStatus.role === 'passenger' && (
-                      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold animate-fade-in shadow-sm">
+                      <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold animate-fade-in shadow-sm">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">👋</span>
-                          <span>هذا الرقم مسجل مسبقاً كراكب</span>
-                          {phoneStatus.name && <span className="text-emerald-200 font-normal">({phoneStatus.name})</span>}
+                          <span className="text-lg">👋</span>
+                          <span>مرحباً بك مجدداً {phoneStatus.name ? phoneStatus.name : ''}! حسابك مسجل كراكب</span>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shrink-0">حساب نشط</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shrink-0 font-bold">حساب نشط</span>
                       </div>
                     )}
 
                     {!phoneStatus.checking && phoneStatus.checked && phoneStatus.exists && phoneStatus.role === 'driver' && (
-                      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-fade-in shadow-sm">
+                      <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-fade-in shadow-sm">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">🚖</span>
-                          <span>هذا الرقم مسجل مسبقاً ككابتن معتمد</span>
-                          {phoneStatus.name && <span className="text-amber-200 font-normal">({phoneStatus.name})</span>}
+                          <span className="text-lg">🚖</span>
+                          <span>أهلاً بك يا كابتن {phoneStatus.name || 'توصيلة'}! حسابك معتمد ومسجل</span>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-500/40 shrink-0">كابتن رسمي</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-500/40 shrink-0 font-bold">كابتن رسمي</span>
                       </div>
                     )}
 
                     {!phoneStatus.checking && phoneStatus.checked && !phoneStatus.exists && (
-                      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold animate-fade-in shadow-sm">
+                      <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold animate-fade-in shadow-sm">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">✨</span>
-                          <span>رقم جديد (سيتم تسجيلك كحساب جديد)</span>
+                          <span className="text-lg">✨</span>
+                          <span>رقم جديد.. أهلاً بك في عائلة توصيلة</span>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/25 text-sky-300 border border-sky-500/40 shrink-0">تسجيل فوري</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/25 text-sky-300 border border-sky-500/40 shrink-0 font-bold">تسجيل فوري</span>
                       </div>
                     )}
                   </div>
 
-                  {/* زر المتابعة بمساحة لمس قياسية */}
-                  <button 
-                    type="submit"
-                    disabled={isLoading || !phone.trim()}
-                    className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
-                  >
-                    {isLoading ? (
-                      <span className="animate-pulse flex items-center justify-center gap-2">
-                        <Spinner className="w-5 h-5 text-slate-950" />
-                        <span>جاري إرسال رمز التحقق...</span>
-                      </span>
-                    ) : (
-                      <>
-                        <span>
-                          {phoneStatus.checked
-                            ? phoneStatus.exists
-                              ? 'تسجيل الدخول عبر واتساب 💬'
-                              : 'إنشاء حساب ومتابعة عبر واتساب 💬'
-                            : 'متابعة عبر واتساب 💬'}
+                  {/* أزرار الإجراء للراكب وفق مصفوفة الدخول */}
+                  {phoneStatus.checked && phoneStatus.exists && phoneStatus.role === 'passenger' && (
+                    <button 
+                      type="button"
+                      onClick={handleDirectLogin}
+                      disabled={isLoading}
+                      className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-bold text-base shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
+                    >
+                      {isLoading ? (
+                        <span className="animate-pulse flex items-center justify-center gap-2">
+                          <Spinner className="w-5 h-5 text-white" />
+                          <span>جاري تسجيل الدخول السريع...</span>
                         </span>
-                        <span>←</span>
-                      </>
-                    )}
-                  </button>
+                      ) : (
+                        <>
+                          <span>دخول سريع كراكب 🚀</span>
+                          <span>←</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {phoneStatus.checked && phoneStatus.exists && phoneStatus.role === 'driver' && (
+                    <button 
+                      type="button"
+                      onClick={handleDirectLogin}
+                      disabled={isLoading}
+                      className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
+                    >
+                      {isLoading ? (
+                        <span className="animate-pulse flex items-center justify-center gap-2">
+                          <Spinner className="w-5 h-5 text-slate-950" />
+                          <span>جاري تسجيل الدخول المباشر...</span>
+                        </span>
+                      ) : (
+                        <>
+                          <span>دخول مباشر للمنظومة 🚖</span>
+                          <span>←</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {phoneStatus.checked && !phoneStatus.exists && (
+                    <button 
+                      type="submit"
+                      disabled={isLoading || !phone.trim()}
+                      className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
+                    >
+                      {isLoading ? (
+                        <span className="animate-pulse flex items-center justify-center gap-2">
+                          <Spinner className="w-5 h-5 text-slate-950" />
+                          <span>جاري إرسال رمز التحقق...</span>
+                        </span>
+                      ) : (
+                        <>
+                          <span>تأكيد الرقم واستلام الرمز عبر واتساب 💬</span>
+                          <span>←</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {(!phoneStatus.checked || !phone.trim() || phone.replace(/[^0-9]/g, '').length < 10) && (
+                    <button 
+                      type="submit"
+                      disabled
+                      className="w-full min-h-[56px] rounded-2xl bg-slate-800 text-slate-400 font-bold text-base border border-slate-700/60 flex items-center justify-center gap-2 disabled:opacity-50 cursor-not-allowed select-none"
+                    >
+                      <span>يرجى إدخال رقم الهاتف للمتابعة</span>
+                      <span>←</span>
+                    </button>
+                  )}
 
                   {/* رابط الشروط والخصوصية */}
                   <div className="text-center pt-1">
@@ -872,147 +1014,204 @@ export default function LoginPage() {
                       )}
                     </div>
 
-                    {/* شارة حالة وتصنيف الرقم الفورية (Real-time Phone Status Pill) */}
+                    {/* شارة حالة وتصنيف الرقم الفورية للكابتن */}
                     {phoneStatus.checking && (
-                      <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-slate-300 text-xs font-semibold animate-pulse shadow-sm">
+                      <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-slate-800/80 border border-slate-700/80 text-slate-300 text-xs font-semibold animate-pulse shadow-sm">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0"></span>
-                        <span>جاري التحقق ومطابقة الرقم في المنظومة...</span>
+                        <span>جاري التحقق ومطابقة رقم الكابتن في المنظومة...</span>
                       </div>
                     )}
 
                     {!phoneStatus.checking && phoneStatus.checked && phoneStatus.exists && phoneStatus.role === 'driver' && (
-                      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-fade-in shadow-sm">
+                      <div className="flex items-center justify-between px-3.5 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-fade-in shadow-sm">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">🚖</span>
-                          <span>هذا الرقم مسجل مسبقاً ككابتن معتمد</span>
-                          {phoneStatus.name && <span className="text-amber-200 font-normal">({phoneStatus.name})</span>}
+                          <span className="text-lg">🚖</span>
+                          <span>أهلاً بك يا كابتن {phoneStatus.name || 'توصيلة'}! حسابك معتمد ومسجل</span>
                         </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-500/40 shrink-0">كابتن رسمي</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/25 text-amber-300 border border-amber-500/40 shrink-0 font-bold">كابتن رسمي</span>
                       </div>
                     )}
 
-                    {!phoneStatus.checking && phoneStatus.checked && phoneStatus.exists && phoneStatus.role === 'passenger' && (
-                      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold animate-fade-in shadow-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">👋</span>
-                          <span>هذا الرقم مسجل مسبقاً كراكب</span>
-                          {phoneStatus.name && <span className="text-emerald-200 font-normal">({phoneStatus.name})</span>}
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 shrink-0">حساب راكب</span>
-                      </div>
-                    )}
-
-                    {!phoneStatus.checking && phoneStatus.checked && !phoneStatus.exists && (
-                      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold animate-fade-in shadow-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">✨</span>
-                          <span>رقم جديد (غير مسجل ككابتن بعد)</span>
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/25 text-sky-300 border border-sky-500/40 shrink-0">جديد</span>
+                    {!phoneStatus.checking && phoneStatus.checked && (!phoneStatus.exists || phoneStatus.role !== 'driver') && (
+                      <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold animate-fade-in shadow-sm">
+                        <span className="text-lg">⚠️</span>
+                        <span>هذا الرقم غير مسجل ككابتن معتمد في أسطول توصيلة</span>
                       </div>
                     )}
                   </div>
 
-                  {/* زر تسجيل الدخول للكابتن */}
-                  <button 
-                    type="submit"
-                    disabled={isLoading || !phone.trim()}
-                    className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
-                  >
-                    {isLoading ? (
-                      <span className="animate-pulse flex items-center justify-center gap-2">
-                        <Spinner className="w-5 h-5 text-slate-950" />
-                        <span>جاري إرسال رمز التحقق...</span>
-                      </span>
-                    ) : (
-                      <>
-                        <span>
-                          {phoneStatus.checked
-                            ? phoneStatus.exists
-                              ? 'تسجيل الدخول عبر واتساب 💬'
-                              : 'تحقق ومتابعة عبر واتساب 💬'
-                            : 'تسجيل الدخول عبر واتساب 💬'}
+                  {/* في حالة الكابتن المسجل: زر الدخول الفوري المباشر 56px دون إرسال كود */}
+                  {phoneStatus.checked && phoneStatus.exists && phoneStatus.role === 'driver' && (
+                    <button 
+                      type="button"
+                      onClick={handleDirectLogin}
+                      disabled={isLoading}
+                      className="w-full min-h-[56px] rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-bold text-base shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform duration-150 disabled:opacity-60 cursor-pointer"
+                    >
+                      {isLoading ? (
+                        <span className="animate-pulse flex items-center justify-center gap-2">
+                          <Spinner className="w-5 h-5 text-slate-950" />
+                          <span>جاري تسجيل الدخول المباشر...</span>
                         </span>
-                        <span>←</span>
-                      </>
-                    )}
-                  </button>
+                      ) : (
+                        <>
+                          <span>دخول مباشر للمنظومة 🚖</span>
+                          <span>←</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {/* في حالة السائق غير المسجل: حظر زر الدخول وإظهار بطاقة التوجيه لمراجعة الإدارة */}
+                  {phoneStatus.checked && (!phoneStatus.exists || phoneStatus.role !== 'driver') && (
+                    <div className="rounded-2xl bg-[#1A202C] border border-amber-500/20 p-4 flex flex-col gap-3 shadow-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0">
+                          🛡️
+                        </div>
+                        <div className="flex flex-col">
+                          <h3 className="text-sm font-bold text-white">مراجعة الإدارة لاعتماد الكابتن</h3>
+                          <span className="text-[11px] text-amber-400">اعتماد النخبة • تدقيق رسمي بالنجف الأشرف</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        التسجيل والتدريب وتفعيل حساب الكابتن يتم حضورياً أو عبر التواصل المباشر مع إدارة الشركة بالنجف الأشرف.
+                      </p>
+
+                      <div className="flex flex-col gap-2.5 pt-1">
+                        {/* 1. زر واتساب الإدارة */}
+                        <a 
+                          href="https://wa.me/9647722154182?text=تحية%20طيبة،%20أرغب%20بالانضمام%20ككابتن%20في%20توصيلة%20النجف" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-xl">💬</span>
+                            <span className="text-sm">واتساب الإدارة المباشر</span>
+                          </div>
+                          <span>←</span>
+                        </a>
+
+                        {/* 2. زر تيليجرام الإدارة */}
+                        <a 
+                          href="https://t.me/wsam_ta" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#0088CC]/15 hover:bg-[#0088CC]/25 text-[#29B6F6] border border-[#0088CC]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-xl">✈️</span>
+                            <span className="text-sm">المكتب الرقمي تيليجرام (@wsam_ta)</span>
+                          </div>
+                          <span>←</span>
+                        </a>
+
+                        {/* 3. زر الاتصال الهاتفي المباشر */}
+                        <a 
+                          href="tel:07722154182"
+                          className="w-full min-h-[48px] py-2.5 px-4 rounded-2xl bg-[#242A37] hover:bg-[#2D3546] text-slate-200 font-bold flex items-center justify-between transition-all active:scale-[0.98] border border-slate-700/60 no-underline"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">📞</span>
+                            <span className="text-xs">اتصال هاتفي مباشر</span>
+                          </div>
+                          <span dir="ltr" className="font-mono text-xs text-amber-400 font-bold">07722154182</span>
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* في حالة عدم الفحص أو الرقم غير مكتمل */}
+                  {(!phoneStatus.checked || !phone.trim() || phone.replace(/[^0-9]/g, '').length < 10) && (
+                    <button 
+                      type="submit"
+                      disabled
+                      className="w-full min-h-[56px] rounded-2xl bg-slate-800 text-slate-400 font-bold text-base border border-slate-700/60 flex items-center justify-center gap-2 disabled:opacity-50 cursor-not-allowed select-none"
+                    >
+                      <span>أدخل رقم هاتف الكابتن المسجل للمتابعة</span>
+                      <span>←</span>
+                    </button>
+                  )}
                 </form>
               )}
 
-              {/* بوابة انضمام الكباتن الجدد */}
-              <div className="mt-1 pt-3 border-t border-white/5 flex flex-col gap-3">
-                <div className="bg-[#1A202C] rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden border border-white/5">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0">
-                      🛡️
+              {/* بوابة انضمام الكباتن الجدد عند عدم إدخال رقم بعد */}
+              {(!phoneStatus.checked || phoneStatus.role === 'driver') && (
+                <div className="mt-1 pt-3 border-t border-white/5 flex flex-col gap-3">
+                  <div className="bg-[#1A202C] rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden border border-white/5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0">
+                        🛡️
+                      </div>
+                      <div className="flex flex-col">
+                        <h3 className="text-base font-bold text-white">بوابة انضمام الكباتن الجدد</h3>
+                        <span className="text-xs text-amber-400">اعتماد النخبة • تدقيق رسمي</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <h3 className="text-base font-bold text-white">بوابة انضمام الكباتن الجدد</h3>
-                      <span className="text-xs text-amber-400">اعتماد النخبة • تدقيق رسمي</span>
+                    <p className="text-xs text-slate-300 leading-relaxed mt-1">
+                      انضمام الكباتن يتم حصرياً عبر الإدارة المركزية لضمان أعلى معايير الأمان وفحص المركبات لحماية العائلات والزائرين في النجف.
+                    </p>
+                    <div className="flex items-center gap-2 pt-1 text-emerald-400 text-xs font-semibold">
+                      <span>🌟</span>
+                      <span>أعلى نسبة أرباح للمشاوير في النجف الأشرف والكوفة</span>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed mt-1">
-                    انضمام الكباتن يتم حصرياً عبر الإدارة المركزية لضمان أعلى معايير الأمان وفحص المركبات لحماية العائلات والزائرين في النجف.
-                  </p>
-                  <div className="flex items-center gap-2 pt-1 text-emerald-400 text-xs font-semibold">
-                    <span>🌟</span>
-                    <span>أعلى نسبة أرباح للمشاوير في النجف الأشرف والكوفة</span>
+
+                  <div className="flex flex-col gap-2.5">
+                    <span className="text-xs text-slate-400 px-1 font-semibold">تواصل مباشر مع مسؤولي التسجيل:</span>
+                    
+                    {/* زر واتساب */}
+                    <a 
+                      href="https://wa.me/9647722154182?text=تحية%20طيبة،%20أرغب%20بالانضمام%20ككابتن%20في%20توصيلة%20النجف" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">💬</span>
+                        <span className="text-sm">تفعيل الحساب عبر واتساب (WhatsApp)</span>
+                      </div>
+                      <span>←</span>
+                    </a>
+
+                    {/* زر تيليجرام */}
+                    <a 
+                      href="https://t.me/wsam_ta" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#0088CC]/15 hover:bg-[#0088CC]/25 text-[#29B6F6] border border-[#0088CC]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">✈️</span>
+                        <span className="text-sm">المكتب الرقمي تيليجرام (@wsam_ta)</span>
+                      </div>
+                      <span>←</span>
+                    </a>
+
+                    {/* الاتصال الهاتفي المباشر */}
+                    <a 
+                      href="tel:07722154182"
+                      className="w-full min-h-[48px] py-2.5 px-4 rounded-2xl bg-[#1A202C] hover:bg-[#242A37] text-slate-300 font-bold flex items-center justify-between transition-all active:scale-[0.98] border border-white/5 no-underline"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📞</span>
+                        <span className="text-xs">اتصال هاتفي مباشر</span>
+                      </div>
+                      <span dir="ltr" className="font-mono text-xs text-amber-400 font-bold">07722154182</span>
+                    </a>
                   </div>
+
+                  <button 
+                    type="button"
+                    onClick={() => setRole('passenger')}
+                    className="w-full py-3 text-center text-xs text-slate-400 hover:text-amber-400 transition-colors cursor-pointer min-h-[48px] flex items-center justify-center"
+                  >
+                    العودة لواجهة الركاب
+                  </button>
                 </div>
-
-                <div className="flex flex-col gap-2.5">
-                  <span className="text-xs text-slate-400 px-1 font-semibold">تواصل مباشر مع مسؤولي التسجيل:</span>
-                  
-                  {/* زر واتساب */}
-                  <a 
-                    href="https://wa.me/9647722154182?text=تحية%20طيبة،%20أرغب%20بالانضمام%20ككابتن%20في%20توصيلة%20النجف" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">💬</span>
-                      <span className="text-sm">تفعيل الحساب عبر واتساب (WhatsApp)</span>
-                    </div>
-                    <span>←</span>
-                  </a>
-
-                  {/* زر تيليجرام */}
-                  <a 
-                    href="https://t.me/wsam_ta" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-full min-h-[50px] py-3 px-4 rounded-2xl bg-[#0088CC]/15 hover:bg-[#0088CC]/25 text-[#29B6F6] border border-[#0088CC]/30 font-bold flex items-center justify-between transition-all active:scale-[0.98] no-underline"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xl">✈️</span>
-                      <span className="text-sm">المكتب الرقمي تيليجرام (@wsam_ta)</span>
-                    </div>
-                    <span>←</span>
-                  </a>
-
-                  {/* الاتصال الهاتفي المباشر */}
-                  <a 
-                    href="tel:07722154182"
-                    className="w-full min-h-[48px] py-2.5 px-4 rounded-2xl bg-[#1A202C] hover:bg-[#242A37] text-slate-300 font-bold flex items-center justify-between transition-all active:scale-[0.98] border border-white/5 no-underline"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">📞</span>
-                      <span className="text-xs">اتصال هاتفي مباشر</span>
-                    </div>
-                    <span dir="ltr" className="font-mono text-xs text-amber-400 font-bold">07722154182</span>
-                  </a>
-                </div>
-
-                <button 
-                  type="button"
-                  onClick={() => setRole('passenger')}
-                  className="w-full py-2 text-center text-xs text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
-                >
-                  العودة لواجهة الركاب
-                </button>
-              </div>
+              )}
             </div>
           )}
         </div>
