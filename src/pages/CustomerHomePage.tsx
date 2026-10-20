@@ -1263,110 +1263,6 @@ export default function CustomerHomePage() {
     );
   }
 
-  // تتبع حالة الرحلة لحظياً من الخادم
-  useEffect(() => {
-    if (!rideRequestId || (stage !== 'searching' && stage !== 'driver_arriving')) return;
-
-    const interval = setInterval(async () => {
-      if (document.hidden) return;
-      try {
-        const { data } = await http.get<{
-          success: boolean;
-          request?: {
-            status: string;
-            assignedDriverId?: string;
-            assignedDriverName?: string;
-            assignedDriverPhone?: string;
-            assignedDriverVehicle?: string;
-            acceptedDriverId?: string;
-          };
-        }>(`/ride/status/${rideRequestId}`);
-
-        if (data.success && data.request) {
-          const req = data.request;
-          const status = (req.status || '').toLowerCase();
-
-          // الاستماع المباشر لتنبيهات الهورن (بيب بيب 📢) الصادرة من السائق
-          const incomingHornSeq = Number((req as any).hornSequence || 0);
-          if (incomingHornSeq > 0 && incomingHornSeq > lastHeardHornSeqRef.current) {
-            lastHeardHornSeqRef.current = incomingHornSeq;
-            playCarHornBeep();
-            if (typeof navigator !== 'undefined' && navigator.vibrate) {
-              try {
-                navigator.vibrate([250, 100, 250, 100, 400]);
-              } catch (_) {}
-            }
-            show('الكابتن وصل وينبهك بالهورن! 🚖', 'success', 7000);
-          }
-          if (status === 'accepted') {
-            setRideStatus('Accepted');
-            if (stage !== 'driver_arriving') {
-              setStage('driver_arriving');
-              setRideSheetState('expanded');
-              show('تم قبول رحلتك من قبل الكابتن! 🚖 الكابتن في طريقه إليك', 'success');
-              mapRef.current?.flyTo({ center: [pickup.lng, pickup.lat], zoom: 15.5, duration: 700 });
-            }
-          } else if (status === 'arrived') {
-            setRideStatus('Arrived');
-            if (stage !== 'driver_arriving') {
-              setStage('driver_arriving');
-              setRideSheetState('expanded');
-            }
-            if (!hasNotifiedArrivalRef.current) {
-              hasNotifiedArrivalRef.current = true;
-              show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
-              playCarHornBeep();
-            }
-          } else if (status === 'inprogress' || status === 'in_progress') {
-            if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
-              setRideStatus('InProgress');
-              if (stage !== 'driver_arriving') {
-                setStage('driver_arriving');
-              }
-              show('انطلقت الرحلة الآن! الكابتن في الطريق إلى الوجهة 🚗💨', 'success', 5000);
-              if (dropoff.lat && dropoff.lng) {
-                mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
-              }
-            }
-          } else if (req.status === 'Completed' || req.status === 'completed' || req.status === 'RideCompleted') {
-            triggerDriverRatingModal(req);
-          } else if (req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
-            hasNotifiedArrivalRef.current = false;
-            localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
-            show(req.status === 'Cancelled' ? 'تم إلغاء الرحلة' : 'لم يتم العثور على سائق متوفر حالياً', 'warning');
-            setStage('ride_options');
-            setRideRequestId(null);
-            setAssignedDriverInfo(null);
-            setLiveDriverPosition(null);
-            setRouteCoordinates(null);
-          }
-
-          if (status === 'accepted' || status === 'arrived' || status === 'inprogress' || status === 'in_progress') {
-            if (req.assignedDriverName || req.assignedDriverPhone) {
-              setAssignedDriverInfo((prev) => ({
-                ...prev,
-                driverId: req.acceptedDriverId || req.assignedDriverId || prev?.driverId,
-                driverName: req.assignedDriverName || prev?.driverName,
-                driverPhone: req.assignedDriverPhone || prev?.driverPhone,
-                driverVehicle: req.assignedDriverVehicle || prev?.driverVehicle,
-                driverPlate: (req as any).driverPlate || prev?.driverPlate || '١١٣٤٠ ة - النجف',
-                driverRating: (req as any).driverRating || prev?.driverRating || 5.0,
-              }));
-            }
-          } else if (status === 'pending') {
-            if (stage !== 'searching') {
-              setStage('searching');
-            }
-            setRideStatus('Pending');
-            setAssignedDriverInfo(null);
-          }
-        }
-      } catch (_) {}
-    }, 1800);
-
-    return () => clearInterval(interval);
-  }, [rideRequestId, stage, pickup, dropoff, rideStatus, triggerDriverRatingModal]);
-
   // معالجة تحديث موقع السائق الحي مع حساب زاوية الاتجاه رياضياً ورسم خط المسار
   const handleDriverPositionUpdate = useCallback(
     (newPos: { lat: number; lng: number }, serverHeading?: number) => {
@@ -1425,6 +1321,153 @@ export default function CustomerHomePage() {
     },
     [stage, rideStatus, pickup, dropoff]
   );
+
+  // معالجة تغييرات حالة الرحلة مركزياً
+  const handleRideStateChange = useCallback((req: any) => {
+    if (!req) return;
+    const status = (req.status || '').toLowerCase();
+
+    // الاستماع المباشر لتنبيهات الهورن (بيب بيب 📢) الصادرة من السائق
+    const incomingHornSeq = Number((req as any).hornSequence || 0);
+    if (incomingHornSeq > 0 && incomingHornSeq > lastHeardHornSeqRef.current) {
+      lastHeardHornSeqRef.current = incomingHornSeq;
+      playCarHornBeep();
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try {
+          navigator.vibrate([250, 100, 250, 100, 400]);
+        } catch (_) {}
+      }
+      show('الكابتن وصل وينبهك بالهورن! 🚖', 'success', 7000);
+    }
+    if (status === 'accepted') {
+      setRideStatus('Accepted');
+      if (stage !== 'driver_arriving') {
+        setStage('driver_arriving');
+        setRideSheetState('expanded');
+        show('تم قبول رحلتك من قبل الكابتن! 🚖 الكابتن في طريقه إليك', 'success');
+        mapRef.current?.flyTo({ center: [pickup.lng, pickup.lat], zoom: 15.5, duration: 700 });
+      }
+    } else if (status === 'arrived') {
+      setRideStatus('Arrived');
+      if (stage !== 'driver_arriving') {
+        setStage('driver_arriving');
+        setRideSheetState('expanded');
+      }
+      if (!hasNotifiedArrivalRef.current) {
+        hasNotifiedArrivalRef.current = true;
+        show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
+        playCarHornBeep();
+      }
+    } else if (status === 'inprogress' || status === 'in_progress') {
+      if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
+        setRideStatus('InProgress');
+        if (stage !== 'driver_arriving') {
+          setStage('driver_arriving');
+        }
+        show('انطلقت الرحلة الآن! الكابتن في الطريق إلى الوجهة 🚗💨', 'success', 5000);
+        if (dropoff.lat && dropoff.lng) {
+          mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
+        }
+      }
+    } else if (req.status === 'Completed' || req.status === 'completed' || req.status === 'RideCompleted') {
+      triggerDriverRatingModal(req);
+    } else if (req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
+      hasNotifiedArrivalRef.current = false;
+      localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+      show(req.status === 'Cancelled' ? 'تم إلغاء الرحلة' : 'لم يتم العثور على سائق متوفر حالياً', 'warning');
+      setStage('ride_options');
+      setRideRequestId(null);
+      setAssignedDriverInfo(null);
+      setLiveDriverPosition(null);
+      setRouteCoordinates(null);
+    }
+
+    if (status === 'accepted' || status === 'arrived' || status === 'inprogress' || status === 'in_progress') {
+      if (req.assignedDriverName || req.assignedDriverPhone || req.driverName || req.driverPhone) {
+        setAssignedDriverInfo((prev) => ({
+          ...prev,
+          driverId: req.acceptedDriverId || req.assignedDriverId || req.driverId || prev?.driverId,
+          driverName: req.assignedDriverName || req.driverName || prev?.driverName,
+          driverPhone: req.assignedDriverPhone || req.driverPhone || prev?.driverPhone,
+          driverVehicle: req.assignedDriverVehicle || req.driverVehicle || prev?.driverVehicle,
+          driverPlate: (req as any).driverPlate || (req as any).plateNumber || prev?.driverPlate || '١١٣٤٠ ة - النجف',
+          driverRating: (req as any).driverRating || prev?.driverRating || 5.0,
+        }));
+      }
+    } else if (status === 'pending') {
+      if (stage !== 'searching') {
+        setStage('searching');
+      }
+      setRideStatus('Pending');
+      setAssignedDriverInfo(null);
+    }
+  }, [stage, rideStatus, pickup, dropoff, show, triggerDriverRatingModal]);
+
+  // تتبع حالة الرحلة وبث الأحداث اللحظية عبر SSE مع احتياط نبض كل 20 ثانية (Tawseela IQ v72)
+  useEffect(() => {
+    if (!rideRequestId || (stage !== 'searching' && stage !== 'driver_arriving')) return;
+
+    const checkStatus = async () => {
+      if (document.hidden) return;
+      try {
+        const { data } = await http.get<{
+          success: boolean;
+          request?: any;
+        }>(`/ride/status/${rideRequestId}`);
+
+        if (data.success && data.request) {
+          handleRideStateChange(data.request);
+        }
+      } catch (_) {}
+    };
+
+    void checkStatus();
+    // احتياط نبض كل 20 ثانية بدلاً من الاقتراع الكثيف
+    const interval = setInterval(checkStatus, 20000);
+
+    // اتصال SSE اللحظي لتلقي تحديثات المشوار وموقع السائق فوراً
+    let es: EventSource | null = null;
+    try {
+      const streamUrl = `${config.apiBaseUrl}/ride/${encodeURIComponent(rideRequestId)}/stream`;
+      es = new EventSource(streamUrl);
+
+      es.addEventListener('init', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data?.request) {
+            handleRideStateChange(data.request);
+          }
+        } catch (_) {}
+      });
+
+      es.addEventListener('trip_update', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data?.request) {
+            handleRideStateChange(data.request);
+          } else if (data?.status) {
+            handleRideStateChange(data);
+          }
+          if (data?.event === 'driver_location' && data.location) {
+            handleDriverPositionUpdate({ lat: data.location.lat, lng: data.location.lon }, data.location.heading);
+          }
+        } catch (_) {}
+      });
+
+      es.onerror = () => {
+        // EventSource will automatically retry connecting
+      };
+    } catch (sseErr) {
+      console.warn('[SSE] Ride EventSource init error, falling back:', sseErr);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (es) {
+        es.close();
+      }
+    };
+  }, [rideRequestId, stage, handleRideStateChange, handleDriverPositionUpdate]);
 
   // اشتراك لحظي في أحداث الرحلة وموقع السائق عبر SignalR / Realtime
   useEffect(() => {
@@ -1496,7 +1539,7 @@ export default function CustomerHomePage() {
     };
   }, [rideRequestId, dropoff, rideStatus, stage, assignedDriverInfo, triggerDriverRatingModal, handleDriverPositionUpdate]);
 
-  // تتبع موقع السائق الحي على الخريطة
+  // تتبع موقع السائق الحي على الخريطة (احتياط نبض 15 ثانية - SSE يتكفل بالبث الفوري)
   useEffect(() => {
     if (stage !== 'driver_arriving' || !assignedDriverInfo?.driverId) return;
 
@@ -1512,7 +1555,7 @@ export default function CustomerHomePage() {
           handleDriverPositionUpdate({ lat: data.latitude, lng: data.longitude }, data.heading);
         }
       } catch (_) {}
-    }, 3000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [stage, assignedDriverInfo?.driverId, handleDriverPositionUpdate]);

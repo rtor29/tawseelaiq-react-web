@@ -380,7 +380,7 @@ export default function DriverHomePage() {
 
   useEffect(() => {
     void fetchSubscribers();
-    const interval = setInterval(fetchSubscribers, 4000);
+    const interval = setInterval(fetchSubscribers, 25000);
     return () => clearInterval(interval);
   }, [fetchSubscribers]);
 
@@ -405,7 +405,7 @@ export default function DriverHomePage() {
     };
 
     void checkActive();
-    const interval = setInterval(checkActive, 2500);
+    const interval = setInterval(checkActive, 20000);
     return () => clearInterval(interval);
   }, [driverId, rawPhone]);
 
@@ -458,7 +458,7 @@ export default function DriverHomePage() {
     }
   }, [isChatOpen, latestPassengerMsg]);
 
-  // استطلاع الطلبات الواردة في الانتظار (taxi / both modes only)
+  // استطلاع وبث الطلبات الواردة في الانتظار عبر SSE (مع احتياط 15 ثانية)
   useEffect(() => {
     if (!currentTargetId) {
       setPendingRequests([]);
@@ -486,36 +486,39 @@ export default function DriverHomePage() {
     };
     sendLocation();
 
+    const handleIncomingList = (incoming: any) => {
+      setPollStatus('connected');
+      const validList: IncomingRideRequest[] = Array.isArray(incoming) ? incoming : [];
+      setPendingRequests(validList);
+
+      if (validList.length > 0) {
+        const req = validList[0];
+        if (!lastIncomingIdRef.current || lastIncomingIdRef.current !== req.id) {
+          lastIncomingIdRef.current = req.id;
+          setCountdown(20);
+          try {
+            playIncomingTripAlert();
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              navigator.vibrate([200, 100, 200, 100, 300]);
+            }
+          } catch (err) {
+            console.warn('تعذر تشغيل الصوت أو الاهتزاز تلقائياً:', err);
+          }
+        }
+      } else {
+        if (lastIncomingIdRef.current) {
+          lastIncomingIdRef.current = null;
+        }
+      }
+    };
+
     const fetchPending = async () => {
       try {
         const { data: resData } = await http.get<any>(
           `/driver/${encodeURIComponent(currentTargetId)}/pending-requests`
         );
-        setPollStatus('connected');
-
         const incoming = resData?.pendingRequests || resData?.requests || resData?.data || (Array.isArray(resData) ? resData : []);
-        const validList: IncomingRideRequest[] = Array.isArray(incoming) ? incoming : [];
-        setPendingRequests(validList);
-
-        if (validList.length > 0) {
-          const req = validList[0];
-          if (!lastIncomingIdRef.current || lastIncomingIdRef.current !== req.id) {
-            lastIncomingIdRef.current = req.id;
-            setCountdown(20);
-            try {
-              playIncomingTripAlert();
-              if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate([200, 100, 200, 100, 300]);
-              }
-            } catch (err) {
-              console.warn('تعذر تشغيل الصوت أو الاهتزاز تلقائياً:', err);
-            }
-          }
-        } else {
-          if (lastIncomingIdRef.current) {
-            lastIncomingIdRef.current = null;
-          }
-        }
+        handleIncomingList(incoming);
       } catch (err) {
         console.warn('[Dispatch] Polling pending requests error:', err);
         setPollStatus('error');
@@ -523,9 +526,50 @@ export default function DriverHomePage() {
     };
 
     void fetchPending();
-    const interval = setInterval(fetchPending, 2000);
+    // احتياط نبض كل 15 ثانية (SSE يتكفل بالبث الفوري الفائق السرعة)
+    const interval = setInterval(fetchPending, 15000);
 
-    return () => clearInterval(interval);
+    // اتصال SSE اللحظي لتلقي المشاوير فوراً وتحديث الرحلة النشطة
+    let es: EventSource | null = null;
+    try {
+      const streamUrl = `${config.apiBaseUrl}/driver/stream?driverId=${encodeURIComponent(currentTargetId)}`;
+      es = new EventSource(streamUrl);
+
+      es.addEventListener('init', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data?.pendingRequests) handleIncomingList(data.pendingRequests);
+          if (data?.activeRide !== undefined) setActiveRide(data.activeRide);
+        } catch (_) {}
+      });
+
+      es.addEventListener('dispatch', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data?.pendingRequests) handleIncomingList(data.pendingRequests);
+        } catch (_) {}
+      });
+
+      es.addEventListener('driver_event', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data?.activeRide !== undefined) setActiveRide(data.activeRide);
+        } catch (_) {}
+      });
+
+      es.onerror = () => {
+        // EventSource will automatically retry connecting
+      };
+    } catch (sseErr) {
+      console.warn('[SSE] EventSource init error, falling back to polling:', sseErr);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (es) {
+        es.close();
+      }
+    };
   }, [currentTargetId, workStatus, driverLoc]);
 
   // قبول الطلب حقيقياً
