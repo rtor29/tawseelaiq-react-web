@@ -4,7 +4,7 @@
 // - استراتيجية Network-First مع السقوط على الكاش للتنقل عند انقطاع أو ضعف الاتصال
 // - استثناء استعلامات الـ API و Mapbox الحية من الكاش للحفاظ على دقة التتبع اللحظي
 
-const CACHE_NAME = 'tawseela-static-v58';
+const CACHE_NAME = 'tawseela-static-v59';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -58,6 +58,8 @@ self.addEventListener('fetch', (event) => {
   // 1. استعلامات الخادم المباشرة والتتبع الحي وماب بوكس: شبكة فقط دائماً دون كاش
   if (
     url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/driver/') ||
+    url.pathname.startsWith('/ride/') ||
     url.pathname.startsWith('/hubs/') ||
     url.hostname.includes('mapbox.com')
   ) {

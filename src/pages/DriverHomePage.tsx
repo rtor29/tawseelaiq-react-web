@@ -150,8 +150,25 @@ export default function DriverHomePage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [pendingSeatRequests, setPendingSeatRequests] = useState<PendingSeatBooking[]>([]);
   const lastNotifiedSeatBookingIdRef = useRef<string | null>(null);
-  const [incomingRequest, setIncomingRequest] = useState<IncomingRideRequest | null>(null);
+
+  // قائمة الطلبات المعلقة الفورية وحالة المشوار النشط الحقيقي
+  const [pendingRequests, setPendingRequests] = useState<IncomingRideRequest[]>([]);
   const [activeRide, setActiveRide] = useState<any | null>(null);
+  const activeTrip = activeRide;
+
+  // تحرير المشوار الجديد من قيود المشاوير السابقة (completed / cancelled / null لا تمنع الطلب الجديد)
+  const hasRealActiveTrip = Boolean(
+    activeTrip &&
+    activeTrip.status &&
+    ['accepted', 'arrived', 'in_progress', 'started', 'ontheway', 'Accepted', 'Arrived', 'InProgress', 'Started', 'OnTheWay'].includes(activeTrip.status)
+  );
+  const shouldShowDispatchSheet = Boolean(pendingRequests && pendingRequests.length > 0 && !hasRealActiveTrip);
+  const incomingRequest = shouldShowDispatchSheet ? pendingRequests[0] : null;
+
+  // معرف السائق الحالي وحالة الاستعلام الحي
+  const currentTargetId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
+  const [pollStatus, setPollStatus] = useState<'connected' | 'polling' | 'idle' | 'error'>('idle');
+
   const [isTriggeringHorn, setIsTriggeringHorn] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -162,9 +179,14 @@ export default function DriverHomePage() {
   } | null>(null);
   const lastSeenMsgIdRef = useRef<string | null>(null);
 
-  // مؤقت العد التنازلي للطلب الوارد (15 ثانية)
-  const [countdownSeconds, setCountdownSeconds] = useState(15);
+  // مؤقت العد التنازلي المحلي للطلب الوارد (20 ثانية كاملة ومستقلة تماماً عن ساعة السيرفر)
+  const [countdown, setCountdown] = useState<number>(20);
   const lastIncomingIdRef = useRef<string | null>(null);
+
+  // إرسال تحديث حالة ونمط العمل إلى الخادم فور تحميل الصفحة لأول مرة
+  useEffect(() => {
+    sendDriverStatusUpdate(workStatus);
+  }, [sendDriverStatusUpdate, workStatus]);
 
   // نافذة ملخص الأجرة وتحصيل الكاش
   const [isFareModalOpen, setIsFareModalOpen] = useState(false);
@@ -225,21 +247,23 @@ export default function DriverHomePage() {
     }
   }
 
-  // العد التنازلي ونغمة التنبيه عند وصول طلب جديد
+  // العد التنازلي التلقائي المحلي (20 ثانية) ونغمة التنبيه عند وصول طلب جديد
   useEffect(() => {
-    if (incomingRequest) {
+    if (shouldShowDispatchSheet && incomingRequest) {
       if (incomingRequest.id !== lastIncomingIdRef.current) {
         lastIncomingIdRef.current = incomingRequest.id;
-        setCountdownSeconds(15);
-        playIncomingTripAlert();
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          try {
+        setCountdown(20);
+        try {
+          playIncomingTripAlert();
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
             navigator.vibrate([200, 100, 200, 100, 300]);
-          } catch (_) {}
+          }
+        } catch (err) {
+          console.warn('تعذر تشغيل الصوت أو الاهتزاز تلقائياً:', err);
         }
       }
       const timer = setInterval(() => {
-        setCountdownSeconds((prev) => {
+        setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
             void handleRejectRide();
@@ -252,7 +276,7 @@ export default function DriverHomePage() {
     } else {
       lastIncomingIdRef.current = null;
     }
-  }, [incomingRequest]);
+  }, [shouldShowDispatchSheet, incomingRequest?.id]);
 
   // جلب ركاب الخط الدائمي وطلبات المقاعد
   const prevCancelIdsRef = useRef<Set<string>>(new Set());
@@ -320,11 +344,13 @@ export default function DriverHomePage() {
           const newestId = newest.id || newest.bookingId || '';
           if (newestId && newestId !== lastNotifiedSeatBookingIdRef.current) {
             lastNotifiedSeatBookingIdRef.current = newestId;
-            playIncomingTripAlert();
-            if ('vibrate' in navigator) {
-              try {
-                navigator.vibrate([200, 100, 200, 100, 350]);
-              } catch (_) {}
+            try {
+              playIncomingTripAlert();
+              if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate([200, 100, 200, 100, 300]);
+              }
+            } catch (err) {
+              console.warn('تعذر تشغيل الصوت أو الاهتزاز تلقائياً:', err);
             }
             show(`💺 طلب حجز مقعد جديد من: ${newest.customerName} (${newest.pickupLocation} ➔ ${newest.dropoffLocation})`, 'info', 9000);
           }
@@ -415,14 +441,15 @@ export default function DriverHomePage() {
 
   // استطلاع الطلبات الواردة في الانتظار (taxi / both modes only)
   useEffect(() => {
-    const currentTargetId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
     if (!currentTargetId) {
-      setIncomingRequest(null);
+      setPendingRequests([]);
+      setPollStatus('idle');
       return;
     }
-    // Only poll for pending ride requests when driver can accept taxi trips
+    // استطلاع الطلبات فقط عندما يكون الكابتن في وضع التكسي أو كلاهما
     if (workStatus !== 'taxi' && workStatus !== 'both') {
-      setIncomingRequest(null);
+      setPendingRequests([]);
+      setPollStatus('idle');
       return;
     }
 
@@ -440,54 +467,65 @@ export default function DriverHomePage() {
     };
     sendLocation();
 
-    const interval = setInterval(async () => {
-      if (document.hidden) return;
+    const fetchPending = async () => {
       try {
         const { data: resData } = await http.get<any>(
           `/driver/${encodeURIComponent(currentTargetId)}/pending-requests`
         );
+        setPollStatus('connected');
 
         const incoming = resData?.pendingRequests || resData?.requests || resData?.data || (Array.isArray(resData) ? resData : []);
-        if (Array.isArray(incoming) && incoming.length > 0) {
-          const req = incoming[0];
+        const validList: IncomingRideRequest[] = Array.isArray(incoming) ? incoming : [];
+        setPendingRequests(validList);
+
+        if (validList.length > 0) {
+          const req = validList[0];
           if (!lastIncomingIdRef.current || lastIncomingIdRef.current !== req.id) {
             lastIncomingIdRef.current = req.id;
-            setCountdownSeconds(15);
-            playIncomingTripAlert();
-            if (typeof navigator !== 'undefined' && navigator.vibrate) {
-              try {
+            setCountdown(20);
+            try {
+              playIncomingTripAlert();
+              if (typeof navigator !== 'undefined' && navigator.vibrate) {
                 navigator.vibrate([200, 100, 200, 100, 300]);
-              } catch (_) {}
+              }
+            } catch (err) {
+              console.warn('تعذر تشغيل الصوت أو الاهتزاز تلقائياً:', err);
             }
           }
-          setIncomingRequest(req);
         } else {
           if (lastIncomingIdRef.current) {
             lastIncomingIdRef.current = null;
           }
-          setIncomingRequest(null);
         }
-      } catch (_) {}
-    }, 2000);
+      } catch (err) {
+        console.warn('[Dispatch] Polling pending requests error:', err);
+        setPollStatus('error');
+      }
+    };
+
+    void fetchPending();
+    const interval = setInterval(fetchPending, 2000);
 
     return () => clearInterval(interval);
-  }, [driverId, rawPhone, session?.userId, workStatus, driverLoc]);
+  }, [currentTargetId, workStatus, driverLoc]);
 
   // قبول الطلب حقيقياً
   async function handleAcceptRide() {
     if (!incomingRequest) return;
-    const currentId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
+    const currentId = currentTargetId;
     if (!currentId) return;
+    const acceptedReq = incomingRequest;
     try {
       const { data } = await http.post<{ success: boolean; request: any; message?: string }>('/ride/respond', {
-        requestId: incomingRequest.id,
+        requestId: acceptedReq.id,
         driverId: currentId,
         action: 'accept',
       });
       if (data?.success) {
         show('تم قبول المشوار بنجاح! 🚖 توجه إلى موقع الراكب', 'success');
-        setActiveRide(data.request);
-        setIncomingRequest(null);
+        setActiveRide(data.request || acceptedReq);
+        setPendingRequests((prev) => prev.filter((r) => r.id !== acceptedReq.id));
+        lastIncomingIdRef.current = null;
       } else {
         show('تعذر قبول الطلب', 'error');
       }
@@ -499,18 +537,18 @@ export default function DriverHomePage() {
   // رفض الطلب حقيقياً
   async function handleRejectRide() {
     if (!incomingRequest) return;
-    const currentId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
+    const currentId = currentTargetId;
+    const rejectedId = incomingRequest.id;
     try {
       await http.post('/ride/respond', {
-        requestId: incomingRequest.id,
+        requestId: rejectedId,
         driverId: currentId,
         action: 'reject',
       });
-      setIncomingRequest(null);
-      show('تم رفض الطلب', 'info');
-    } catch (_) {
-      setIncomingRequest(null);
-    }
+    } catch (_) {}
+    setPendingRequests((prev) => prev.filter((r) => r.id !== rejectedId));
+    lastIncomingIdRef.current = null;
+    show('تم رفض الطلب', 'info');
   }
 
   // قبول حجز مقعد في الخط الدائمي
@@ -1154,7 +1192,7 @@ export default function DriverHomePage() {
             </div>
 
             {/* 3. بطاقة المشوار النشط (Active Trip Captain Control Dock) */}
-            {activeRide && (activeRide.status === 'Accepted' || activeRide.status === 'Arrived' || activeRide.status === 'InProgress' || activeRide.status === 'in_progress') ? (
+            {hasRealActiveTrip && activeRide ? (
               <div className="rounded-3xl border border-emerald-500/60 bg-[#161C28]/95 p-4 shadow-2xl backdrop-blur-2xl animate-fade-in">
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                   <div className="flex items-center gap-2">
@@ -1276,21 +1314,21 @@ export default function DriverHomePage() {
                   )}
                 </div>
               </div>
-            ) : incomingRequest ? (
+            ) : shouldShowDispatchSheet && incomingRequest ? (
               /* 4. بطاقة استقبال المشوار الواردة الفاخرة (Incoming Trip Dispatch Sheet) */
               <div className="rounded-3xl border-2 border-amber-500 bg-[#161C28]/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-fade-in text-white space-y-3">
                 {/* شريط العد التنازلي التفاعلي */}
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-1">
                   <div
                     className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
-                    style={{ width: `${(countdownSeconds / 15) * 100}%` }}
+                    style={{ width: `${(countdown / 20) * 100}%` }}
                   />
                 </div>
 
                 <div className="flex items-center justify-between pb-2 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
-                      طلب مشوار جديد ({countdownSeconds} ثانية) 🚖
+                      طلب مشوار جديد ({countdown} ثانية) 🚖
                     </span>
                     {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
                       <span className="rounded-full bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs">
@@ -1350,6 +1388,24 @@ export default function DriverHomePage() {
                 </div>
                 <h4 className="text-sm font-bold text-white mb-0.5">أنت في وضع الجاهزية</h4>
                 <p className="text-xs text-slate-400">جاري مسح النجف وبانتظار أقرب مشوار لك...</p>
+
+                {/* شريط التشخيص الحي المصغر (Live Diagnostic Chip) */}
+                <div className="mt-3.5 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full bg-white/5 border border-white/10 text-[10.5px] font-mono text-slate-300 max-w-fit mx-auto shadow-sm backdrop-blur-md select-none">
+                  <span>حالة الاستعلام:</span>
+                  <span className={pollStatus === 'connected' ? 'text-emerald-400 font-bold' : pollStatus === 'error' ? 'text-red-400 font-bold' : 'text-amber-400 font-bold'}>
+                    {pollStatus === 'connected' ? '[متصل 🟢]' : pollStatus === 'error' ? '[غير متصل 🔴]' : '[جاري الفحص 🟡]'}
+                  </span>
+                  <span className="text-white/20">•</span>
+                  <span>المعرف:</span>
+                  <span className="text-white font-bold max-w-[110px] truncate" title={currentTargetId}>
+                    [{currentTargetId || 'غير محدد'}]
+                  </span>
+                  <span className="text-white/20">•</span>
+                  <span>الطلبات المعلقة:</span>
+                  <span className={`font-bold ${pendingRequests.length > 0 ? 'text-amber-400 animate-pulse' : 'text-slate-300'}`}>
+                    [{pendingRequests.length}]
+                  </span>
+                </div>
               </div>
             )}
           </section>
@@ -1731,21 +1787,21 @@ export default function DriverHomePage() {
       )}
 
       {/* بطاقة استقبال المشوار الواردة الفاخرة العائمة (Incoming Trip Dispatch Sheet - z-[9999]) */}
-      {incomingRequest && !activeRide && (
+      {shouldShowDispatchSheet && incomingRequest && (
         <div className="fixed inset-x-0 bottom-0 z-[9999] p-4 max-w-lg mx-auto pointer-events-auto animate-slide-up" dir="rtl">
           <div className="rounded-3xl border-2 border-amber-500 bg-[#161C28]/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.9)] backdrop-blur-2xl text-white space-y-3">
             {/* شريط العد التنازلي التفاعلي */}
             <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-1">
               <div
                 className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
-                style={{ width: `${(countdownSeconds / 15) * 100}%` }}
+                style={{ width: `${(countdown / 20) * 100}%` }}
               />
             </div>
 
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
-                  طلب مشوار جديد ({countdownSeconds} ثانية) 🚖
+                  طلب مشوار جديد ({countdown} ثانية) 🚖
                 </span>
                 {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
                   <span className="rounded-full bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs">
