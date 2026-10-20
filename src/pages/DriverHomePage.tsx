@@ -57,6 +57,9 @@ interface IncomingRideRequest {
   distanceKm?: number;
   surgeMultiplier?: number;
   surgeBadge?: { text: string; type: string; percent?: number };
+  isRoundTrip?: boolean;
+  secondDestination?: string;
+  stopDuration?: number;
 }
 
 export default function DriverHomePage() {
@@ -1371,6 +1374,24 @@ export default function DriverHomePage() {
                     <p className="text-slate-300">
                       🔴 إلى: <span className="text-white font-bold">{incomingRequest.dropoffName}</span>
                     </p>
+                    {incomingRequest.isRoundTrip && (
+                      <p className="text-amber-400 font-bold flex items-center gap-1.5 pt-0.5">
+                        <span>🔄</span>
+                        <span>رحلة ذهاب وإياب</span>
+                      </p>
+                    )}
+                    {incomingRequest.secondDestination && (
+                      <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                        <span>📍</span>
+                        <span>محطة إضافية: <b className="text-white">{incomingRequest.secondDestination}</b></span>
+                      </p>
+                    )}
+                    {incomingRequest.stopDuration ? (
+                      <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                        <span>⏱️</span>
+                        <span>توقف في الطريق: <b className="text-white">{incomingRequest.stopDuration} دقائق</b></span>
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1844,6 +1865,24 @@ export default function DriverHomePage() {
                 <p className="text-slate-300">
                   🔴 إلى: <span className="text-white font-bold">{incomingRequest.dropoffName}</span>
                 </p>
+                {incomingRequest.isRoundTrip && (
+                  <p className="text-amber-400 font-bold flex items-center gap-1.5 pt-0.5">
+                    <span>🔄</span>
+                    <span>رحلة ذهاب وإياب</span>
+                  </p>
+                )}
+                {incomingRequest.secondDestination && (
+                  <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                    <span>📍</span>
+                    <span>محطة إضافية: <b className="text-white">{incomingRequest.secondDestination}</b></span>
+                  </p>
+                )}
+                {incomingRequest.stopDuration ? (
+                  <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                    <span>⏱️</span>
+                    <span>توقف في الطريق: <b className="text-white">{incomingRequest.stopDuration} دقائق</b></span>
+                  </p>
+                ) : null}
               </div>
             </div>
 

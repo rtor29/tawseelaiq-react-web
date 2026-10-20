@@ -123,8 +123,8 @@ const RIDE_TIERS: RideTier[] = [
 // مراحل حجز الرحلة
 type BookingStage = 'pickup' | 'dropoff' | 'ride_options' | 'searching' | 'driver_arriving';
 
-// رسمة السيارة الزرقاء مع الشارة العائمة كما في الصورتين
-function CarBadgeIllustration({
+// شعار توصيلة الرسمي المعتمد مع الشارة العائمة لكل فئة (استبدال السيارة الكرتونية)
+function TawseelaTierLogo({
   badge,
   size = 'md',
 }: {
@@ -132,58 +132,45 @@ function CarBadgeIllustration({
   size?: 'sm' | 'md' | 'lg';
 }) {
   const isLarge = size === 'lg';
-  const width = isLarge ? 170 : 80;
-  const height = isLarge ? 95 : 44;
+  const isSmall = size === 'sm';
+
+  const containerClass = isLarge
+    ? 'relative h-16 w-36 max-w-[150px] flex items-center justify-center shrink-0 select-none'
+    : isSmall
+    ? 'relative w-14 h-10 flex items-center justify-center shrink-0 select-none'
+    : 'relative w-20 h-12 flex items-center justify-center shrink-0 select-none';
+
+  const badgeClass = isLarge
+    ? 'absolute -top-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-black shadow-md'
+    : isSmall
+    ? 'absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold shadow-md'
+    : 'absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold shadow-md';
+
+  const badgeBg =
+    badge === 'saving'
+      ? 'bg-emerald-500 text-slate-950 ring-2 ring-emerald-400/40'
+      : 'bg-amber-400 text-slate-950 ring-2 ring-amber-400/40';
+
+  const badgeIcon =
+    badge === 'super' ? '⚡' : badge === 'saving' ? '🏷️' : '★';
 
   return (
-    <div className="relative inline-flex items-center justify-center select-none">
-      {/* الشارة العائمة فوق السيارة */}
-      <div
-        className={`absolute z-10 flex items-center justify-center rounded-full shadow-md font-bold ${
-          isLarge ? '-top-3 right-5 h-12 w-12 text-2xl' : '-top-1.5 right-1.5 h-5 w-5 text-[11px]'
-        } bg-[#facc15] text-[#854d0e]`}
-      >
-        {badge === 'super' && '⚡'}
-        {badge === 'saving' && '$'}
-        {badge === 'plus' && '★'}
+    <div className={containerClass}>
+      <img
+        src="/logo.png?v=40"
+        alt="توصيلة"
+        className="w-full h-full object-contain filter drop-shadow-sm select-none"
+        loading="eager"
+      />
+      <div className={`${badgeClass} ${badgeBg}`}>
+        {badgeIcon}
       </div>
-
-      {/* السيارة الزرقاء */}
-      <svg
-        width={width}
-        height={height}
-        viewBox="0 0 120 60"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="drop-shadow-sm"
-      >
-        {/* هيكل السيارة */}
-        <path
-          d="M12 37C12 37 17 27 31 21C45 15 75 15 85 21C97 27 110 29 113 35C116 41 114 45 110 46H10C6 46 6 40 12 37Z"
-          fill="#1d4ed8"
-        />
-        <path
-          d="M14 35C14 35 19 25 33 19C47 13 74 13 84 19C95 25 107 27 110 33C113 39 111 43 107 44H12C8 44 8 38 14 35Z"
-          fill="#2563eb"
-        />
-        {/* السقف والزجاج */}
-        <path d="M34 19L44 8H72L84 19H34Z" fill="#1e3a8a" />
-        <path d="M36 18L44 10H57V18H36Z" fill="#bfdbfe" opacity="0.95" />
-        <path d="M59 10H71L81 18H59V10Z" fill="#bfdbfe" opacity="0.95" />
-        {/* العجلات والجنوط البيضاء والزرقاء */}
-        <circle cx="28" cy="45" r="9.5" fill="#0f172a" />
-        <circle cx="28" cy="45" r="5.5" fill="#ffffff" />
-        <circle cx="28" cy="45" r="2.5" fill="#2563eb" />
-        <circle cx="92" cy="45" r="9.5" fill="#0f172a" />
-        <circle cx="92" cy="45" r="5.5" fill="#ffffff" />
-        <circle cx="92" cy="45" r="2.5" fill="#2563eb" />
-        {/* الإضاءة */}
-        <path d="M112 35L115 37L112 39Z" fill="#fef08a" />
-        <path d="M8 36L6 38L8 40Z" fill="#ef4444" />
-      </svg>
     </div>
   );
 }
+
+// الاسم المستعار للتوافق الكامل
+const CarBadgeIllustration = TawseelaTierLogo;
 
 export default function CustomerHomePage() {
   const navigate = useNavigate();
@@ -981,6 +968,7 @@ export default function CustomerHomePage() {
           vehicleType: selectedTierId,
           isRoundTrip,
           hasSecondStop: Boolean(secondDestination.trim()),
+          stopDuration: stopDuration || 0,
           promoCode: appliedPromo ? 'PROMO20' : ''
         });
 
@@ -1014,18 +1002,28 @@ export default function CustomerHomePage() {
 
     fetchDynamicPricing();
     return () => { isCancelled = true; };
-  }, [stage, pickup.lat, pickup.lng, dropoff.lat, dropoff.lng, selectedTierId, isRoundTrip, secondDestination, appliedPromo]);
+  }, [stage, pickup.lat, pickup.lng, dropoff.lat, dropoff.lng, selectedTierId, isRoundTrip, secondDestination, stopDuration, appliedPromo]);
 
-  // حساب سعر الرحلة الحالي حسب الفئة والخيارات الإضافية (مع الأخذ بالاعتبار محرك التسعير الديناميكي)
+  // حساب سعر كل فئة بدقة وفق الخيارات المحددة (مع الأخذ بالاعتبار محرك التسعير الديناميكي)
+  const getTierPrice = (tier: RideTier) => {
+    let p = tier.id === 'saving'
+      ? (dynamicPricingData.savingFare || tier.basePrice)
+      : tier.id === 'plus'
+      ? (dynamicPricingData.plusFare || tier.basePrice)
+      : (dynamicPricingData.superFare || tier.basePrice);
+
+    if (!dynamicPricingData.selectedFare) {
+      if (isRoundTrip) p *= 1.85;
+      if (secondDestination.trim()) p += 1000;
+      if (stopDuration) p += 500;
+      if (appliedPromo) p = Math.max(1000, Math.round(p * 0.8));
+      p = Math.max(tier.id === 'plus' ? 3500 : 3000, Math.ceil(p / 250) * 250);
+    }
+    return p;
+  };
+
   const currentTier = RIDE_TIERS.find((t) => t.id === selectedTierId) || RIDE_TIERS[0];
-  let calculatedPrice = dynamicPricingData.selectedFare || currentTier.basePrice;
-  if (!dynamicPricingData.selectedFare) {
-    if (isRoundTrip) calculatedPrice *= 1.85;
-    if (secondDestination.trim()) calculatedPrice += 1000;
-    if (stopDuration) calculatedPrice += 500;
-    if (appliedPromo) calculatedPrice = Math.max(1000, Math.round(calculatedPrice * 0.8));
-    calculatedPrice = Math.max(3000, Math.ceil(calculatedPrice / 250) * 250);
-  }
+  const calculatedPrice = getTierPrice(currentTier);
 
   // طلب التكسي النهائي — إرسال حقيقي للخادم
   async function handleOrderTrip() {
@@ -1060,6 +1058,10 @@ export default function CustomerHomePage() {
         distanceKm: Math.max(0.5, Math.round(dist * 10) / 10),
         durationMins: Math.max(5, Math.round(dist * 2.5)),
         vehicleType: selectedTierId === 'plus' ? 'vip' : 'eco',
+        isRoundTrip: Boolean(isRoundTrip),
+        secondDestination: secondDestination.trim(),
+        hasSecondStop: Boolean(secondDestination.trim()),
+        stopDuration: stopDuration || 0,
         rangeKm: 25,
       });
 
@@ -1080,6 +1082,9 @@ export default function CustomerHomePage() {
             dropoff,
             dropoffName,
             selectedTierId,
+            isRoundTrip: Boolean(isRoundTrip),
+            secondDestination: secondDestination.trim(),
+            stopDuration: stopDuration || 0,
             assignedDriverInfo: null,
             routeCoordinates,
           }));
@@ -1944,13 +1949,13 @@ export default function CustomerHomePage() {
 
         {/* 7. بطاقة خيارات فئات الرحلة الفاخرة */}
         {stage === 'ride_options' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-[#161C28]/95 backdrop-blur-md pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in">
-            {/* التبويبات العلوية: تكسي و بوكس */}
+          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-[#161C28]/95 backdrop-blur-md pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in" dir="rtl">
+            {/* التبويبات العلوية: تكسي و بوكس (RTL: تكسي يمين، بوكس يسار) */}
             <div className="flex border-b border-slate-800 px-4" dir="rtl">
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('taxi')}
-                className={`flex-1 py-3 text-center text-[15px] font-bold transition relative ${
+                className={`flex-1 min-h-[48px] py-3 text-center text-[15px] font-bold transition relative cursor-pointer ${
                   selectedServiceTab === 'taxi'
                     ? 'text-amber-400 border-b-2 border-amber-500'
                     : 'text-slate-400 hover:text-slate-200'
@@ -1961,7 +1966,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('box')}
-                className={`flex-1 py-3 text-center text-[15px] font-bold transition relative ${
+                className={`flex-1 min-h-[48px] py-3 text-center text-[15px] font-bold transition relative cursor-pointer ${
                   selectedServiceTab === 'box'
                     ? 'text-amber-400 border-b-2 border-amber-500'
                     : 'text-slate-400 hover:text-slate-200'
@@ -1973,7 +1978,7 @@ export default function CustomerHomePage() {
 
             {/* شارة الذروة أو الخصم الذكي المفعّل */}
             {dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs">
+              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs" dir="rtl">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
                   <span className="text-[12.5px] font-bold text-amber-200">{dynamicPricingData.surgeBadge.text}</span>
@@ -1984,7 +1989,7 @@ export default function CustomerHomePage() {
               </div>
             )}
             {dynamicPricingData.discountBadge && !dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs">
+              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs" dir="rtl">
                 <div className="flex items-center gap-2">
                   <span className="w-6 h-6 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
                   <span className="text-[12.5px] font-bold text-emerald-200">{dynamicPricingData.discountBadge.text}</span>
@@ -1995,40 +2000,42 @@ export default function CustomerHomePage() {
               </div>
             )}
 
-            {/* قائمة فئات الرحلة (سوبر، توفير، بلس) */}
-            <div className="px-4 py-2 space-y-1.5">
+            {/* قائمة فئات الرحلة (سوبر، توفير، بلس) بأسلوب RTL صارم */}
+            <div className="px-4 py-2 space-y-1.5" dir="rtl">
               {RIDE_TIERS.map((tier) => {
                 const isSelected = selectedTierId === tier.id;
-                const dynamicPrice = tier.id === 'saving'
-                  ? (dynamicPricingData.savingFare || tier.basePrice)
-                  : tier.id === 'plus'
-                  ? (dynamicPricingData.plusFare || tier.basePrice)
-                  : (dynamicPricingData.superFare || tier.basePrice);
+                const tierPrice = getTierPrice(tier);
 
                 return (
                   <div
                     key={tier.id}
                     onClick={() => setSelectedTierId(tier.id)}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer ${
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer min-h-[58px] ${
                       isSelected
-                        ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                        ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/50'
                         : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/30'
                     }`}
+                    dir="rtl"
                   >
-                    {/* السعر على اليسار */}
-                    <div className="text-left font-black text-[16px] text-amber-400">
-                      {dynamicPrice.toLocaleString()} دينار
-                    </div>
-
-                    {/* الاسم والوصف والسيارة الزرقاء على اليمين */}
+                    {/* الطرف الأيمن: شعار توصيلة المعتمد + الشارة، وبجانبه الاسم والوصف */}
                     <div className="flex items-center gap-3">
+                      <TawseelaTierLogo badge={tier.badge} size="sm" />
                       <div className="text-right">
-                        <p className="text-[15px] font-bold text-white">{tier.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-[15px] font-bold text-white">{tier.name}</p>
+                          {isSelected && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              محدد
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[12px] font-medium text-slate-400">{tier.subtitle}</p>
                       </div>
+                    </div>
 
-                      {/* رسمة السيارة مع الشارة */}
-                      <CarBadgeIllustration badge={tier.badge} size="sm" />
+                    {/* الطرف الأيسر: السعر بالدينار العراقي */}
+                    <div className="text-left font-black text-[16px] text-amber-400 whitespace-nowrap">
+                      {tierPrice.toLocaleString()} د.ع
                     </div>
                   </div>
                 );
@@ -2036,12 +2043,12 @@ export default function CustomerHomePage() {
             </div>
 
             {/* شريط الإجراءات: خيارات الرحلة وقسيمة */}
-            <div className="my-1 flex items-center justify-around border-t border-b border-slate-800 py-3 px-6">
+            <div className="my-1 flex items-center justify-around border-t border-b border-slate-800 py-2 px-6" dir="rtl">
               {/* خيارات الرحلة */}
               <button
                 type="button"
                 onClick={() => setIsTripOptionsOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 text-slate-300 hover:text-amber-400 transition cursor-pointer"
+                className="flex flex-1 items-center justify-center gap-2 min-h-[48px] py-2 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
               >
                 <span className="text-[14px] font-bold">خيارات الرحلة</span>
                 <svg
@@ -2065,7 +2072,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={() => setIsPromoModalOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 text-slate-300 hover:text-amber-400 transition cursor-pointer"
+                className="flex flex-1 items-center justify-center gap-2 min-h-[48px] py-2 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
               >
                 <span className="text-[14px] font-bold">
                   {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
@@ -2085,12 +2092,12 @@ export default function CustomerHomePage() {
               </button>
             </div>
 
-            {/* الزر الرئيسي: طلب الفئة المحددة */}
-            <div className="px-6 pt-2">
+            {/* الزر الرئيسي: طلب الفئة المحددة (بارتفاع 56px = h-14) */}
+            <div className="px-6 pt-2 pb-2">
               <button
                 type="button"
                 onClick={handleOrderTrip}
-                className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3.5 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer"
+                className="w-full h-14 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer flex items-center justify-center"
               >
                 طلب {currentTier.name}
               </button>
@@ -2139,6 +2146,24 @@ export default function CustomerHomePage() {
                 <div className="space-y-1 text-slate-300 text-start">
                   <p className="truncate">🟢 من: <span className="text-white font-bold">{pickupName}</span></p>
                   <p className="truncate">🔴 إلى: <span className="text-white font-bold">{dropoffName}</span></p>
+                  {isRoundTrip && (
+                    <p className="text-amber-400 font-bold flex items-center gap-1 pt-0.5">
+                      <span>🔄</span>
+                      <span>رحلة ذهاب وإياب</span>
+                    </p>
+                  )}
+                  {secondDestination && (
+                    <p className="text-amber-300 flex items-center gap-1 pt-0.5">
+                      <span>📍</span>
+                      <span>محطة إضافية: <b className="text-white">{secondDestination}</b></span>
+                    </p>
+                  )}
+                  {stopDuration ? (
+                    <p className="text-amber-300 flex items-center gap-1 pt-0.5">
+                      <span>⏱️</span>
+                      <span>توقف في الطريق: <b className="text-white">{stopDuration} دقائق</b></span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -2420,13 +2445,14 @@ export default function CustomerHomePage() {
       {/* 8. نافذة "خيارات الرحلة" الفاخرة */}
       {isTripOptionsOpen && (
         <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-[#0D131F] text-white overflow-y-auto animate-fade-in" dir="rtl">
-          {/* الترويسة العلوية: سهم الرجوع وعنوان خيارات الرحلة */}
-          <div className="flex items-center gap-3 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-slate-800">
+          {/* الترويسة العلوية: سهم الرجوع وعنوان خيارات الرحلة في أقصى اليمين */}
+          <div className="flex items-center gap-3 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-slate-800" dir="rtl">
             <button
               type="button"
               onClick={() => setIsTripOptionsOpen(false)}
-              className="p-1 text-amber-400 hover:text-amber-300 cursor-pointer transition active:scale-95"
+              className="w-12 h-12 flex items-center justify-center rounded-xl text-amber-400 hover:text-amber-300 hover:bg-slate-800/50 cursor-pointer transition active:scale-95 shrink-0"
               title="رجوع"
+              aria-label="رجوع"
             >
               {/* سهم الرجوع باتجاه اليمين في نمط RTL */}
               <svg
@@ -2438,31 +2464,26 @@ export default function CustomerHomePage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 19 12 12 5" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
               </svg>
             </button>
-            <h2 className="text-[20px] font-bold text-white">خيارات الرحلة</h2>
+            <h2 className="text-[20px] font-bold text-white text-right">خيارات الرحلة</h2>
           </div>
 
-          {/* صورة السيارة مع الشارة واسم الفئة */}
+          {/* شعار توصيلة المعتمد مع الشارة واسم الفئة */}
           <div className="flex flex-col items-center justify-center pt-8 pb-6">
-            <CarBadgeIllustration badge={currentTier.badge} size="lg" />
+            <TawseelaTierLogo badge={currentTier.badge} size="lg" />
             <h3 className="mt-4 text-[22px] font-black text-white">{currentTier.name}</h3>
+            <p className="text-xs font-semibold text-slate-400 mt-1">{currentTier.subtitle}</p>
           </div>
 
           {/* تنبيه: لا يمكن تغيير الخيارات أثناء الرحلة */}
-          <div className="mx-6 mb-6 flex items-center justify-between rounded-2xl bg-[#0B101B] border border-slate-800 p-3.5">
-            <div className="text-right">
-              <p className="text-[13px] font-bold text-slate-400 leading-relaxed">
-                ملحوظة: لا يمكن تغيير الخيارات التي اخترتها أثناء الرحلة.
-              </p>
-            </div>
-            {/* أيقونة الهاتف الأحمر */}
-            <div className="mr-2 shrink-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-950/60 text-red-400 border border-red-500/30 shadow-sm">
+          <div className="mx-6 mb-6 flex items-center gap-3 rounded-2xl bg-[#0B101B] border border-slate-800 p-3.5" dir="rtl">
+            <div className="shrink-0">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-xs">
                 <svg
-                  className="h-6 w-6 text-red-400"
+                  className="h-5 w-5 text-amber-400"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -2470,25 +2491,41 @@ export default function CustomerHomePage() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
-                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                  <line x1="12" y1="18" x2="12.01" y2="18" />
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
               </div>
             </div>
+            <div className="text-right flex-1">
+              <p className="text-[13px] font-bold text-slate-300 leading-relaxed">
+                ملحوظة: لا يمكن تغيير الخيارات التي اخترتها أثناء الرحلة.
+              </p>
+            </div>
           </div>
 
-          {/* قائمة الخيارات */}
-          <div className="px-6 flex-1">
-            <h4 className="text-[16px] font-bold text-slate-300 mb-2">خيارات الرحلة</h4>
+          {/* قائمة الخيارات بأسلوب RTL صارم */}
+          <div className="px-6 flex-1" dir="rtl">
+            <h4 className="text-[16px] font-bold text-slate-300 mb-2 text-right">خيارات الرحلة</h4>
             <div className="divide-y divide-slate-800">
               {/* 1. الوجهة الثانية */}
               <div
                 onClick={() => setIsAddingSecondDest((v) => !v)}
-                className="flex items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40 transition"
+                className="flex items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40 transition min-h-[48px]"
+                dir="rtl"
               >
-                <div className="text-slate-500">
+                {/* النص على اليمين */}
+                <div className="text-right">
+                  <span className="text-[16px] font-bold text-slate-200">الوجهة الثانية</span>
+                  {secondDestination && (
+                    <p className="text-xs font-semibold text-amber-400 mt-0.5">{secondDestination}</p>
+                  )}
+                </div>
+
+                {/* مؤشر التوسيع على اليسار */}
+                <div className="text-slate-400">
                   <svg
-                    className="h-5 w-5"
+                    className={`h-5 w-5 transition-transform duration-200 ${isAddingSecondDest ? 'rotate-90' : ''}`}
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -2499,17 +2536,11 @@ export default function CustomerHomePage() {
                     <polyline points="15 18 9 12 15 6" />
                   </svg>
                 </div>
-                <div className="text-right">
-                  <span className="text-[16px] font-bold text-slate-200">الوجهة الثانية</span>
-                  {secondDestination && (
-                    <p className="text-xs font-semibold text-amber-400 mt-0.5">{secondDestination}</p>
-                  )}
-                </div>
               </div>
 
               {/* حقل إدخال الوجهة الثانية إن تم فتحها */}
               {isAddingSecondDest && (
-                <div className="py-2 animate-fade-in">
+                <div className="py-2 animate-fade-in" dir="rtl">
                   <input
                     type="text"
                     name="fake_dest_rand_88"
@@ -2523,7 +2554,7 @@ export default function CustomerHomePage() {
                     value={secondDestination}
                     onChange={(e) => setSecondDestination(e.target.value)}
                     placeholder="حدد اسم الوجهة الإضافية..."
-                    className="w-full rounded-xl border border-amber-500/30 bg-[#0B101B] p-2.5 text-xs font-bold text-amber-300 text-right outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-amber-500/30 bg-[#0B101B] p-3 text-xs font-bold text-amber-300 text-right outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50"
                   />
                 </div>
               )}
@@ -2531,11 +2562,23 @@ export default function CustomerHomePage() {
               {/* 2. التوقف في الطريق */}
               <div
                 onClick={() => setIsAddingStop((v) => !v)}
-                className="flex items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40 transition"
+                className="flex items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40 transition min-h-[48px]"
+                dir="rtl"
               >
-                <div className="text-slate-500">
+                {/* النص على اليمين */}
+                <div className="text-right">
+                  <span className="text-[16px] font-bold text-slate-200">التوقف في الطريق</span>
+                  {stopDuration ? (
+                    <p className="text-xs font-semibold text-amber-400 mt-0.5">
+                      توقف لمدة {stopDuration} دقائق (+500 د.ع)
+                    </p>
+                  ) : null}
+                </div>
+
+                {/* مؤشر التوسيع على اليسار */}
+                <div className="text-slate-400">
                   <svg
-                    className="h-5 w-5"
+                    className={`h-5 w-5 transition-transform duration-200 ${isAddingStop ? 'rotate-90' : ''}`}
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -2546,25 +2589,17 @@ export default function CustomerHomePage() {
                     <polyline points="15 18 9 12 15 6" />
                   </svg>
                 </div>
-                <div className="text-right">
-                  <span className="text-[16px] font-bold text-slate-200">التوقف في الطريق</span>
-                  {stopDuration && (
-                    <p className="text-xs font-semibold text-amber-400 mt-0.5">
-                      توقف لمدة {stopDuration} دقائق (+500 د.ع)
-                    </p>
-                  )}
-                </div>
               </div>
 
               {/* خيارات مدة التوقف */}
               {isAddingStop && (
-                <div className="flex gap-2 py-2 animate-fade-in">
+                <div className="flex gap-2 py-2 animate-fade-in" dir="rtl">
                   {[5, 10, 15].map((mins) => (
                     <button
                       key={mins}
                       type="button"
                       onClick={() => setStopDuration(mins)}
-                      className={`flex-1 rounded-xl py-2 text-xs font-bold transition cursor-pointer ${
+                      className={`flex-1 rounded-xl py-2.5 text-xs font-bold transition cursor-pointer min-h-[48px] ${
                         stopDuration === mins
                           ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-[#090D16] font-black shadow-md'
                           : 'bg-[#0B101B] text-slate-300 hover:bg-slate-800 border border-slate-700'
@@ -2573,49 +2608,64 @@ export default function CustomerHomePage() {
                       {mins} دقائق
                     </button>
                   ))}
+                  {stopDuration ? (
+                    <button
+                      type="button"
+                      onClick={() => setStopDuration(null)}
+                      className="px-3 rounded-xl py-2.5 text-xs font-bold text-red-400 hover:bg-red-950/40 border border-red-500/30 transition min-h-[48px]"
+                    >
+                      إلغاء
+                    </button>
+                  ) : null}
                 </div>
               )}
 
               {/* 3. رحلة ذهاب وإياب */}
-              <div className="flex items-center justify-between py-4">
-                {/* زر التبديل التوجل Toggle Switch */}
+              <div className="flex items-center justify-between py-4 min-h-[48px]" dir="rtl">
+                {/* النص على اليمين */}
+                <div className="text-right">
+                  <span className="text-[16px] font-bold text-slate-200">رحلة ذهاب وإياب</span>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                    {isRoundTrip ? 'مفعّلة (توفير 15% على العودة)' : 'توفير تكلفة العودة للموقع'}
+                  </p>
+                </div>
+
+                {/* مفتاح التبديل Toggle Switch على اليسار */}
                 <button
                   type="button"
                   onClick={() => setIsRoundTrip((v) => !v)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
                     isRoundTrip ? 'bg-amber-500' : 'bg-slate-700'
                   }`}
                   aria-label="تفعيل رحلة ذهاب وإياب"
                 >
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      isRoundTrip ? '-translate-x-5' : 'translate-x-0'
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-md transition-all duration-200 ease-in-out ${
+                      isRoundTrip ? 'left-1' : 'right-1'
                     }`}
                   />
                 </button>
-
-                <span className="text-[15px] font-bold text-slate-200">رحلة ذهاب وإياب</span>
               </div>
             </div>
           </div>
 
           {/* الشريط السفلي: مبلغ الرحلة وزر التأكيد وزر الإنهاء */}
-          <div className="border-t border-slate-800 p-6 bg-[#0B101B]">
+          <div className="border-t border-slate-800 p-5 bg-[#0B101B]" dir="rtl">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-[16px] font-black text-amber-400">
-                {calculatedPrice.toLocaleString()} دينار
+              <span className="text-[14px] font-medium text-slate-400">مبلغ الرحلة التقديري</span>
+              <span className="text-[18px] font-black text-amber-400 font-mono">
+                {calculatedPrice.toLocaleString()} د.ع
               </span>
-              <span className="text-[14px] font-medium text-slate-400">مبلغ الرحلة</span>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {/* زر إنهاء */}
               <button
                 type="button"
                 onClick={() => setIsTripOptionsOpen(false)}
-                className="py-3 px-4 text-center text-sm font-bold text-slate-400 hover:text-white transition cursor-pointer"
+                className="h-12 px-6 rounded-xl border border-slate-700 bg-slate-800/80 text-sm font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition active:scale-95 cursor-pointer min-w-[80px]"
               >
-                انهاء
+                إغلاق
               </button>
 
               {/* زر تأكيد */}
@@ -2625,9 +2675,9 @@ export default function CustomerHomePage() {
                   setIsTripOptionsOpen(false);
                   show('تم حفظ وتأكيد خيارات الرحلة بنجاح ✅', 'success');
                 }}
-                className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 py-3 text-center text-sm font-black text-[#090D16] hover:brightness-110 shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 active:scale-[0.98] cursor-pointer"
+                className="flex-1 h-12 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-center text-[15px] font-black text-[#090D16] hover:brightness-110 shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center"
               >
-                تأكيد
+                تأكيد الخيارات
               </button>
             </div>
           </div>
