@@ -299,14 +299,14 @@ export default function CreateRoutePage() {
           >
             <NavigationControl position="bottom-left" showCompass={false} />
 
-            {/* خط المسار بنمط ويز */}
+            {/* خط المسار الانسيابي النحيف */}
             {route && route.coordinates.length > 1 && (
               <RouteLines
                 lines={[
                   {
                     id: 'create-route-line',
                     coordinates: route.coordinates.map((p) => [p.lng, p.lat]),
-                    color: '#3b82f6',
+                    color: '#F59E0B',
                   },
                 ]}
               />

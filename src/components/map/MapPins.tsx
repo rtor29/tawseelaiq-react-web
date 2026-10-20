@@ -65,19 +65,21 @@ export interface RouteLineData {
   color?: string;
   width?: number;
   casingColor?: string;
+  dashed?: boolean;
 }
 
-// طبقة مسارات الملاحة بنمط ويز (Waze-Style Double Layer Polyline):
-// 1. طبقة الغلاف الخارجي (Casing / Border): بلون أزرق داكن لإبراز المسار وفصله عن خلفية الخريطة
-// 2. طبقة القلب الداخلي الساطع (Inner Core / Waze Blue): بلون أزرق ويز ساطع
+// مسار الملاحة الانسيابي فائق الدقة والأناقة (Sleek Slim Route Polyline):
+// - تنحيف السماكة لتكون بعرض 2.5px إلى حد أقصى 3px (بدلاً من السماكة المفرطة السابقة 7-18px)
+// - الحفاظ التام على الهوية الذهبية العنبرية #F59E0B
+// - تقليص الهالة المتوهجة لتكون محصورة في 1px فقط حول الخط لمنع انتفاخه بصرياً وتغطية الشوارع
 export function RouteLines({ lines }: { lines: RouteLineData[] }) {
   return (
     <>
       {lines.map((line) => {
         const casingId = line.id === 'route-line' ? 'route-casing' : `route-casing-${line.id}`;
         const innerId = line.id === 'route-line' ? 'route-inner' : `route-inner-${line.id}`;
-        const innerColor = line.color || '#3b82f6';
-        const casingColor = line.casingColor || '#1d4ed8';
+        const innerColor = line.color || '#F59E0B';
+        const casingColor = line.casingColor || 'rgba(15, 23, 42, 0.45)';
 
         return (
           <Source
@@ -90,7 +92,7 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
               geometry: { type: 'LineString', coordinates: line.coordinates },
             }}
           >
-            {/* 1. الغلاف الخارجي للمسار بنمط ويز (Route Casing) */}
+            {/* 1. الغلاف الخارجي الخفيف المحدد للمسار (Subtle 1px Halo Casing) */}
             <Layer
               id={casingId}
               type="line"
@@ -101,34 +103,40 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
                   'interpolate',
                   ['linear'],
                   ['zoom'],
-                  11,
-                  7,
-                  15,
-                  12,
+                  10,
+                  3.0,
+                  14,
+                  3.8,
                   18,
-                  18,
+                  4.8,
                 ],
-                'line-opacity': 0.85,
+                'line-blur': 1,
+                'line-opacity': 0.4,
               }}
             />
-            {/* 2. القلب الداخلي الساطع للمسار بنمط ويز (Route Inner Core) */}
+            {/* 2. خط المسار الانسيابي الذهبي النحيف (2.5px - 3.0px) */}
             <Layer
               id={innerId}
               type="line"
-              layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+              layout={{
+                'line-join': 'round',
+                'line-cap': 'round',
+              }}
               paint={{
                 'line-color': innerColor,
                 'line-width': [
                   'interpolate',
                   ['linear'],
                   ['zoom'],
-                  11,
-                  4,
-                  15,
-                  8,
+                  10,
+                  2.0,
+                  14,
+                  2.8,
                   18,
-                  13,
+                  3.5,
                 ],
+                'line-opacity': 0.95,
+                ...(line.dashed ? { 'line-dasharray': [2, 2] } : {}),
               }}
             />
           </Source>

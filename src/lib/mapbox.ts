@@ -401,7 +401,7 @@ export function isStrictlyNajaf(name: string, lat: number, lon: number): boolean
  * 2. تكبير حجم الخطوط بنسبة 25%: ['interpolate', ['linear'], ['zoom'], 10, 13, 14, 16.5, 18, 20.5]
  * 3. إضافة هالة بيضاء واضحة (White Halo): text-halo-color: '#ffffff', text-halo-width: 2
  */
-export function applyArabicAndEnhancedLabels(rawMap: any) {
+export function applyArabicAndEnhancedLabels(rawMap: any, isDark = true) {
   if (!rawMap) return;
   const map = typeof rawMap.getMap === 'function' ? rawMap.getMap() : rawMap;
   if (!map) return;
@@ -473,11 +473,20 @@ export function applyArabicAndEnhancedLabels(rawMap: any) {
             map.setPaintProperty(layer.id, 'text-opacity', 1);
           } catch {}
 
-          // 9. هالة واضحة ومريحة لسهولة قراءة أسماء المعالم فوق خلفيات الخريطة
+          // 9. هالة واضحة ومريحة لسهولة قراءة أسماء المعالم فوق خلفيات الخريطة (تباين عالي لليلي والنهاري)
           try {
-            map.setPaintProperty(layer.id, 'text-color', '#FFFFFF');
-            map.setPaintProperty(layer.id, 'text-halo-color', '#090D16');
-            map.setPaintProperty(layer.id, 'text-halo-width', 2.5);
+            if (isDark) {
+              map.setPaintProperty(layer.id, 'text-color', '#FFFFFF');
+              map.setPaintProperty(layer.id, 'text-halo-color', '#090D16');
+              map.setPaintProperty(layer.id, 'text-halo-width', 2.5);
+              map.setPaintProperty(layer.id, 'text-halo-blur', 0.5);
+            } else {
+              // الوضع النهاري: نصوص داكنة صريحة #0F172A مع هالة بيضاء 2.0px لسهولة القراءة السريعة أثناء حركة المركبة
+              map.setPaintProperty(layer.id, 'text-color', '#0F172A');
+              map.setPaintProperty(layer.id, 'text-halo-color', '#FFFFFF');
+              map.setPaintProperty(layer.id, 'text-halo-width', 2.0);
+              map.setPaintProperty(layer.id, 'text-halo-blur', 0.5);
+            }
           } catch {}
         }
       }
@@ -561,5 +570,110 @@ export function enhanceDarkMapRoads(rawMap: any) {
 
   if (typeof map.on === 'function') {
     map.on('style.load', updateRoads);
+  }
+}
+
+/**
+ * رفع تباين ووضوح شبكة الشوارع في الوضع النهاري (Day Mode Road Contrast Enhancement)
+ * - الشوارع الرئيسية والسريعة: لون رمادي/كحلي واضح #475569 مع خط حافة ناصع #FFFFFF بعرض 1px
+ * - الشوارع الفرعية والأزقة: لون #94A3B8 عالي التباين يمنع بهتانها تحت أشعة الشمس
+ * - تسميات الشوارع والمعالم بالعربية: لون داكن صريح #0F172A مع هالة بيضاء 2.0px
+ */
+export function enhanceDayMapRoads(rawMap: any) {
+  if (!rawMap) return;
+  const map = typeof rawMap.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map) return;
+
+  const updateDayRoads = () => {
+    try {
+      if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) return;
+      const style = map.getStyle?.();
+      if (!style || !Array.isArray(style.layers)) return;
+
+      for (const layer of style.layers) {
+        // 1. خلفية الخريطة النهارية
+        if (layer.type === 'background') {
+          try {
+            map.setPaintProperty(layer.id, 'background-color', '#F8FAFC');
+          } catch {}
+        }
+
+        // 2. مسطحات المياه
+        if (layer.type === 'fill' && layer.id.includes('water')) {
+          try {
+            map.setPaintProperty(layer.id, 'fill-color', '#BAE6FD');
+          } catch {}
+        }
+
+        // 3. المباني والكتل العمرانية
+        if (layer.type === 'fill' && layer.id.includes('building')) {
+          try {
+            map.setPaintProperty(layer.id, 'fill-color', '#E2E8F0');
+            map.setPaintProperty(layer.id, 'fill-opacity', 0.65);
+            map.setPaintProperty(layer.id, 'fill-outline-color', '#CBD5E1');
+          } catch {}
+        }
+
+        // 4. خطوط الشوارع والأزقة في النهار
+        if (layer.type === 'line' && (
+          layer.id.includes('road') || 
+          layer.id.includes('street') || 
+          layer.id.includes('bridge') || 
+          layer.id.includes('tunnel') ||
+          layer.id.includes('highway')
+        )) {
+          try {
+            const isCasing = layer.id.includes('case') || layer.id.includes('casing');
+            if (isCasing) {
+              // خطوط الحواف الناصعة للفصل عن الكتل العمرانية
+              map.setPaintProperty(layer.id, 'line-color', '#FFFFFF');
+              map.setPaintProperty(layer.id, 'line-opacity', 1);
+            } else if (layer.id.includes('motorway') || layer.id.includes('trunk') || layer.id.includes('primary')) {
+              // الشوارع الرئيسية والسريعة: رمادي/كحلي واضح بدقة #475569
+              map.setPaintProperty(layer.id, 'line-color', '#475569');
+              map.setPaintProperty(layer.id, 'line-opacity', 1);
+            } else if (layer.id.includes('secondary') || layer.id.includes('tertiary')) {
+              // الشوارع الفرعية
+              map.setPaintProperty(layer.id, 'line-color', '#64748B');
+              map.setPaintProperty(layer.id, 'line-opacity', 0.95);
+            } else {
+              // الأزقة والشوارع الداخلية لمنع بهتانها تحت الشمس #94A3B8
+              map.setPaintProperty(layer.id, 'line-color', '#94A3B8');
+              map.setPaintProperty(layer.id, 'line-opacity', 0.9);
+            }
+          } catch {}
+        }
+
+        // 5. نصوص وتسميات المعالم بالعربية نهاراً
+        if (layer.type === 'symbol') {
+          try {
+            map.setPaintProperty(layer.id, 'text-color', '#0F172A');
+            map.setPaintProperty(layer.id, 'text-halo-color', '#FFFFFF');
+            map.setPaintProperty(layer.id, 'text-halo-width', 2.0);
+            map.setPaintProperty(layer.id, 'text-halo-blur', 0.5);
+          } catch {}
+        }
+      }
+    } catch {}
+  };
+
+  if (typeof map.isStyleLoaded === 'function' && map.isStyleLoaded()) {
+    updateDayRoads();
+  }
+
+  if (typeof map.on === 'function') {
+    map.on('style.load', updateDayRoads);
+  }
+}
+
+/**
+ * تطبيق تحسينات وتوضيح الخريطة الشاملة حسب الثيم الفعال (ليلي / نهاري)
+ */
+export function applyMapEnhancements(rawMap: any, isDark = true) {
+  applyArabicAndEnhancedLabels(rawMap, isDark);
+  if (isDark) {
+    enhanceDarkMapRoads(rawMap);
+  } else {
+    enhanceDayMapRoads(rawMap);
   }
 }

@@ -16,7 +16,7 @@ import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { AppDrawer } from '../components/AppDrawer';
 import { RouteLines } from '../components/map/MapPins';
-import { applyArabicAndEnhancedLabels, enhanceDarkMapRoads, getDirections, searchPlaces, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { applyMapEnhancements, getDirections, searchPlaces, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
 import { useTheme } from '../context/ThemeContext';
@@ -63,8 +63,20 @@ function CarSVG({ color }: { color: string }) {
 export default function DailyRoutePage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { mapStyle } = useTheme();
+  const { mapStyle, isDark } = useTheme();
   const mapRef = useRef<MapRef | null>(null);
+
+  // تحديث تباين الخريطة وتسمياتها تلقائياً عند تغيير الثيم
+  useEffect(() => {
+    if (mapRef.current) {
+      try {
+        const rawMap = mapRef.current.getMap();
+        if (rawMap) {
+          applyMapEnhancements(rawMap, isDark);
+        }
+      } catch {}
+    }
+  }, [isDark]);
   const hasAutoLocatedRef = useRef(false);
   const [userLoc, setUserLoc] = useState(USER_LOC);
   const [drivers, setDrivers] = useState<DriverItem[]>([]);
@@ -674,20 +686,19 @@ export default function DailyRoutePage() {
         initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
         onClick={handleMapClick}
         onLoad={(e) => {
-          applyArabicAndEnhancedLabels(e.target);
-          enhanceDarkMapRoads(e.target);
+          applyMapEnhancements(e.target, isDark);
           autoLocateDailyRouteOnMapReady(e.target);
         }}
         style={{ width: '100%', height: '100%' }}
       >
-        {/* مسار الملاحة بنمط ويز بين الراكب وسائق الخط الدائمي */}
+        {/* مسار الملاحة الانسيابي النحيف بين الراكب وسائق الخط الدائمي */}
         {selectedDriverRoute && selectedDriverRoute.length > 0 && (
           <RouteLines
             lines={[
               {
                 id: 'daily-route-line',
                 coordinates: selectedDriverRoute,
-                color: '#3b82f6',
+                color: '#F59E0B',
               },
             ]}
           />

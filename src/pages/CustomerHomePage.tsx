@@ -13,7 +13,7 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { realtime } from '../lib/realtime';
-import { searchPlaces, reverseGeocode, getDirections, applyArabicAndEnhancedLabels, enhanceDarkMapRoads, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import {
   calculateBearing,
   distanceMeters,
@@ -188,9 +188,21 @@ function CarBadgeIllustration({
 export default function CustomerHomePage() {
   const navigate = useNavigate();
   const { show } = useToast();
-  const { mapStyle } = useTheme();
+  const { mapStyle, isDark } = useTheme();
   const mapRef = useRef<MapRef>(null);
   const hasAutoLocatedRef = useRef(false);
+
+  // تحديث تباين الشوارع وألوان التسميات تلقائياً عند التبديل بين الوضع النهاري والليلي
+  useEffect(() => {
+    if (mapRef.current) {
+      try {
+        const rawMap = mapRef.current.getMap();
+        if (rawMap) {
+          applyMapEnhancements(rawMap, isDark);
+        }
+      } catch {}
+    }
+  }, [isDark]);
 
   const session = authStore.getSession();
 
@@ -1531,9 +1543,9 @@ export default function CustomerHomePage() {
     (c) => c.name.includes(citySearchQuery.trim()) || c.sub.includes(citySearchQuery.trim())
   );
 
-  // إعداد طبقة خط المسار بنمط ويز
+  // إعداد طبقة خط المسار الانسيابي النحيف (Sleek Slim Polyline - 2.8px)
   const routeLines: RouteLineData[] = routeCoordinates && routeCoordinates.length
-    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#F59E0B', width: 5.5 }]
+    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#F59E0B' }]
     : [];
 
   return (
@@ -1675,8 +1687,7 @@ export default function CustomerHomePage() {
           onMoveEnd={handleMapMoveEnd}
           onClick={handleMapClick}
           onLoad={(e) => {
-            applyArabicAndEnhancedLabels(e.target);
-            enhanceDarkMapRoads(e.target);
+            applyMapEnhancements(e.target, isDark);
             autoLocateUserOnMapReady(e.target);
           }}
         >

@@ -7,7 +7,7 @@ import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { config } from '../lib/config';
 import { RouteLines } from '../components/map/MapPins';
-import { applyArabicAndEnhancedLabels, enhanceDarkMapRoads } from '../lib/mapbox';
+import { applyMapEnhancements } from '../lib/mapbox';
 import { playIncomingTripAlert } from '../lib/sound';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
@@ -61,7 +61,20 @@ interface IncomingRideRequest {
 
 export default function DriverHomePage() {
   const { show } = useToast();
-  const { mapStyle } = useTheme();
+  const { mapStyle, isDark } = useTheme();
+
+  // تحديث تباين الشوارع والتسميات عند تبديل الثيم للكابتن
+  useEffect(() => {
+    if (mapRef.current) {
+      try {
+        const rawMap = mapRef.current.getMap();
+        if (rawMap) {
+          applyMapEnhancements(rawMap, isDark);
+        }
+      } catch {}
+    }
+  }, [isDark]);
+
   const session = authStore.getSession();
   const driverId = session?.userId || storage.getUserId() || '';
 
@@ -1106,12 +1119,11 @@ export default function DriverHomePage() {
                 initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
                 cooperativeGestures={true}
                 onLoad={(e) => {
-                  applyArabicAndEnhancedLabels(e.target);
-                  enhanceDarkMapRoads(e.target);
+                  applyMapEnhancements(e.target, isDark);
                 }}
                 style={{ width: '100%', height: '100%' }}
               >
-                {/* مسار الملاحة بنمط ويز المتوهج */}
+                {/* مسار الملاحة الانسيابي النحيف (Sleek Slim Polyline - 2.8px) */}
                 {driverRouteCoordinates && driverRouteCoordinates.length > 0 && (
                   <RouteLines
                     lines={[
@@ -1119,7 +1131,6 @@ export default function DriverHomePage() {
                         id: 'driver-route-line',
                         coordinates: driverRouteCoordinates,
                         color: '#F59E0B',
-                        width: 5,
                       },
                     ]}
                   />

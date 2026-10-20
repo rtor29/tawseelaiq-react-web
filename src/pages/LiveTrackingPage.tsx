@@ -69,7 +69,7 @@ export default function LiveTrackingPage() {
   }, [bookingId]);
 
   const lines: RouteLineData[] = routePoints.length
-    ? [{ id: 'live-route', coordinates: routePoints.map((p) => [p.longitude, p.latitude]), color: '#2563EB', width: 5 }]
+    ? [{ id: 'live-route', coordinates: routePoints.map((p) => [p.longitude, p.latitude]), color: '#F59E0B' }]
     : [];
 
   return (
