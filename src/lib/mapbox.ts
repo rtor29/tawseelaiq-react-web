@@ -492,3 +492,74 @@ export function applyArabicAndEnhancedLabels(rawMap: any) {
     map.on('style.load', updateLayers);
   }
 }
+
+/**
+ * توضيح خطوط الشوارع والأزقة باللون الفضي عالي التباين (#E2E8F0) مع خلفية كحلية/أوبسيديانية لخرائط الوضع الليلي
+ */
+export function enhanceDarkMapRoads(rawMap: any) {
+  if (!rawMap) return;
+  const map = typeof rawMap.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map) return;
+
+  const updateRoads = () => {
+    try {
+      if (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded()) return;
+      const style = map.getStyle?.();
+      if (!style || !Array.isArray(style.layers)) return;
+
+      for (const layer of style.layers) {
+        // خلفية الخريطة الداكنة
+        if (layer.type === 'background') {
+          try {
+            map.setPaintProperty(layer.id, 'background-color', '#080E1A');
+          } catch {}
+        }
+
+        // مسطحات المياه
+        if (layer.type === 'fill' && layer.id.includes('water')) {
+          try {
+            map.setPaintProperty(layer.id, 'fill-color', '#0A1220');
+          } catch {}
+        }
+
+        // المباني
+        if (layer.type === 'fill' && layer.id.includes('building')) {
+          try {
+            map.setPaintProperty(layer.id, 'fill-color', '#111827');
+            map.setPaintProperty(layer.id, 'fill-opacity', 0.6);
+          } catch {}
+        }
+
+        // خطوط الشوارع والمسارات والأزقة
+        if (layer.type === 'line' && (
+          layer.id.includes('road') || 
+          layer.id.includes('street') || 
+          layer.id.includes('bridge') || 
+          layer.id.includes('tunnel') ||
+          layer.id.includes('highway')
+        )) {
+          try {
+            if (layer.id.includes('motorway') || layer.id.includes('trunk') || layer.id.includes('primary')) {
+              map.setPaintProperty(layer.id, 'line-color', '#E2E8F0');
+              map.setPaintProperty(layer.id, 'line-opacity', 0.95);
+            } else if (layer.id.includes('secondary') || layer.id.includes('tertiary')) {
+              map.setPaintProperty(layer.id, 'line-color', '#CBD5E1');
+              map.setPaintProperty(layer.id, 'line-opacity', 0.88);
+            } else {
+              map.setPaintProperty(layer.id, 'line-color', '#94A3B8');
+              map.setPaintProperty(layer.id, 'line-opacity', 0.8);
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  };
+
+  if (typeof map.isStyleLoaded === 'function' && map.isStyleLoaded()) {
+    updateRoads();
+  }
+
+  if (typeof map.on === 'function') {
+    map.on('style.load', updateRoads);
+  }
+}

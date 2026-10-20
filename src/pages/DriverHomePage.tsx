@@ -7,7 +7,7 @@ import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { config } from '../lib/config';
 import { RouteLines } from '../components/map/MapPins';
-import { applyArabicAndEnhancedLabels } from '../lib/mapbox';
+import { applyArabicAndEnhancedLabels, enhanceDarkMapRoads } from '../lib/mapbox';
 import { playIncomingTripAlert } from '../lib/sound';
 
 const ChatModal = lazy(() => import('../components/ChatModal'));
@@ -840,7 +840,8 @@ export default function DriverHomePage() {
 
   return (
     <div
-      className="relative flex h-full min-h-[100dvh] w-full flex-col bg-[#080E1A] text-[#DDE2F4] font-cairo text-right select-none touch-pan-x touch-pan-y"
+      className="w-full min-h-screen bg-[#080E1A] text-[#DDE2F4] flex flex-col font-cairo selection:bg-amber-500 overflow-y-auto"
+      style={{ touchAction: 'pan-y' }}
       dir="rtl"
     >
       {/* 1. شريط المؤشرات العلوي للكابتن (Captain Top HUD Bar) */}
@@ -850,7 +851,7 @@ export default function DriverHomePage() {
           <img
             src="/logo.png?v=40"
             alt="توصيلة"
-            className="h-8 w-auto object-contain select-none pointer-events-none drop-shadow"
+            className="h-8 max-w-[190px] w-auto object-contain select-none pointer-events-none drop-shadow"
           />
           <div className="text-right">
             <p className="text-[14.5px] font-black text-white leading-tight">{driverName}</p>
@@ -894,7 +895,11 @@ export default function DriverHomePage() {
       </header>
 
       {/* المحتوى الرئيسي */}
-      <main className="flex-1 px-4 py-3 pb-[calc(5rem+env(safe-area-inset-bottom))]" dir="rtl">
+      <main 
+        className="w-full max-w-md mx-auto px-4 pt-3 flex flex-col gap-4 flex-1"
+        style={{ paddingBottom: 'calc(130px + env(safe-area-inset-bottom, 24px))', touchAction: 'pan-y' }}
+        dir="rtl"
+      >
         {/* شريط الإحصائيات المدمج للموبايل */}
         <div className="grid grid-cols-3 gap-2 mb-3 sm:hidden">
           <div className="bg-[#161C28]/90 border border-white/10 rounded-2xl p-2.5 text-center shadow-md">
@@ -1030,14 +1035,18 @@ export default function DriverHomePage() {
 
         {/* 2. الخريطة الليلية ورادار البحث عن المشاوير (Nocturnal Radar Map) */}
         {(workStatus === 'taxi' || workStatus === 'both') && (
-          <section className="mb-4 space-y-3">
-            <div className="relative w-full h-[280px] sm:h-[320px] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-[#0A101D]">
+          <section className="space-y-3">
+            <div className="relative w-full h-[280px] sm:h-[320px] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-[#0A101D] touch-pan-y">
               <MapGL
                 ref={mapRef}
                 mapboxAccessToken={config.mapboxToken}
-                mapStyle={config.mapStyle}
+                mapStyle="mapbox://styles/mapbox/dark-v11"
                 initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
-                onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
+                cooperativeGestures={true}
+                onLoad={(e) => {
+                  applyArabicAndEnhancedLabels(e.target);
+                  enhanceDarkMapRoads(e.target);
+                }}
                 style={{ width: '100%', height: '100%' }}
               >
                 {/* مسار الملاحة بنمط ويز المتوهج */}

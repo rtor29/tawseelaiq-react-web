@@ -134,7 +134,7 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
 
   return (
     <div 
-      className="w-full bg-[#0D131F] text-[#DDE2F4] min-h-screen flex flex-col font-cairo selection:bg-amber-500 selection:text-slate-950" 
+      className="w-full bg-[#080E1A] text-[#DDE2F4] min-h-screen flex flex-col font-cairo selection:bg-amber-500 selection:text-slate-950" 
       dir="rtl"
     >
       {/* هالة التوهج المحيطية العلوية */}
