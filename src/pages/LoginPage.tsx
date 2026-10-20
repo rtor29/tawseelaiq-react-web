@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore, useSession } from '../lib/auth';
+import { storage } from '../lib/storage';
 import { consumeLoginTokenFromUrl } from '../lib/googleAuth';
 import type { Session } from '../types';
 import { Spinner } from '../components/ui';
@@ -29,6 +30,8 @@ export default function LoginPage() {
   const [isResending, setIsResending] = useState(false);
   const [detectedRole, setDetectedRole] = useState<'Customer' | 'Driver'>('Customer');
   const [termsModalTab, setTermsModalTab] = useState<'terms' | 'privacy' | null>(null);
+  const [isCheckingTelegram, setIsCheckingTelegram] = useState(false);
+  const [telegramAlert, setTelegramAlert] = useState<string | null>(null);
 
   // Smart PWA prompt dismissal & Native Install/Share
   const [isPwaDismissed, setIsPwaDismissed] = useState<boolean>(() => {
@@ -300,8 +303,24 @@ export default function LoginPage() {
           if (detectedRole === 'Driver') {
             navigateAfterLogin('Driver');
           } else {
-            setIsLoading(false);
-            setStep('service_select');
+            // التحقق مما إذا كان حساب التيليجرام مربوطاً بالفعل
+            try {
+              const tgRes = await http.get<{
+                success: boolean;
+                linked: boolean;
+              }>(`/auth/check-telegram-linked?phone=${encodeURIComponent(cleanPhone)}&userId=${encodeURIComponent(loginData.userId)}`);
+
+              if (tgRes.data?.linked) {
+                setIsLoading(false);
+                setStep('service_select');
+              } else {
+                setIsLoading(false);
+                setStep('telegram_link');
+              }
+            } catch (_) {
+              setIsLoading(false);
+              setStep('telegram_link');
+            }
           }
           return;
         }
@@ -323,6 +342,36 @@ export default function LoginPage() {
       setErrorMessage(serverErr || 'رمز التحقق غير صحيح أو منتهي الصلاحية');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleCheckTelegramLinked() {
+    if (isCheckingTelegram) return;
+    setIsCheckingTelegram(true);
+    setTelegramAlert(null);
+    const cleanPhone = normalizePhone(phone);
+    const currentUserId = session?.userId || storage.getUserId() || '';
+
+    try {
+      const res = await http.get<{
+        success: boolean;
+        linked: boolean;
+        telegramChatId?: string;
+        telegramUsername?: string;
+      }>(`/auth/check-telegram-linked?phone=${encodeURIComponent(cleanPhone)}&userId=${encodeURIComponent(currentUserId)}`);
+
+      if (res.data?.linked) {
+        show('تم التحقق من ربط بوت التيليجرام بنجاح! مرحباً بك 🚖', 'success');
+        setStep('service_select');
+      } else {
+        setTelegramAlert('يرجى الضغط على Start داخل البوت أولاً لإتمام التفعيل');
+        show('يرجى الضغط على Start داخل البوت أولاً لإتمام التفعيل', 'info');
+      }
+    } catch (_) {
+      setTelegramAlert('يرجى التأكد من الضغط على Start داخل البوت والمحاولة مجدداً');
+      show('يرجى الضغط على Start داخل البوت أولاً لإتمام التفعيل', 'info');
+    } finally {
+      setIsCheckingTelegram(false);
     }
   }
 
@@ -636,24 +685,27 @@ export default function LoginPage() {
                 </form>
               )}
 
-              {/* الخطوة 4: تأكيد إشعارات التيليجرام */}
+              {/* الخطوة 4: توثيق بوت التيليجرام الإلزامي */}
               {step === 'telegram_link' && (
                 <div className="flex flex-col gap-4 animate-fade-in text-right">
-                  <div className="text-center mb-1 flex justify-center">
-                    <div className="w-14 h-14 bg-sky-500/15 border border-sky-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-sm">
-                      ✈️
+                  {/* شارة الترويسة الإلزامية */}
+                  <div className="flex justify-center">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 text-xs font-bold shadow-sm">
+                      <span>🛡️</span>
+                      <span>خطوة أمان إلزامية • توثيق الحساب</span>
                     </div>
                   </div>
 
                   <div className="text-center">
-                    <h2 className="text-lg font-bold text-white mb-1">
-                      تأكيد استلام إشعارات المشوار 📱
+                    <h2 className="text-xl font-bold text-white mb-1.5">
+                      تفعيل إشعارات رحلاتك عبر التيليجرام ✈️
                     </h2>
-                    <p className="text-xs text-slate-300">
-                      خطوة لتأكيد حسابك واستلام إشعار وصول الكابتن فورياً
+                    <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+                      لضمان وصول إشعارات وصول الكابتن، تفاصيل المركبة، والتسعيرة الرسمية، يتوجب عليك تفعيل البوت الرسمي للمنظومة قبل بدء استخدام التطبيق.
                     </p>
                   </div>
 
+                  {/* مميزات التفعيل */}
                   <div className="bg-[#1A202C] border border-sky-500/20 rounded-2xl p-3.5 space-y-2 text-xs">
                     <div className="flex items-center gap-2 text-emerald-400 font-semibold">
                       <span>✓</span>
@@ -665,29 +717,45 @@ export default function LoginPage() {
                     </div>
                     <div className="flex items-center gap-2 text-emerald-400 font-semibold">
                       <span>✓</span>
-                      <span>دعم فني واستفسارات مباشرة عبر البوت</span>
+                      <span>تأكيد التسعيرة الرسمية للرحلة بدون أي زيادة</span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const cleanPhone = normalizePhone(phone);
-                        window.open(`https://t.me/tawseela_najaf_bot?start=reg_${cleanPhone}`, '_blank');
-                        setStep('service_select');
-                      }}
-                      className="w-full min-h-[50px] rounded-2xl bg-[#0088cc] hover:bg-[#0077b5] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
-                    >
-                      <span>تأكيد الإشعارات عبر بوت التيليجرام 📱</span>
-                    </button>
+                  {/* تنبيه حالة الربط إن وجد */}
+                  {telegramAlert && (
+                    <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs text-center font-bold animate-shake">
+                      ⚠️ {telegramAlert}
+                    </div>
+                  )}
 
+                  {/* أزرار الإجراء: فتح البوت أولاً ثم التحقق والاستمرار (بدون أي خيار تخطي) */}
+                  <div className="flex flex-col gap-3 pt-1">
+                    {/* الزر الأول: فتح البوت */}
+                    <a
+                      href={`https://t.me/tawseela_najaf_bot?start=${encodeURIComponent(normalizePhone(phone))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full min-h-[50px] py-3.5 px-4 rounded-2xl bg-[#0088CC] hover:bg-[#0077B5] text-white font-bold text-sm shadow-lg shadow-sky-600/25 flex items-center justify-center gap-2 active:scale-[0.98] transition-all no-underline cursor-pointer"
+                    >
+                      <span className="text-xl">🤖</span>
+                      <span>فتح بوت توصيلة والتفعيل</span>
+                    </a>
+
+                    {/* الزر الثاني: التحقق والاستمرار */}
                     <button
                       type="button"
-                      onClick={() => setStep('service_select')}
-                      className="w-full py-2.5 text-center text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                      disabled={isCheckingTelegram}
+                      onClick={handleCheckTelegramLinked}
+                      className="w-full min-h-[50px] py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
                     >
-                      تخطي والبدء بدون إشعارات تيليجرام
+                      {isCheckingTelegram ? (
+                        <span className="animate-pulse">جاري التحقق من التفعيل في البوت...</span>
+                      ) : (
+                        <>
+                          <span>تم التفعيل في البوت.. دخول للتطبيق</span>
+                          <span>🚖</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

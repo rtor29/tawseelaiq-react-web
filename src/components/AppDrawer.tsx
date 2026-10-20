@@ -70,7 +70,17 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
   }
 
   function handleLogout() {
-    localStorage.clear();
+    authStore.clear();
+    storage.clearAll();
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth');
+      localStorage.removeItem('tawseela_auth');
+      localStorage.removeItem('tawseela_session');
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (_) {}
     if (onClose) onClose();
     window.location.replace('/login');
   }

@@ -89,10 +89,15 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
     authStore.clear();
     storage.clearAll();
     try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth');
+      localStorage.removeItem('tawseela_auth');
+      localStorage.removeItem('tawseela_session');
       localStorage.clear();
       sessionStorage.clear();
     } catch (_) {}
-    navigate('/login', { replace: true });
+    window.location.replace('/login');
   }
 
   return (
