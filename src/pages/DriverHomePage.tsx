@@ -402,9 +402,14 @@ export default function DriverHomePage() {
     }
   }, [isChatOpen, latestPassengerMsg]);
 
-  // استطلاع الطلبات الواردة في الانتظار
+  // استطلاع الطلبات الواردة في الانتظار (taxi mode only)
   useEffect(() => {
     if (!driverId && !rawPhone) {
+      setIncomingRequest(null);
+      return;
+    }
+    // Only poll for pending ride requests in taxi mode
+    if (workStatus !== 'taxi') {
       setIncomingRequest(null);
       return;
     }
@@ -417,10 +422,11 @@ export default function DriverHomePage() {
           longitude: driverLoc.lng,
           heading: 0,
           tripStatus: 'Online',
+          workStatus: 'taxi',
         })
         .catch(() => {});
     };
-    if (workStatus === 'taxi') sendLocation();
+    sendLocation();
 
     const interval = setInterval(async () => {
       if (document.hidden) return;
@@ -433,7 +439,6 @@ export default function DriverHomePage() {
 
         if (pendingData?.success && pendingData.requests && pendingData.requests.length > 0) {
           setIncomingRequest(pendingData.requests[0]);
-          setWorkStatus((prev) => (prev === 'idle' ? prev : 'taxi'));
         } else {
           setIncomingRequest(null);
         }
@@ -566,6 +571,28 @@ export default function DriverHomePage() {
       show(err?.response?.data?.error || 'حدث خطأ أثناء اعتماد الإلغاء', 'error');
     } finally {
       setIsSubmittingCancellation(false);
+    }
+  }
+
+  // إلغاء اشتراك راكب من طرف الكابتن (force cancel)
+  async function handleDriverCancelSubscriber(bookingId: string, subName: string) {
+    if (!bookingId) return;
+    if (!window.confirm(`هل أنت متأكد من إلغاء اشتراك ${subName}؟ سيتم تحرير مقعده فوراً.`)) return;
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string }>('/driver/cancel-subscriber', {
+        bookingId,
+        driverId: driverId || rawPhone,
+        reason: 'إلغاء من الكابتن',
+      });
+      if (data?.success) {
+        show(data.message || 'تم إلغاء اشتراك الراكب بنجاح وتحرير مقعده ✅', 'success');
+        setSubscribers((prev) => prev.filter((s) => s.id !== bookingId));
+        void fetchSubscribers();
+      } else {
+        show('تعذر إلغاء الاشتراك', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ أثناء إلغاء الاشتراك', 'error');
     }
   }
 
@@ -1370,14 +1397,24 @@ export default function DriverHomePage() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
-                          className="min-h-[40px] px-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 transition"
-                        >
-                          <span>واتساب</span>
-                          <span>💬</span>
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
+                            className="min-h-[48px] px-3 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 transition"
+                          >
+                            <span>واتساب</span>
+                            <span>💬</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDriverCancelSubscriber(sub.id, sub.name)}
+                            className="min-h-[48px] px-3 rounded-xl bg-red-600/20 text-red-400 border border-red-500/30 flex items-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 transition hover:bg-red-600/40"
+                          >
+                            <span>إلغاء</span>
+                            <span>✕</span>
+                          </button>
+                        </div>
                         <div className="text-right">
                           <p className="font-bold text-white text-sm">{sub.name}</p>
                           <p className="text-xs text-slate-400">{sub.from} ➔ {sub.to}</p>
