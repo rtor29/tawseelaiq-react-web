@@ -40,7 +40,6 @@ import { RouteLines, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { AppDrawer } from '../components/AppDrawer';
-import { RideMapBookingView } from '../components/RideMapBookingView';
 
 // التحميل الكسول لنافذة الدردشة لتقليل الحزمة الأولية
 const ChatModal = lazy(() => import('../components/ChatModal'));
@@ -276,6 +275,7 @@ export default function CustomerHomePage() {
   const [isListeningMic, setIsListeningMic] = useState(false);
   const searchTimer = useRef<number | null>(null);
   const hasNotifiedArrivalRef = useRef(false);
+  const lastHeardHornSeqRef = useRef<number>(0);
 
   // نافذة تقييم الراكب للكابتن بنمط بلي (Customer Rating Captain Modal)
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
@@ -1276,6 +1276,14 @@ export default function CustomerHomePage() {
         if (data.success && data.request) {
           const req = data.request;
           const status = (req.status || '').toLowerCase();
+
+          // الاستماع المباشر لتنبيهات الهورن (بيب بيب 📢) الصادرة من السائق
+          const incomingHornSeq = Number((req as any).hornSequence || 0);
+          if (incomingHornSeq > 0 && incomingHornSeq > lastHeardHornSeqRef.current) {
+            lastHeardHornSeqRef.current = incomingHornSeq;
+            playCarHornBeep();
+            show('الكابتن ينبهك لوصوله بالهورن! 🚖', 'success', 6000);
+          }
           if (status === 'accepted') {
             setRideStatus('Accepted');
             if (stage !== 'driver_arriving') {
@@ -1522,48 +1530,6 @@ export default function CustomerHomePage() {
     ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#3b82f6', width: 5.5 }]
     : [];
 
-  // شاشة الخريطة الليلية الفاخرة ولوحة التحكم السفلية (Midnight Executive Nocturnal Map)
-  const isNocturnalStage = (stage as any) === 'pickup' || (stage as any) === 'dropoff';
-  if (isNocturnalStage) {
-    return (
-      <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden font-cairo text-right select-none" dir="rtl">
-        <RideMapBookingView
-          mode="instant"
-          onBack={() => {
-            if (stage === 'dropoff') {
-              setStage('pickup');
-            } else {
-              navigate('/hub');
-            }
-          }}
-          onOpenDrawer={() => setIsDrawerOpen(true)}
-          initialPickupAddress={pickupName || DEFAULT_PICKUP_NAME}
-          initialDropoffAddress={dropoffName || DEFAULT_DROPOFF_NAME}
-          onConfirmPickup={(loc) => {
-            setPickup({ lat: loc.lat, lng: loc.lng });
-            setPickupName(loc.address);
-            handleConfirmPickup();
-          }}
-          onConfirmDropoff={(loc) => {
-            setDropoff({ lat: loc.lat, lng: loc.lng });
-            setDropoffName(loc.address);
-            handleConfirmDropoff();
-          }}
-          onRequestRide={(tier, details) => {
-            const mappedTier: 'saving' | 'plus' | 'super' = tier === 'vip' ? 'plus' : tier;
-            setSelectedTierId(mappedTier);
-            setPickup({ lat: details.pickup.lat, lng: details.pickup.lng });
-            setPickupName(details.pickup.address);
-            setDropoff({ lat: details.dropoff.lat, lng: details.dropoff.lng });
-            setDropoffName(details.dropoff.address);
-            handleOrderTrip();
-          }}
-        />
-        <AppDrawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
-      </div>
-    );
-  }
-
   return (
     <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-slate-100 select-none font-cairo flex flex-col" dir="rtl">
       {/* ====================================================================
@@ -1670,7 +1636,7 @@ export default function CustomerHomePage() {
           </button>
         )}
 
-        {/* شريط تنبيه وصول الكابتن العائم في أعلى الشاشة مع زر بيب بيب */}
+        {/* شريط تنبيه وصول الكابتن العائم في أعلى الشاشة */}
         {(rideStatus?.toLowerCase() === 'arrived') && (
           <div className="absolute top-4 inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
             <div className="w-full max-w-md bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgba(217,119,6,0.45)] border-2 border-white/90 flex items-center justify-between gap-3 backdrop-blur-md">
@@ -1681,19 +1647,10 @@ export default function CustomerHomePage() {
                   <span className="text-[11.5px] font-bold text-amber-100">يرجى التوجه إلى السيارة</span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  playCarHornBeep();
-                  show('بيب بيب! 🚖 تم إطلاق التنبيه الصوتي', 'info', 3000);
-                }}
-                className="bg-white text-amber-700 hover:bg-amber-50 active:scale-90 font-black px-3.5 py-2 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer shrink-0 border border-amber-300"
-                title="إعادة تشغيل صوت الهورن"
-              >
-                <span className="text-base">📢</span>
-                <span className="text-[13px]">بيب بيب</span>
-              </button>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 border border-white/30 text-white text-xs font-bold shrink-0">
+                <span>📢</span>
+                <span>في الانتظار</span>
+              </div>
             </div>
           </div>
         )}

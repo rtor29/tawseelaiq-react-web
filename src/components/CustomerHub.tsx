@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { useSession, authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
+import { playCarHornBeep } from '../lib/sound';
 import TermsPrivacyModal from './TermsPrivacyModal';
 
 interface CustomerHubProps {
@@ -28,6 +29,37 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
   const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'notifications' | 'safety' | 'profile'>('home');
   const [announcementText, setAnnouncementText] = useState<string>(DEFAULT_ANNOUNCEMENT);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const [activeTaxiRide, setActiveTaxiRide] = useState<any | null>(null);
+  const lastHeardHubHornRef = React.useRef(0);
+
+  useEffect(() => {
+    const raw = localStorage.getItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.rideRequestId && (parsed.stage === 'searching' || parsed.stage === 'driver_arriving')) {
+        setActiveTaxiRide(parsed);
+        const interval = setInterval(async () => {
+          try {
+            const { data } = await http.get<any>(`/ride/status/${parsed.rideRequestId}`);
+            if (data?.success && data?.request) {
+              const req = data.request;
+              const hornSeq = Number(req.hornSequence || 0);
+              if (hornSeq > 0 && hornSeq > lastHeardHubHornRef.current) {
+                lastHeardHubHornRef.current = hornSeq;
+                playCarHornBeep();
+              }
+              if (req.status === 'Completed' || req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
+                setActiveTaxiRide(null);
+                clearInterval(interval);
+              }
+            }
+          } catch (_) {}
+        }, 3000);
+        return () => clearInterval(interval);
+      }
+    } catch (_) {}
+  }, []);
 
   const fullName = session?.fullName || storage.getFullName() || 'وسام الشمري';
   const phone = (session as any)?.phone || storage.getPhone() || '07700000000';
@@ -184,6 +216,31 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                 {announcementText}
               </p>
             </div>
+
+            {/* بطاقة متابعة المشوار الجاري إن وجد */}
+            {activeTaxiRide && (
+              <div 
+                onClick={() => onSelectService ? onSelectService('taxi') : navigate('/')}
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/20 via-[#161C28] to-[#161C28] border-2 border-amber-400 p-4 shadow-xl flex items-center justify-between gap-3 cursor-pointer animate-fade-in group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-2xl shrink-0 animate-pulse">
+                    🚖
+                  </div>
+                  <div className="flex flex-col text-right min-w-0">
+                    <span className="text-xs font-bold text-amber-400">مشوار تكسي جارٍ الآن</span>
+                    <span className="text-sm font-black text-white truncate">
+                      {activeTaxiRide.rideStatus === 'Arrived' ? 'الكابتن وصل بانتظارك! 📍' : 'الكابتن في طريقه إليك'}
+                    </span>
+                    <span className="text-[11px] text-slate-300">اضغط للعودة إلى شاشة التتبع والخريطة</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs shrink-0 group-hover:brightness-110 transition">
+                  <span>الخريطة</span>
+                  <span>🗺️</span>
+                </div>
+              </div>
+            )}
 
             {/* 2. قسم احجز مشوارك (الخدمات الرئيسية) */}
             <section className="w-full flex flex-col gap-3">

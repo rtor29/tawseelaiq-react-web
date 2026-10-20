@@ -139,6 +139,7 @@ export default function DriverHomePage() {
   const lastNotifiedSeatBookingIdRef = useRef<string | null>(null);
   const [incomingRequest, setIncomingRequest] = useState<IncomingRideRequest | null>(null);
   const [activeRide, setActiveRide] = useState<any | null>(null);
+  const [isTriggeringHorn, setIsTriggeringHorn] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [latestPassengerMsg, setLatestPassengerMsg] = useState<{
@@ -576,6 +577,50 @@ export default function DriverHomePage() {
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ أثناء تأكيد الوصول', 'error');
+    }
+  }
+
+  // إرسال تنبيه الهورن للراكب (بيب بيب 📢) عبر الباك إند
+  async function handleTriggerHorn() {
+    if (!activeRide) return;
+    setIsTriggeringHorn(true);
+    const tripId = activeRide.id;
+    const currentId = driverId || rawPhone;
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string }>(`/trips/${tripId}/horn`, {
+        requestId: tripId,
+        tripId,
+        driverId: currentId,
+      });
+      if (data?.success) {
+        show('تم إرسال تنبيه الهورن للراكب بنجاح (بيب بيب 📢)', 'success');
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([100, 50, 100]);
+        }
+      } else {
+        show(data?.message || 'تعذر إرسال تنبيه الهورن', 'error');
+      }
+    } catch (err: any) {
+      try {
+        const { data } = await http.post<{ success: boolean; message?: string }>('/ride/horn', {
+          requestId: tripId,
+          tripId,
+          driverId: currentId,
+        });
+        if (data?.success) {
+          show('تم إرسال تنبيه الهورن للراكب بنجاح (بيب بيب 📢)', 'success');
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+          }
+        } else {
+          show(data?.message || 'تعذر إرسال تنبيه الهورن', 'error');
+        }
+      } catch (err2: any) {
+        console.error('فشل إرسال تنبيه الهورن:', err2);
+        show(err2?.response?.data?.error || 'تعذر إرسال تنبيه الهورن', 'error');
+      }
+    } finally {
+      setIsTriggeringHorn(false);
     }
   }
 
@@ -1075,14 +1120,26 @@ export default function DriverHomePage() {
                       <span>أنا في موقع الراكب (وصلت)</span>
                     </button>
                   ) : activeRide.status === 'Arrived' ? (
-                    <button
-                      type="button"
-                      onClick={handleDriverStartRide}
-                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-amber-400 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-orange-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
-                    >
-                      <span>🚗💨</span>
-                      <span>بدء المشوار والانطلاق</span>
-                    </button>
+                    <div className="flex flex-col gap-2.5 w-full">
+                      <button
+                        type="button"
+                        onClick={handleTriggerHorn}
+                        disabled={isTriggeringHorn}
+                        className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer border border-amber-300 disabled:opacity-60"
+                      >
+                        <span className="text-xl animate-bounce">📢</span>
+                        <span>{isTriggeringHorn ? 'جاري التنبيه...' : 'تنبيه الراكب (بيب بيب 🚖)'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDriverStartRide}
+                        className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
+                      >
+                        <span className="text-xl">🚗💨</span>
+                        <span>بدء المشوار والانطلاق</span>
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"
