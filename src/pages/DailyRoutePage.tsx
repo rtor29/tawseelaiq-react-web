@@ -538,7 +538,13 @@ export default function DailyRoutePage() {
   }
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden font-cairo text-right select-none" dir="rtl">
+    <div 
+      className={`relative h-dvh w-full overflow-hidden font-cairo text-right select-none transition-colors duration-200 ${
+        isDark ? 'bg-[#080E1A] text-slate-100' : 'bg-[#F8FAFC] text-slate-900'
+      }`} 
+      style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }} 
+      dir="rtl"
+    >
 
       {/* الترويسة العلوية العائمة مع حماية كاملة لهوامش الأمان على iOS */}
       <div className="fixed top-0 inset-x-0 max-w-md mx-auto z-40 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 flex items-center justify-between pointer-events-none">
@@ -547,7 +553,11 @@ export default function DailyRoutePage() {
           <button
             type="button"
             onClick={() => navigate('/hub')}
-            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#161C28]/95 border border-white/15 shadow-lg flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400/50 transition-all active:scale-95 cursor-pointer"
+            className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+              isDark 
+                ? 'bg-[#161C28]/95 border-white/15 text-amber-400 hover:text-amber-300 hover:border-amber-400/50' 
+                : 'bg-white/95 border-slate-200 text-amber-600 hover:border-amber-400 shadow-sm'
+            }`}
             title="الرئيسية"
             aria-label="الرئيسية"
           >
@@ -568,7 +578,9 @@ export default function DailyRoutePage() {
 
         {/* عنوان التبويب */}
         <div className="pointer-events-auto">
-          <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/15 shadow-lg text-white text-[13px] font-bold">
+          <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full backdrop-blur-md border shadow-lg text-[13px] font-bold ${
+            isDark ? 'bg-[#161C28]/95 border-white/15 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
+          }`}>
             <span>حجز خط دائمي</span>
             <span>🚌</span>
           </div>
@@ -580,7 +592,11 @@ export default function DailyRoutePage() {
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#161C28]/95 border border-white/15 shadow-lg flex items-center justify-center text-slate-300 hover:text-white hover:border-amber-400/50 transition-all active:scale-95 cursor-pointer"
+            className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+              isDark 
+                ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-amber-400/50' 
+                : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-amber-400 shadow-sm'
+            }`}
             title="الحساب والإعدادات"
             aria-label="الحساب"
           >

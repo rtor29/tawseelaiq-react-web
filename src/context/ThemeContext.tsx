@@ -33,10 +33,12 @@ export function applyThemeToDom(theme: ThemeMode): void {
     root.classList.add('dark');
     root.classList.remove('light');
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#080E1A');
+    document.querySelector('meta[name="background-color"]')?.setAttribute('content', '#080E1A');
   } else {
     root.classList.add('light');
     root.classList.remove('dark');
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#F8FAFC');
+    document.querySelector('meta[name="background-color"]')?.setAttribute('content', '#F8FAFC');
   }
 }
 
@@ -55,6 +57,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       localStorage.setItem(STORAGE_KEY, mode);
       localStorage.setItem('tawseela_theme_mode', mode);
+      window.dispatchEvent(new Event('theme-change'));
       window.dispatchEvent(new CustomEvent('tawseela-theme-change', { detail: { theme: mode } }));
     } catch {}
   };
@@ -76,6 +79,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
+    const handleGeneralThemeChange = () => {
+      const next = getInitialTheme();
+      setThemeState(next);
+      applyThemeToDom(next);
+    };
+
     const handleCustomChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ theme: ThemeMode }>;
       if (customEvent.detail?.theme) {
@@ -85,10 +94,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     window.addEventListener('storage', handleStorage);
+    window.addEventListener('theme-change', handleGeneralThemeChange);
     window.addEventListener('tawseela-theme-change', handleCustomChange);
 
     return () => {
       window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('theme-change', handleGeneralThemeChange);
       window.removeEventListener('tawseela-theme-change', handleCustomChange);
     };
   }, [theme]);

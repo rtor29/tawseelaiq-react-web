@@ -918,9 +918,17 @@ export default function DriverHomePage() {
   const isOnline = workStatus !== 'idle';
 
   return (
-    <div className="w-full min-h-screen bg-[#080E1A] text-[#DDE2F4] flex flex-col font-cairo selection:bg-amber-500" dir="rtl">
+    <div 
+      className={`w-full min-h-[100dvh] flex flex-col font-cairo selection:bg-amber-500 transition-colors duration-200 ${
+        isDark ? 'bg-[#080E1A] text-[#DDE2F4]' : 'bg-[#F8FAFC] text-[#0F172A]'
+      }`} 
+      style={{ minHeight: '100dvh', backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }}
+      dir="rtl"
+    >
       {/* 1. شريط المؤشرات العلوي للكابتن (Captain Top HUD Bar) */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-[#161C28]/95 backdrop-blur-xl shadow-lg" dir="rtl">
+      <header className={`sticky top-0 z-30 flex items-center justify-between border-b px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-xl shadow-lg transition-colors ${
+        isDark ? 'bg-[#161C28]/95 border-white/10 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
+      }`} dir="rtl">
         {/* اليمين: الشعار المفرغ ومعلومات الكابتن */}
         <div className="flex items-center gap-2.5">
           <img
@@ -929,13 +937,13 @@ export default function DriverHomePage() {
             className="h-8 max-w-[190px] w-auto object-contain select-none pointer-events-none drop-shadow"
           />
           <div className="text-right">
-            <p className="text-[14.5px] font-black text-white leading-tight">{driverName}</p>
+            <p className={`text-[14.5px] font-black leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{driverName}</p>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[11px] font-bold text-amber-400">⭐ 4.9</span>
-              <span className="text-slate-500 text-[10px]">•</span>
-              <span className="text-[10.5px] font-bold text-emerald-400">كابتن معتمد</span>
-              <span className="text-slate-500 text-[10px]">•</span>
-              <span className="text-[10px] text-slate-400 font-mono" dir="ltr">{formattedPhone}</span>
+              <span className="text-[11px] font-bold text-amber-500 dark:text-amber-400">⭐ 4.9</span>
+              <span className="text-slate-400 dark:text-slate-500 text-[10px]">•</span>
+              <span className="text-[10.5px] font-bold text-emerald-500 dark:text-emerald-400">كابتن معتمد</span>
+              <span className="text-slate-400 dark:text-slate-500 text-[10px]">•</span>
+              <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`} dir="ltr">{formattedPhone}</span>
             </div>
           </div>
         </div>
@@ -943,9 +951,11 @@ export default function DriverHomePage() {
         {/* اليسار: مفتاح الاتصال السريع، زر تبديل الثيم، وبطاقة الأرباح */}
         <div className="flex items-center gap-2">
           {/* كبسولة الأرباح السريعة */}
-          <div className="hidden sm:flex flex-col text-left font-mono bg-white/5 border border-white/10 px-2.5 py-1 rounded-xl">
-            <span className="text-[10px] text-slate-400">أرباح اليوم</span>
-            <span className="text-xs font-bold text-amber-400">{driverBalance} د.ع</span>
+          <div className={`hidden sm:flex flex-col text-left font-mono px-2.5 py-1 rounded-xl border ${
+            isDark ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'
+          }`}>
+            <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>أرباح اليوم</span>
+            <span className="text-xs font-bold text-amber-500 dark:text-amber-400">{driverBalance} د.ع</span>
           </div>
 
           {/* زر تبديل الوضع النهاري والليلي الشامل */}
@@ -957,8 +967,10 @@ export default function DriverHomePage() {
             onClick={() => handleSwitchWorkStatus(isOnline ? 'idle' : 'taxi')}
             className={`min-h-[48px] px-3.5 py-2 rounded-full flex items-center gap-2 transition-all cursor-pointer active:scale-95 border ${
               isOnline
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/20'
-                : 'bg-slate-800 text-slate-400 border-slate-700/60'
+                ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/20'
+                : isDark
+                ? 'bg-slate-800 text-slate-400 border-slate-700/60'
+                : 'bg-slate-100 text-slate-600 border-slate-300'
             }`}
             title="تبديل حالة الاتصال"
             aria-label="تبديل الاتصال"
@@ -980,17 +992,23 @@ export default function DriverHomePage() {
       >
         {/* شريط الإحصائيات المدمج للموبايل */}
         <div className="grid grid-cols-3 gap-2 mb-3 sm:hidden">
-          <div className="bg-[#161C28]/90 border border-white/10 rounded-2xl p-2.5 text-center shadow-md">
-            <span className="text-[10px] text-slate-400 block mb-0.5">أرباح اليوم</span>
-            <span className="text-xs font-black text-amber-400 font-mono">{driverBalance}</span>
+          <div className={`rounded-2xl p-2.5 text-center shadow-md border ${
+            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-white border-slate-200 shadow-sm'
+          }`}>
+            <span className={`text-[10px] block mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>أرباح اليوم</span>
+            <span className="text-xs font-black text-amber-500 dark:text-amber-400 font-mono">{driverBalance}</span>
           </div>
-          <div className="bg-[#161C28]/90 border border-white/10 rounded-2xl p-2.5 text-center shadow-md">
-            <span className="text-[10px] text-slate-400 block mb-0.5">التقييم</span>
-            <span className="text-xs font-black text-emerald-400">⭐ 4.9</span>
+          <div className={`rounded-2xl p-2.5 text-center shadow-md border ${
+            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-white border-slate-200 shadow-sm'
+          }`}>
+            <span className={`text-[10px] block mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>التقييم</span>
+            <span className="text-xs font-black text-emerald-500 dark:text-emerald-400">⭐ 4.9</span>
           </div>
-          <div className="bg-[#161C28]/90 border border-white/10 rounded-2xl p-2.5 text-center shadow-md">
-            <span className="text-[10px] text-slate-400 block mb-0.5">النقاط</span>
-            <span className="text-xs font-black text-white">{driverPoints}</span>
+          <div className={`rounded-2xl p-2.5 text-center shadow-md border ${
+            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-white border-slate-200 shadow-sm'
+          }`}>
+            <span className={`text-[10px] block mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>النقاط</span>
+            <span className={`text-xs font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{driverPoints}</span>
           </div>
         </div>
 
@@ -998,18 +1016,22 @@ export default function DriverHomePage() {
         {latestPassengerMsg && activeRide && (
           <div
             onClick={() => setIsChatOpen(true)}
-            className="mb-3 flex items-center justify-between rounded-2xl bg-[#161C28] border border-amber-500/40 p-3 text-white shadow-xl cursor-pointer transition active:scale-[0.99] hover:border-amber-400 animate-fade-in"
+            className={`mb-3 flex items-center justify-between rounded-2xl border p-3 shadow-xl cursor-pointer transition active:scale-[0.99] animate-fade-in ${
+              isDark
+                ? 'bg-[#161C28] border-amber-500/40 text-white hover:border-amber-400'
+                : 'bg-white border-amber-500/50 text-slate-900 hover:border-amber-500 shadow-md'
+            }`}
             dir="rtl"
           >
             <div className="flex items-center gap-2.5 text-right">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 text-lg">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-500 dark:text-amber-400 text-lg">
                 💬
               </div>
               <div className="text-right">
-                <p className="text-[11px] font-bold text-amber-400">
+                <p className="text-[11px] font-bold text-amber-500 dark:text-amber-400">
                   رسالة جديدة من الراكب ({activeRide.customerName || 'الراكب'}):
                 </p>
-                <p className="text-[13px] font-semibold text-white truncate max-w-[190px]">
+                <p className={`text-[13px] font-semibold truncate max-w-[190px] ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {latestPassengerMsg.text}
                 </p>
               </div>
@@ -1020,7 +1042,7 @@ export default function DriverHomePage() {
                   {unreadCount}
                 </span>
               )}
-              <span className="rounded-xl bg-amber-500/20 text-amber-300 px-3 py-1.5 text-xs font-bold flex items-center gap-1 border border-amber-500/30">
+              <span className="rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300 px-3 py-1.5 text-xs font-bold flex items-center gap-1 border border-amber-500/30">
                 <span>فتح المحادثة</span>
                 <span>➔</span>
               </span>
@@ -1032,15 +1054,19 @@ export default function DriverHomePage() {
         {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && workStatus !== 'both' && (
           <div
             onClick={() => handleSwitchWorkStatus('permanent')}
-            className="mb-3 flex items-center justify-between rounded-2xl bg-amber-500/15 border border-amber-400/50 p-3 text-amber-300 shadow-xl cursor-pointer transition active:scale-[0.99] hover:bg-amber-500/20 animate-fade-in"
+            className={`mb-3 flex items-center justify-between rounded-2xl border p-3 shadow-xl cursor-pointer transition active:scale-[0.99] animate-fade-in ${
+              isDark
+                ? 'bg-amber-500/15 border-amber-400/50 text-amber-300 hover:bg-amber-500/20'
+                : 'bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100 shadow-md'
+            }`}
             dir="rtl"
           >
             <div className="text-right">
-              <p className="text-[13px] font-bold text-white flex items-center gap-1.5">
+              <p className={`text-[13px] font-bold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <span>💺</span>
                 <span>لديك {pendingSeatRequests.length} طلب حجز مقعد في الخط الدائمي!</span>
               </p>
-              <p className="text-[11px] text-amber-300/80 mt-0.5">اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار</p>
+              <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-300/80' : 'text-amber-700'}`}>اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار</p>
             </div>
             <span className="rounded-xl bg-amber-500 text-slate-950 font-black px-3 py-1.5 text-xs shadow-md shrink-0">
               معاينة ➔
@@ -1050,15 +1076,21 @@ export default function DriverHomePage() {
 
         {/* أزرار التبديل الرباعية لنمط العمل (Segmented Luxury Control) */}
         <section className="mb-3 text-right" dir="rtl">
-          <div className="grid grid-cols-4 gap-1 p-1.5 bg-[#161C28]/90 rounded-2xl border border-white/10 shadow-lg" dir="rtl">
+          <div className={`grid grid-cols-4 gap-1 p-1.5 rounded-2xl border shadow-lg ${
+            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-slate-200/80 border-slate-300'
+          }`} dir="rtl">
             {/* خمول */}
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('idle')}
               className={`rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
                 workStatus === 'idle'
-                  ? 'bg-slate-700/80 text-white shadow-md border border-slate-600'
-                  : 'text-slate-400 hover:text-white'
+                  ? isDark
+                    ? 'bg-slate-700/80 text-white shadow-md border border-slate-600'
+                    : 'bg-white text-slate-800 shadow-md border border-slate-300'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               خمول
@@ -1071,7 +1103,9 @@ export default function DriverHomePage() {
               className={`rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
                 workStatus === 'taxi'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                  : 'text-slate-400 hover:text-white'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               تكسي
@@ -1083,8 +1117,12 @@ export default function DriverHomePage() {
               onClick={() => handleSwitchWorkStatus('permanent')}
               className={`relative flex items-center justify-center gap-1 rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] font-bold ${
                 workStatus === 'permanent'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? isDark
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-md'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300 shadow-md'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {pendingSeatRequests.length > 0 && (
@@ -1102,7 +1140,9 @@ export default function DriverHomePage() {
               className={`relative rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex flex-col items-center justify-center font-bold leading-tight ${
                 workStatus === 'both'
                   ? 'bg-gradient-to-b from-emerald-600/60 to-amber-500/40 text-white border border-emerald-400/40 shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <span>كلاهما</span>
@@ -1114,7 +1154,9 @@ export default function DriverHomePage() {
         {/* 2. الخريطة الليلية ورادار البحث عن المشاوير (Nocturnal Radar Map) */}
         {(workStatus === 'taxi' || workStatus === 'both') && (
           <section className="space-y-3">
-            <div className="relative w-full h-[280px] sm:h-[320px] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-[#0A101D] touch-pan-y">
+            <div className={`relative w-full h-[280px] sm:h-[320px] rounded-3xl overflow-hidden shadow-2xl border touch-pan-y ${
+              isDark ? 'border-white/10 bg-[#0A101D]' : 'border-slate-200 bg-slate-100 shadow-md'
+            }`}>
               <MapGL
                 ref={mapRef}
                 mapboxAccessToken={config.mapboxToken}
@@ -1152,12 +1194,14 @@ export default function DriverHomePage() {
 
               {/* شارة حالة الرادار العائمة */}
               <div className="absolute top-3 right-3 z-20 pointer-events-none">
-                <div className="flex items-center gap-1.5 bg-[#161C28]/90 backdrop-blur-xl border border-emerald-500/30 px-3 py-1.5 rounded-full shadow-lg">
+                <div className={`flex items-center gap-1.5 backdrop-blur-xl border px-3 py-1.5 rounded-full shadow-lg ${
+                  isDark ? 'bg-[#161C28]/90 border-emerald-500/30 text-white' : 'bg-white/90 border-emerald-500/40 text-slate-900'
+                }`}>
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                   </span>
-                  <span className="text-white font-bold text-[11px]">رادار المشاوير نشط</span>
+                  <span className="font-bold text-[11px]">رادار المشاوير نشط</span>
                 </div>
               </div>
 
@@ -1179,7 +1223,9 @@ export default function DriverHomePage() {
                   type="button"
                   onClick={handleRecenterDriverMap}
                   disabled={isLocating}
-                  className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-[#161C28]/95 text-amber-400 border border-amber-500/40 shadow-xl backdrop-blur-xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
+                  className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-full text-amber-500 dark:text-amber-400 border border-amber-500/40 shadow-xl backdrop-blur-xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
+                    isDark ? 'bg-[#161C28]/95' : 'bg-white/95 border-amber-400'
+                  } ${
                     isLocating ? 'animate-spin border-amber-400 ring-2 ring-amber-400/30' : ''
                   }`}
                   title="تحديد موقعي الفعلي"
@@ -1191,15 +1237,17 @@ export default function DriverHomePage() {
 
               {/* نافذة الطوارئ للكابتن */}
               {showSosAlert && (
-                <div className="absolute inset-x-3 bottom-16 z-40 bg-[#161C28]/95 border border-red-500/40 rounded-2xl p-3.5 shadow-2xl backdrop-blur-2xl animate-fade-in flex flex-col gap-2">
+                <div className={`absolute inset-x-3 bottom-16 z-40 border rounded-2xl p-3.5 shadow-2xl backdrop-blur-2xl animate-fade-in flex flex-col gap-2 ${
+                  isDark ? 'bg-[#161C28]/95 border-red-500/40 text-white' : 'bg-white/95 border-red-400 text-slate-900'
+                }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-red-400 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-red-500 dark:text-red-400 flex items-center gap-1.5">
                       <span>🚨</span>
                       <span>غرفة طوارئ وعمليات الكباتن - النجف</span>
                     </span>
-                    <button onClick={() => setShowSosAlert(false)} className="text-slate-400 hover:text-white text-xs p-1">✕</button>
+                    <button onClick={() => setShowSosAlert(false)} className={`text-xs p-1 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}>✕</button>
                   </div>
-                  <p className="text-[11px] text-slate-300">
+                  <p className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                     عند إرسال النداء، سيتم إرسال إحداثيات سيارتك الحية مباشرة إلى غرفة العمليات المركزية لإرسال المساعدة.
                   </p>
                   <a
@@ -1215,10 +1263,14 @@ export default function DriverHomePage() {
 
             {/* 3. بطاقة المشوار النشط (Active Trip Captain Control Dock) */}
             {hasRealActiveTrip && activeRide ? (
-              <div className="rounded-3xl border border-emerald-500/60 bg-[#161C28]/95 p-4 shadow-2xl backdrop-blur-2xl animate-fade-in">
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+              <div className={`rounded-3xl border p-4 shadow-2xl backdrop-blur-2xl animate-fade-in ${
+                isDark ? 'border-emerald-500/60 bg-[#161C28]/95 text-white' : 'border-emerald-500 bg-white/98 text-slate-900 shadow-xl'
+              }`}>
+                <div className={`flex items-center justify-between pb-3 mb-3 border-b ${
+                  isDark ? 'border-white/10' : 'border-slate-200'
+                }`}>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300 border border-emerald-500/40">
+                    <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-600 dark:text-emerald-300 border border-emerald-500/40">
                       {activeRide.status === 'Arrived'
                         ? 'وصلت إلى موقع الراكب 📍'
                         : (activeRide.status === 'InProgress' || activeRide.status === 'in_progress')
@@ -1229,29 +1281,31 @@ export default function DriverHomePage() {
                       type="button"
                       title="فتح الملاحة الخارجية"
                       onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
-                      className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 active:scale-95 transition cursor-pointer"
+                      className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-sky-500/20 text-sky-500 dark:text-sky-400 border border-sky-500/30 active:scale-95 transition cursor-pointer"
                     >
                       🧭
                     </button>
                   </div>
-                  <span className="text-base font-black text-amber-400 font-mono">
+                  <span className="text-base font-black text-amber-500 dark:text-amber-400 font-mono">
                     {Number(String(activeRide.fare || activeRide.price || '3500').replace(/[^0-9]/g, '')).toLocaleString()} د.ع
                   </span>
                 </div>
 
                 <div className="text-right space-y-1.5 mb-4 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-bold text-sm">
+                    <span className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       الراكب: {activeRide.customerName || 'راكب توصيلة'}
                     </span>
-                    <span className="text-amber-400 text-xs">⭐ 5.0</span>
+                    <span className="text-amber-500 dark:text-amber-400 text-xs">⭐ 5.0</span>
                   </div>
-                  <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                    <p className="text-slate-300">
-                      🟢 من: <span className="text-white font-bold">{activeRide.pickupName}</span>
+                  <div className={`p-2.5 rounded-2xl border space-y-1 ${
+                    isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                      🟢 من: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{activeRide.pickupName}</span>
                     </p>
-                    <p className="text-slate-300">
-                      🔴 إلى: <span className="text-white font-bold">{activeRide.dropoffName}</span>
+                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                      🔴 إلى: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{activeRide.dropoffName}</span>
                     </p>
                   </div>
                 </div>
@@ -1264,7 +1318,7 @@ export default function DriverHomePage() {
                       <button
                         type="button"
                         onClick={() => window.open(`tel:${activeRide.customerPhone}`)}
-                        className="min-h-[48px] py-2 px-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-emerald-600/30 transition cursor-pointer active:scale-95"
+                        className="min-h-[48px] py-2 px-2 rounded-xl bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-emerald-600/30 transition cursor-pointer active:scale-95"
                       >
                         <span>📞</span>
                         <span>اتصال</span>
@@ -1273,7 +1327,7 @@ export default function DriverHomePage() {
                     <button
                       type="button"
                       onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
-                      className="min-h-[48px] py-2 px-2 rounded-xl bg-sky-600/20 text-sky-400 border border-sky-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
+                      className="min-h-[48px] py-2 px-2 rounded-xl bg-sky-600/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
                     >
                       <span>🧭</span>
                       <span>ملاحة</span>
@@ -1281,7 +1335,7 @@ export default function DriverHomePage() {
                     <button
                       type="button"
                       onClick={() => setIsChatOpen(true)}
-                      className="min-h-[48px] py-2 px-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-amber-500/30 transition cursor-pointer active:scale-95 relative"
+                      className="min-h-[48px] py-2 px-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-amber-500/30 transition cursor-pointer active:scale-95 relative"
                     >
                       <span>💬</span>
                       <span>محادثة</span>
@@ -1338,18 +1392,20 @@ export default function DriverHomePage() {
               </div>
             ) : shouldShowDispatchSheet && incomingRequest ? (
               /* 4. بطاقة استقبال المشوار الواردة الفاخرة (Incoming Trip Dispatch Sheet) */
-              <div className="rounded-3xl border-2 border-amber-500 bg-[#161C28]/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-fade-in text-white space-y-3">
+              <div className={`rounded-3xl border-2 border-amber-500 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-fade-in space-y-3 ${
+                isDark ? 'bg-[#161C28]/95 text-white' : 'bg-white/98 text-slate-900 shadow-2xl'
+              }`}>
                 {/* شريط العد التنازلي التفاعلي */}
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-1">
+                <div className={`w-full h-2 rounded-full overflow-hidden mb-1 ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
                   <div
                     className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
                     style={{ width: `${(countdown / 20) * 100}%` }}
                   />
                 </div>
 
-                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
+                    <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-500 dark:text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
                       طلب مشوار جديد ({countdown} ثانية) 🚖
                     </span>
                     {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
@@ -1358,38 +1414,40 @@ export default function DriverHomePage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-xl font-black text-amber-400 font-mono">
+                  <span className="text-xl font-black text-amber-500 dark:text-amber-400 font-mono">
                     {Number(incomingRequest.fare || 0).toLocaleString()} د.ع
                   </span>
                 </div>
 
                 <div className="text-right space-y-1.5 text-xs">
-                  <p className="text-white font-bold text-sm">
+                  <p className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
                   </p>
-                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                    <p className="text-slate-300">
-                      🟢 من: <span className="text-white font-bold">{incomingRequest.pickupName}</span>
+                  <div className={`p-3 rounded-2xl border space-y-1 ${
+                    isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                      🟢 من: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{incomingRequest.pickupName}</span>
                     </p>
-                    <p className="text-slate-300">
-                      🔴 إلى: <span className="text-white font-bold">{incomingRequest.dropoffName}</span>
+                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                      🔴 إلى: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{incomingRequest.dropoffName}</span>
                     </p>
                     {incomingRequest.isRoundTrip && (
-                      <p className="text-amber-400 font-bold flex items-center gap-1.5 pt-0.5">
+                      <p className="text-amber-500 dark:text-amber-400 font-bold flex items-center gap-1.5 pt-0.5">
                         <span>🔄</span>
                         <span>رحلة ذهاب وإياب</span>
                       </p>
                     )}
                     {incomingRequest.secondDestination && (
-                      <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                      <p className="text-amber-600 dark:text-amber-300 flex items-center gap-1.5 pt-0.5">
                         <span>📍</span>
-                        <span>محطة إضافية: <b className="text-white">{incomingRequest.secondDestination}</b></span>
+                        <span>محطة إضافية: <b className={isDark ? 'text-white' : 'text-slate-900'}>{incomingRequest.secondDestination}</b></span>
                       </p>
                     )}
                     {incomingRequest.stopDuration ? (
-                      <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                      <p className="text-amber-600 dark:text-amber-300 flex items-center gap-1.5 pt-0.5">
                         <span>⏱️</span>
-                        <span>توقف في الطريق: <b className="text-white">{incomingRequest.stopDuration} دقائق</b></span>
+                        <span>توقف في الطريق: <b className={isDark ? 'text-white' : 'text-slate-900'}>{incomingRequest.stopDuration} دقائق</b></span>
                       </p>
                     ) : null}
                   </div>
@@ -1411,7 +1469,11 @@ export default function DriverHomePage() {
                   <button
                     type="button"
                     onClick={handleRejectRide}
-                    className="w-full min-h-[48px] h-12 rounded-2xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700/60 font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
+                    className={`w-full min-h-[48px] h-12 rounded-2xl border font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer ${
+                      isDark
+                        ? 'bg-[#242A37] text-slate-400 hover:text-white border-slate-700/60'
+                        : 'bg-slate-100 text-slate-700 hover:text-slate-900 border-slate-300'
+                    }`}
                   >
                     <span>رفض وتجاهل ✕</span>
                   </button>
@@ -1419,30 +1481,36 @@ export default function DriverHomePage() {
               </div>
             ) : (
               /* بانتظار المشاوير والرادار */
-              <div className="rounded-3xl border border-white/10 bg-[#161C28]/90 p-5 text-center shadow-xl backdrop-blur-xl">
+              <div className={`rounded-3xl border p-5 text-center shadow-xl backdrop-blur-xl ${
+                isDark ? 'border-white/10 bg-[#161C28]/90 text-white' : 'border-slate-200 bg-white/95 text-slate-900 shadow-md'
+              }`}>
                 <div className="relative flex items-center justify-center h-16 w-16 mx-auto mb-2">
                   <span className="absolute h-16 w-16 rounded-full bg-amber-500/20 animate-ping" />
-                  <span className="relative h-11 w-11 rounded-full bg-[#1A202C] border border-amber-400 flex items-center justify-center text-amber-400 text-xl font-bold shadow-lg">
+                  <span className={`relative h-11 w-11 rounded-full border flex items-center justify-center text-amber-500 dark:text-amber-400 text-xl font-bold shadow-lg ${
+                    isDark ? 'bg-[#1A202C] border-amber-400' : 'bg-white border-amber-400'
+                  }`}>
                     🚖
                   </span>
                 </div>
-                <h4 className="text-sm font-bold text-white mb-0.5">أنت في وضع الجاهزية</h4>
-                <p className="text-xs text-slate-400">جاري مسح النجف وبانتظار أقرب مشوار لك...</p>
+                <h4 className={`text-sm font-bold mb-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>أنت في وضع الجاهزية</h4>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>جاري مسح النجف وبانتظار أقرب مشوار لك...</p>
 
                 {/* شريط التشخيص الحي المصغر (Live Diagnostic Chip) */}
-                <div className="mt-3.5 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full bg-white/5 border border-white/10 text-[10.5px] font-mono text-slate-300 max-w-fit mx-auto shadow-sm backdrop-blur-md select-none">
+                <div className={`mt-3.5 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full border text-[10.5px] font-mono max-w-fit mx-auto shadow-sm backdrop-blur-md select-none ${
+                  isDark ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                }`}>
                   <span>حالة الاستعلام:</span>
-                  <span className={pollStatus === 'connected' ? 'text-emerald-400 font-bold' : pollStatus === 'error' ? 'text-red-400 font-bold' : 'text-amber-400 font-bold'}>
+                  <span className={pollStatus === 'connected' ? 'text-emerald-500 dark:text-emerald-400 font-bold' : pollStatus === 'error' ? 'text-red-500 dark:text-red-400 font-bold' : 'text-amber-500 dark:text-amber-400 font-bold'}>
                     {pollStatus === 'connected' ? '[متصل 🟢]' : pollStatus === 'error' ? '[غير متصل 🔴]' : '[جاري الفحص 🟡]'}
                   </span>
-                  <span className="text-white/20">•</span>
+                  <span className={isDark ? 'text-white/20' : 'text-slate-300'}>•</span>
                   <span>المعرف:</span>
-                  <span className="text-white font-bold max-w-[110px] truncate" title={currentTargetId}>
+                  <span className={`font-bold max-w-[110px] truncate ${isDark ? 'text-white' : 'text-slate-900'}`} title={currentTargetId}>
                     [{currentTargetId || 'غير محدد'}]
                   </span>
-                  <span className="text-white/20">•</span>
+                  <span className={isDark ? 'text-white/20' : 'text-slate-300'}>•</span>
                   <span>الطلبات المعلقة:</span>
-                  <span className={`font-bold ${pendingRequests.length > 0 ? 'text-amber-400 animate-pulse' : 'text-slate-300'}`}>
+                  <span className={`font-bold ${pendingRequests.length > 0 ? 'text-amber-500 dark:text-amber-400 animate-pulse' : isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                     [{pendingRequests.length}]
                   </span>
                 </div>
@@ -1829,18 +1897,20 @@ export default function DriverHomePage() {
       {/* بطاقة استقبال المشوار الواردة الفاخرة العائمة (Incoming Trip Dispatch Sheet - z-[9999]) */}
       {shouldShowDispatchSheet && incomingRequest && (
         <div className="fixed inset-x-0 bottom-0 z-[9999] p-4 max-w-lg mx-auto pointer-events-auto animate-slide-up" dir="rtl">
-          <div className="rounded-3xl border-2 border-amber-500 bg-[#161C28]/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.9)] backdrop-blur-2xl text-white space-y-3">
+          <div className={`rounded-3xl border-2 border-amber-500 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.9)] backdrop-blur-2xl space-y-3 ${
+            isDark ? 'bg-[#161C28]/95 text-white' : 'bg-white/98 text-slate-900 shadow-2xl'
+          }`}>
             {/* شريط العد التنازلي التفاعلي */}
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-1">
+            <div className={`w-full h-2 rounded-full overflow-hidden mb-1 ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
               <div
                 className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
                 style={{ width: `${(countdown / 20) * 100}%` }}
               />
             </div>
 
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+            <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
+                <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-500 dark:text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
                   طلب مشوار جديد ({countdown} ثانية) 🚖
                 </span>
                 {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
@@ -1849,38 +1919,40 @@ export default function DriverHomePage() {
                   </span>
                 )}
               </div>
-              <span className="text-xl font-black text-amber-400 font-mono">
+              <span className="text-xl font-black text-amber-500 dark:text-amber-400 font-mono">
                 {Number(incomingRequest.fare || 0).toLocaleString()} د.ع
               </span>
             </div>
 
             <div className="text-right space-y-1.5 text-xs">
-              <p className="text-white font-bold text-sm">
+              <p className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
               </p>
-              <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                <p className="text-slate-300">
-                  🟢 من: <span className="text-white font-bold">{incomingRequest.pickupName}</span>
+              <div className={`p-3 rounded-2xl border space-y-1 ${
+                isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                  🟢 من: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{incomingRequest.pickupName}</span>
                 </p>
-                <p className="text-slate-300">
-                  🔴 إلى: <span className="text-white font-bold">{incomingRequest.dropoffName}</span>
+                <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                  🔴 إلى: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{incomingRequest.dropoffName}</span>
                 </p>
                 {incomingRequest.isRoundTrip && (
-                  <p className="text-amber-400 font-bold flex items-center gap-1.5 pt-0.5">
+                  <p className="text-amber-500 dark:text-amber-400 font-bold flex items-center gap-1.5 pt-0.5">
                     <span>🔄</span>
                     <span>رحلة ذهاب وإياب</span>
                   </p>
                 )}
                 {incomingRequest.secondDestination && (
-                  <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                  <p className="text-amber-600 dark:text-amber-300 flex items-center gap-1.5 pt-0.5">
                     <span>📍</span>
-                    <span>محطة إضافية: <b className="text-white">{incomingRequest.secondDestination}</b></span>
+                    <span>محطة إضافية: <b className={isDark ? 'text-white' : 'text-slate-900'}>{incomingRequest.secondDestination}</b></span>
                   </p>
                 )}
                 {incomingRequest.stopDuration ? (
-                  <p className="text-amber-300 flex items-center gap-1.5 pt-0.5">
+                  <p className="text-amber-600 dark:text-amber-300 flex items-center gap-1.5 pt-0.5">
                     <span>⏱️</span>
-                    <span>توقف في الطريق: <b className="text-white">{incomingRequest.stopDuration} دقائق</b></span>
+                    <span>توقف في الطريق: <b className={isDark ? 'text-white' : 'text-slate-900'}>{incomingRequest.stopDuration} دقائق</b></span>
                   </p>
                 ) : null}
               </div>
@@ -1902,7 +1974,11 @@ export default function DriverHomePage() {
               <button
                 type="button"
                 onClick={handleRejectRide}
-                className="w-full min-h-[48px] h-12 rounded-2xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700/60 font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
+                className={`w-full min-h-[48px] h-12 rounded-2xl border font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer ${
+                  isDark
+                    ? 'bg-[#242A37] text-slate-400 hover:text-white border-slate-700/60'
+                    : 'bg-slate-100 text-slate-700 hover:text-slate-900 border-slate-300'
+                }`}
               >
                 <span>رفض وتجاهل ✕</span>
               </button>

@@ -5,6 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#080E1A" />
     <meta name="background-color" content="#080E1A" />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('tawseela_theme') || localStorage.getItem('tawseela_theme_mode');
+          var isLight = false;
+          if (saved === 'light') {
+            isLight = true;
+          } else if (saved && saved.indexOf('{') === 0) {
+            var parsed = JSON.parse(saved);
+            if (parsed.mode === 'light' || parsed.preset === 'light') isLight = true;
+          }
+          var root = document.documentElement;
+          if (isLight) {
+            root.classList.add('light');
+            root.classList.remove('dark');
+            root.style.backgroundColor = '#F8FAFC';
+            root.style.colorScheme = 'light';
+            var tc = document.querySelector('meta[name="theme-color"]');
+            if (tc) tc.setAttribute('content', '#F8FAFC');
+            var bg = document.querySelector('meta[name="background-color"]');
+            if (bg) bg.setAttribute('content', '#F8FAFC');
+          } else {
+            root.classList.add('dark');
+            root.classList.remove('light');
+            root.style.backgroundColor = '#080E1A';
+            root.style.colorScheme = 'dark';
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="mobile-web-app-capable" content="yes" />

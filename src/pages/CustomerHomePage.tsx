@@ -1554,18 +1554,30 @@ export default function CustomerHomePage() {
     : [];
 
   return (
-    <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-[#080E1A] text-slate-100 select-none font-cairo flex flex-col" dir="rtl">
+    <div 
+      className={`relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden select-none font-cairo flex flex-col transition-colors duration-200 ${
+        isDark ? 'bg-[#080E1A] text-slate-100' : 'bg-[#F8FAFC] text-slate-900'
+      }`} 
+      style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }} 
+      dir="rtl"
+    >
       {/* ====================================================================
           الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
           ==================================================================== */}
-      <header className="px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-[#161C28]/95 backdrop-blur-md border-b border-amber-500/20 flex items-center justify-between sticky top-0 z-30 shadow-lg">
+      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-30 shadow-lg transition-colors ${
+        isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
+      }`}>
         {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
         <div className="flex items-center gap-2.5">
           {stage === 'pickup' ? (
             <button
               type="button"
               onClick={() => navigate('/hub')}
-              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#0F172A] border border-amber-500/30 shadow-sm flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
+              className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-sm flex items-center justify-center transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer ${
+                isDark 
+                  ? 'bg-[#0F172A] border-amber-500/30 text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B]' 
+                  : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'
+              }`}
               title="الرجوع لصفحة اختيار الخدمة"
               aria-label="الرئيسية"
             >

@@ -31,6 +31,28 @@
   --text-color: #0F172A;
   --font-family: 'Arial Unicode MS Regular', 'Arial Unicode MS', 'Cairo', system-ui, -apple-system, sans-serif;
   --app-font-size: 14px;
+  --bg-app: #080E1A;
+  --text-app: #F8FAFC;
+  --card-bg-app: #161C28;
+  --card-border-app: rgba(51, 65, 85, 0.4);
+}
+
+html.dark, html:not(.light) {
+  --bg-app: #080E1A;
+  --text-app: #F8FAFC;
+  --card-bg-app: #161C28;
+  --card-border-app: rgba(51, 65, 85, 0.4);
+  background-color: #080E1A !important;
+  color-scheme: dark;
+}
+
+html.light {
+  --bg-app: #F8FAFC;
+  --text-app: #0F172A;
+  --card-bg-app: #FFFFFF;
+  --card-border-app: #E2E8F0;
+  background-color: #F8FAFC !important;
+  color-scheme: light;
 }
 
 /* إزالة أي قيود ارتفاع أو تمرير مزدوج عن وسم html ودعم الوضعين الليلي والنهاري */
@@ -39,20 +61,12 @@ html {
   padding: 0;
   width: 100%;
   height: -webkit-fill-available;
+  min-height: 100dvh;
   overflow-x: hidden !important;
   overflow-y: visible !important;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-}
-
-html.dark, html:not(.light) {
-  background-color: #080E1A !important;
-  color-scheme: dark;
-}
-
-html.light {
-  background-color: #F8FAFC !important;
-  color-scheme: light;
+  background-color: var(--bg-app) !important;
 }
 
 /* body هو كائن التمرير الوحيد لكامل التطبيق مع دعم كامل لإيماءات السحب على أندرويد */
@@ -71,16 +85,8 @@ body {
   line-height: 1.6;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-html.dark body, html:not(.light) body {
-  background-color: #080E1A !important;
-  color: #F8FAFC;
-}
-
-html.light body {
-  background-color: #F8FAFC !important;
-  color: #0F172A;
+  background-color: var(--bg-app) !important;
+  color: var(--text-app);
 }
 
 /* تحرير الحاوية الجذرية #root */
@@ -88,17 +94,12 @@ html.light body {
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100%;
+  max-width: 100vw;
+  min-height: 100dvh;
   display: block !important;
   overflow: visible !important;
-}
-
-html.dark #root, html:not(.light) #root {
-  background-color: #080E1A !important;
-}
-
-html.light #root {
-  background-color: #F8FAFC !important;
+  background-color: var(--bg-app) !important;
+  color: var(--text-app);
 }
 
 /* منع ابتلاع كانفاس خريطة Mapbox للسكرول على الهواتف */
@@ -150,12 +151,6 @@ html.light #root {
   --tw-gradient-to: var(--primary-hover) var(--tw-gradient-to-position) !important;
 }
 
-#root {
-  width: 100%;
-  max-width: 100vw;
-  min-height: 100dvh;
-  overflow-x: hidden;
-}
 
 /* هوامش الأمان للهواتف ذات النوتش والشاشات الحديثة */
 .pb-safe {

@@ -13,6 +13,7 @@ import { http } from '../lib/api';
 import { useSession, authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { playCarHornBeep } from '../lib/sound';
+import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import TermsPrivacyModal from './TermsPrivacyModal';
 
@@ -26,6 +27,7 @@ const DEFAULT_ANNOUNCEMENT =
 export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => {
   const navigate = useNavigate();
   const session = useSession();
+  const { isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'notifications' | 'safety' | 'profile'>('home');
   const [announcementText, setAnnouncementText] = useState<string>(DEFAULT_ANNOUNCEMENT);
@@ -140,16 +142,21 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
 
   return (
     <div 
-      className="w-full bg-[#080E1A] text-[#DDE2F4] min-h-screen flex flex-col font-cairo selection:bg-amber-500 selection:text-slate-950" 
+      className={`w-full min-h-[100dvh] flex flex-col font-cairo selection:bg-amber-500 selection:text-slate-950 transition-colors duration-200 ${
+        isDark ? 'bg-[#080E1A] text-[#DDE2F4]' : 'bg-[#F8FAFC] text-[#0F172A]'
+      }`} 
+      style={{ minHeight: '100dvh', backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }}
       dir="rtl"
     >
       {/* هالة التوهج المحيطية العلوية */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md h-72 bg-gradient-to-b from-amber-500/10 via-orange-500/5 to-transparent blur-3xl pointer-events-none -z-10"></div>
+      <div className={`fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md h-72 bg-gradient-to-b ${
+        isDark ? 'from-amber-500/10 via-orange-500/5' : 'from-amber-500/5 via-sky-500/5'
+      } to-transparent blur-3xl pointer-events-none -z-10`}></div>
 
       {/* محتوى الشاشة المتدفق بالتمرير الطبيعي (Zero-Scroll-Lock) */}
       <main 
         className="w-full max-w-md mx-auto px-4 pt-3 flex flex-col gap-4 flex-1 text-right"
-        style={{ paddingBottom: 'calc(125px + env(safe-area-inset-bottom, 24px))' }}
+        style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 24px))' }}
       >
         {/* ====================================================================
             1. تبويب الرئيسية (Home Tab)
@@ -157,23 +164,29 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         {activeTab === 'home' && (
           <>
             {/* الهيدر العلوي الفاخر مع الشعار الجديد المفرغ */}
-            <header className="w-full p-3.5 rounded-2xl bg-[#161C28]/95 backdrop-blur-xl shadow-lg border border-slate-700/40 flex items-center justify-between gap-2 relative overflow-hidden">
+            <header className={`w-full p-3.5 rounded-2xl backdrop-blur-xl shadow-lg border flex items-center justify-between gap-2 relative overflow-hidden transition-colors ${
+              isDark ? 'bg-[#161C28]/95 border-slate-700/40 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
+            }`}>
               <div className="flex items-center gap-2.5 z-10">
                 <div className="relative">
                   <img 
                     alt="صورة المستخدم" 
-                    className="w-11 h-11 rounded-full object-cover ring-2 ring-amber-500/30 bg-[#080E1A]" 
+                    className={`w-11 h-11 rounded-full object-cover ring-2 ring-amber-500/30 ${
+                      isDark ? 'bg-[#080E1A]' : 'bg-slate-100'
+                    }`}
                     src={user.avatar} 
                   />
-                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-[#161C28]"></span>
+                  <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 ring-2 ${
+                    isDark ? 'ring-[#161C28]' : 'ring-white'
+                  }`}></span>
                 </div>
                 <div className="flex flex-col text-right">
                   <div className="flex items-center gap-1">
-                    <span className="font-bold text-white text-base">مرحباً بك، {user.name}</span>
+                    <span className={`font-bold text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>مرحباً بك، {user.name}</span>
                     <span className="text-sm select-none">👋</span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 text-xs font-semibold">
                       {user.balance.toLocaleString()} د.ع
                     </span>
                   </div>
@@ -182,7 +195,9 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
 
               <div className="flex items-center gap-2 z-10">
                 {/* كبسولة الشعار الرسمي الجديد الشفاف */}
-                <div className="w-11 h-11 rounded-xl bg-[#080E1A] dark:bg-[#080E1A] flex items-center justify-center p-1 shadow-sm border border-slate-700/50">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center p-1 shadow-sm border ${
+                  isDark ? 'bg-[#080E1A] border-slate-700/50' : 'bg-slate-100 border-slate-200'
+                }`}>
                   <img 
                     alt="شعار توصيلة" 
                     className="w-full h-full object-contain drop-shadow" 
@@ -194,19 +209,27 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                 <button 
                   onClick={() => setActiveTab('notifications')}
                   aria-label="الإشعارات" 
-                  className="w-11 h-11 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-[#1A202C] hover:bg-[#242A37] active:scale-[0.96] text-slate-300 transition-all relative shrink-0 cursor-pointer border border-slate-700/40" 
+                  className={`w-11 h-11 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl active:scale-[0.96] transition-all relative shrink-0 cursor-pointer border ${
+                    isDark
+                      ? 'bg-[#1A202C] hover:bg-[#242A37] text-slate-300 border-slate-700/40'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                  }`} 
                   type="button"
                 >
                   <span className="text-xl">🔔</span>
-                  <span className="absolute top-2.5 left-2.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-[#1A202C] animate-pulse"></span>
+                  <span className={`absolute top-2.5 left-2.5 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ${
+                    isDark ? 'ring-[#1A202C]' : 'ring-white'
+                  } animate-pulse`}></span>
                 </button>
               </div>
             </header>
 
             {/* شريط الإعلانات الرسمي الديناميكي المحدث */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-amber-500/15 via-[#161C28] to-[#161C28] border border-amber-500/30 p-3.5 shadow-sm flex flex-col gap-2">
+            <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-l ${
+              isDark ? 'from-amber-500/15 via-[#161C28] to-[#161C28]' : 'from-amber-500/10 via-white to-white'
+            } border border-amber-500/30 p-3.5 shadow-sm flex flex-col gap-2`}>
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span>تنويه رسمي 📢</span>
                 </span>
@@ -214,13 +237,17 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                   href="https://t.me/tawseelaiq"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#080E1A]/90 border border-slate-700/60 text-sky-400 hover:text-sky-300 text-xs font-bold transition-all no-underline min-h-[36px]"
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border text-xs font-bold transition-all no-underline min-h-[36px] ${
+                    isDark
+                      ? 'bg-[#080E1A]/90 border-slate-700/60 text-sky-400 hover:text-sky-300'
+                      : 'bg-slate-100 border-slate-200 text-sky-600 hover:text-sky-700'
+                  }`}
                 >
                   <span>قناة تيليجرام</span>
                   <span>✈️</span>
                 </a>
               </div>
-              <p className="text-xs font-semibold text-slate-200 leading-relaxed">
+              <p className={`text-xs font-semibold leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 {announcementText}
               </p>
             </div>
@@ -229,18 +256,20 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
             {activeTaxiRide && (
               <div 
                 onClick={() => onSelectService ? onSelectService('taxi') : navigate('/taxi')}
-                className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/20 via-[#161C28] to-[#161C28] border-2 border-amber-400 p-4 shadow-xl flex items-center justify-between gap-3 cursor-pointer animate-fade-in group"
+                className={`relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500/20 ${
+                  isDark ? 'via-[#161C28] to-[#161C28]' : 'via-white to-white'
+                } border-2 border-amber-400 p-4 shadow-xl flex items-center justify-between gap-3 cursor-pointer animate-fade-in group`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-2xl shrink-0 animate-pulse">
                     🚖
                   </div>
                   <div className="flex flex-col text-right min-w-0">
-                    <span className="text-xs font-bold text-amber-400">مشوار تكسي جارٍ الآن</span>
-                    <span className="text-sm font-black text-white truncate">
+                    <span className="text-xs font-bold text-amber-500 dark:text-amber-400">مشوار تكسي جارٍ الآن</span>
+                    <span className={`text-sm font-black truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {activeTaxiRide.rideStatus === 'Arrived' ? 'الكابتن وصل بانتظارك! 📍' : 'الكابتن في طريقه إليك'}
                     </span>
-                    <span className="text-[11px] text-slate-300">اضغط للعودة إلى شاشة التتبع والخريطة</span>
+                    <span className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>اضغط للعودة إلى شاشة التتبع والخريطة</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs shrink-0 group-hover:brightness-110 transition">
@@ -253,14 +282,14 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
             {/* 2. قسم احجز مشوارك (الخدمات الرئيسية) */}
             <section className="w-full flex flex-col gap-3">
               <div className="flex items-center justify-between px-1">
-                <h2 className="text-lg text-white font-bold flex items-center gap-2">
+                <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   <span>احجز مشوارك</span>
                   <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                 </h2>
                 <button
                   type="button"
                   onClick={() => handleOpenMonthlyBooking()}
-                  className="text-xs text-amber-400 hover:underline cursor-pointer font-semibold min-h-[36px] flex items-center"
+                  className="text-xs text-amber-500 dark:text-amber-400 hover:underline cursor-pointer font-semibold min-h-[36px] flex items-center"
                 >
                   جدول الرحلات
                 </button>
@@ -270,18 +299,24 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                 {/* بطاقة حجز خط دائمي مع شعار توصيلة المفرغ */}
                 <div 
                   onClick={handleOpenMonthlyBooking}
-                  className="group relative rounded-2xl bg-[#161C28] p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border border-slate-700/40 hover:border-emerald-500/30"
+                  className={`group relative rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border ${
+                    isDark
+                      ? 'bg-[#161C28] border-slate-700/40 hover:border-emerald-500/30'
+                      : 'bg-white border-slate-200 hover:border-emerald-500/40 shadow-sm'
+                  }`}
                 >
                   <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
                   <div className="flex items-start justify-between gap-2 z-10">
                     <div className="flex flex-col text-right">
-                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-semibold w-fit mb-1.5">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-semibold w-fit mb-1.5">
                         <span>التزام يومي 📅</span>
                       </div>
-                      <h3 className="text-lg text-white font-bold">حجز خط دائمي</h3>
-                      <p className="text-xs text-slate-400 mt-0.5 leading-snug">خدمة اشتراكات شهرية للطلبة والموظفين مع كباتن معتمدين</p>
+                      <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>حجز خط دائمي</h3>
+                      <p className={`text-xs mt-0.5 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>خدمة اشتراكات شهرية للطلبة والموظفين مع كباتن معتمدين</p>
                     </div>
-                    <div className="w-16 h-16 rounded-xl bg-[#080E1A]/90 p-2 shadow-inner flex items-center justify-center shrink-0 border border-slate-700/50">
+                    <div className={`w-16 h-16 rounded-xl p-2 shadow-inner flex items-center justify-center shrink-0 border ${
+                      isDark ? 'bg-[#080E1A]/90 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                    }`}>
                       <img 
                         alt="شعار توصيلة" 
                         className="w-full h-full object-contain drop-shadow" 
@@ -291,19 +326,23 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1.5 z-10">
-                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">🎓 خطوط جامعات</span>
-                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">💼 موظفين</span>
-                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">🏛️ دوائر حكومية</span>
-                    <span className="px-2 py-0.5 rounded-md bg-[#242A37] text-slate-200 text-xs">🎒 مدارس</span>
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🎓 خطوط جامعات</span>
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>💼 موظفين</span>
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🏛️ دوائر حكومية</span>
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🎒 مدارس</span>
                   </div>
 
                   <div className="flex items-center justify-between pt-1 z-10">
                     <div className="flex flex-col text-right">
-                      <span className="text-xs text-slate-400">تسعيرة ثابتة معتمدة</span>
-                      <span className="text-sm text-amber-400 font-bold">وفر حتى 35% شهرياً</span>
+                      <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>تسعيرة ثابتة معتمدة</span>
+                      <span className="text-sm text-amber-500 dark:text-amber-400 font-bold">وفر حتى 35% شهرياً</span>
                     </div>
                     <button 
-                      className="min-h-[48px] px-4 py-2 rounded-xl bg-[#242A37] hover:bg-slate-700 active:scale-[0.98] text-amber-400 text-sm font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer border border-slate-700/50" 
+                      className={`min-h-[48px] px-4 py-2 rounded-xl text-sm font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer border ${
+                        isDark
+                          ? 'bg-[#242A37] hover:bg-slate-700 active:scale-[0.98] text-amber-400 border-slate-700/50'
+                          : 'bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-amber-600 border-slate-200'
+                      }`} 
                       type="button"
                     >
                       <span>طلب اشتراك</span>
@@ -315,18 +354,24 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                 {/* بطاقة تكسي فوري مع شعار توصيلة المفرغ */}
                 <div 
                   onClick={handleOpenInstantBooking}
-                  className="group relative rounded-2xl bg-[#1A202C] p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border border-amber-500/25 hover:border-amber-400/50"
+                  className={`group relative rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border ${
+                    isDark
+                      ? 'bg-[#1A202C] border-amber-500/25 hover:border-amber-400/50'
+                      : 'bg-white border-amber-500/30 hover:border-amber-400 shadow-sm'
+                  }`}
                 >
                   <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
                   <div className="flex items-start justify-between gap-2 z-10">
                     <div className="flex flex-col text-right">
-                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-semibold w-fit mb-1.5">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-semibold w-fit mb-1.5">
                         <span>سريع وآمن ⚡</span>
                       </div>
-                      <h3 className="text-lg text-white font-bold">تكسي</h3>
-                      <p className="text-xs text-slate-400 mt-0.5 leading-snug">كابتن معتمد يصلك لباب بيتك بأقل وقت ممكن</p>
+                      <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>تكسي</h3>
+                      <p className={`text-xs mt-0.5 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>كابتن معتمد يصلك لباب بيتك بأقل وقت ممكن</p>
                     </div>
-                    <div className="w-16 h-16 rounded-xl bg-[#080E1A]/90 p-2 shadow-inner flex items-center justify-center shrink-0 border border-slate-700/50">
+                    <div className={`w-16 h-16 rounded-xl p-2 shadow-inner flex items-center justify-center shrink-0 border ${
+                      isDark ? 'bg-[#080E1A]/90 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                    }`}>
                       <img 
                         alt="شعار توصيلة" 
                         className="w-full h-full object-contain drop-shadow" 
@@ -337,12 +382,14 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
 
                   <div className="flex items-center justify-between pt-1 z-10">
                     <div className="flex items-center gap-1.5">
-                      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#242A37] text-emerald-400">
+                      <span className={`flex items-center justify-center w-7 h-7 rounded-full text-emerald-500 ${
+                        isDark ? 'bg-[#242A37]' : 'bg-slate-100'
+                      }`}>
                         📍
                       </span>
                       <div className="flex flex-col text-right">
-                        <span className="text-xs text-slate-400">الوصول التقديري</span>
-                        <span className="text-xs text-emerald-400 font-bold">3 - 5 دقائق فقط</span>
+                        <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الوصول التقديري</span>
+                        <span className="text-xs text-emerald-500 dark:text-emerald-400 font-bold">3 - 5 دقائق فقط</span>
                       </div>
                     </div>
                     <button 
@@ -358,26 +405,32 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
             </section>
 
             {/* 3. بطاقة انضمام الكباتن الفاخرة */}
-            <section className="w-full relative rounded-2xl bg-gradient-to-bl from-[#080E1A] via-[#161C28] to-[#1A202C] p-4 shadow-xl overflow-hidden border border-slate-700/50">
+            <section className={`w-full relative rounded-2xl p-4 shadow-xl overflow-hidden border ${
+              isDark
+                ? 'bg-gradient-to-bl from-[#080E1A] via-[#161C28] to-[#1A202C] border-slate-700/50'
+                : 'bg-gradient-to-bl from-amber-50/60 via-white to-slate-50 border-amber-500/30 shadow-md'
+            }`}>
               <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-500/15 rounded-full blur-2xl pointer-events-none"></div>
               <div className="flex flex-col gap-3 relative z-10">
                 <div className="flex items-center justify-between">
-                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-bold">
                     <span>عمولة 0% لأول شهر 🌟</span>
                   </div>
-                  <div className="w-9 h-9 rounded-xl bg-[#242A37] flex items-center justify-center text-amber-400 text-lg">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-amber-500 dark:text-amber-400 text-lg ${
+                    isDark ? 'bg-[#242A37]' : 'bg-amber-100'
+                  }`}>
                     🚖
                   </div>
                 </div>
                 <div className="flex flex-col text-right">
-                  <h3 className="text-lg text-white font-bold leading-tight">سجل كابتن.. وزيد دخلك الشهري ويا توصيلة 🚖</h3>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">انضم لأسطول النخبة في النجف، أوقات حرة، دفعات أسبوعية مضمونة، وحوافز يومية مستمرة.</p>
+                  <h3 className={`text-lg font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>سجل كابتن.. وزيد دخلك الشهري ويا توصيلة 🚖</h3>
+                  <p className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>انضم لأسطول النخبة في النجف، أوقات حرة، دفعات أسبوعية مضمونة، وحوافز يومية مستمرة.</p>
                 </div>
                 
                 {/* أزرار التواصل الثلاثة بارتفاع قياسي >= 48px */}
                 <div className="grid grid-cols-3 gap-2 pt-1">
                   <a 
-                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 active:scale-[0.98] text-emerald-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-emerald-500/30 no-underline" 
+                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 active:scale-[0.98] text-emerald-600 dark:text-emerald-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-emerald-500/30 no-underline" 
                     href="https://wa.me/9647722154182?text=تحية%20طيبة،%20أرغب%20بالانضمام%20ككابتن%20في%20توصيلة%20النجف" 
                     rel="noopener noreferrer" 
                     target="_blank"
@@ -386,7 +439,7 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                     <span>واتساب</span>
                   </a>
                   <a 
-                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 active:scale-[0.98] text-sky-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-sky-500/30 no-underline" 
+                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 active:scale-[0.98] text-sky-600 dark:text-sky-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-sky-500/30 no-underline" 
                     href="https://t.me/wsam_ta" 
                     rel="noopener noreferrer" 
                     target="_blank"
@@ -395,15 +448,19 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                     <span>تليجرام</span>
                   </a>
                   <a 
-                    className="min-h-[48px] w-full px-2 py-1.5 rounded-xl bg-[#242A37] hover:bg-slate-700 active:scale-[0.98] text-amber-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border border-slate-700/60 no-underline" 
+                    className={`min-h-[48px] w-full px-2 py-1.5 rounded-xl active:scale-[0.98] text-xs font-bold flex flex-col items-center justify-center gap-0.5 shadow-sm text-center border no-underline ${
+                      isDark
+                        ? 'bg-[#242A37] hover:bg-slate-700 text-amber-400 border-slate-700/60'
+                        : 'bg-slate-100 hover:bg-slate-200 text-amber-600 border-slate-200'
+                    }`} 
                     href="tel:07722154182"
                   >
                     <span className="text-lg">📞</span>
                     <span>اتصال</span>
                   </a>
                 </div>
-                <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs pt-0.5">
-                  <span className="text-emerald-400">🛡️</span>
+                <div className={`flex items-center justify-center gap-1.5 text-xs pt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <span className="text-emerald-500">🛡️</span>
                   <span>التفعيل والتدريب فوري خلال ساعة واحدة بمقر الشركة بالنجف</span>
                 </div>
               </div>
@@ -411,15 +468,19 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
 
             {/* 4. بطاقات الثقة السريعة */}
             <section className="w-full grid grid-cols-2 gap-2.5 pb-2">
-              <div className="p-3.5 rounded-xl bg-[#161C28] flex flex-col items-center text-center gap-1 shadow-sm border border-slate-700/30">
-                <span className="text-amber-400 text-2xl">🛡️</span>
-                <span className="text-lg text-white font-bold">100%</span>
-                <span className="text-xs text-slate-400">كباتن مدققون أمنياً</span>
+              <div className={`p-3.5 rounded-xl flex flex-col items-center text-center gap-1 shadow-sm border ${
+                isDark ? 'bg-[#161C28] border-slate-700/30' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <span className="text-amber-500 dark:text-amber-400 text-2xl">🛡️</span>
+                <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>100%</span>
+                <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>كباتن مدققون أمنياً</span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#161C28] flex flex-col items-center text-center gap-1 shadow-sm border border-slate-700/30">
-                <span className="text-emerald-400 text-2xl">🎧</span>
-                <span className="text-lg text-white font-bold">24 / 7</span>
-                <span className="text-xs text-slate-400">غرفة عمليات محلية</span>
+              <div className={`p-3.5 rounded-xl flex flex-col items-center text-center gap-1 shadow-sm border ${
+                isDark ? 'bg-[#161C28] border-slate-700/30' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <span className="text-emerald-500 dark:text-emerald-400 text-2xl">🎧</span>
+                <span className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>24 / 7</span>
+                <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>غرفة عمليات محلية</span>
               </div>
             </section>
           </>
@@ -430,54 +491,68 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
             ==================================================================== */}
         {activeTab === 'profile' && (
           <div className="flex flex-col gap-4 animate-fade-in text-right">
-            <div className="w-full p-5 rounded-2xl bg-[#161C28] border border-slate-700/50 flex flex-col items-center text-center gap-3">
+            <div className={`w-full p-5 rounded-2xl border flex flex-col items-center text-center gap-3 ${
+              isDark ? 'bg-[#161C28] border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
               <div className="relative">
                 <img 
                   alt="صورة الحساب" 
-                  className="w-20 h-20 rounded-full object-cover ring-4 ring-amber-500/20 bg-[#080E1A]" 
+                  className={`w-20 h-20 rounded-full object-cover ring-4 ring-amber-500/20 ${
+                    isDark ? 'bg-[#080E1A]' : 'bg-slate-100'
+                  }`} 
                   src={user.avatar} 
                 />
-                <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 ring-2 ring-[#161C28]"></span>
+                <span className={`absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 ring-2 ${
+                  isDark ? 'ring-[#161C28]' : 'ring-white'
+                }`}></span>
               </div>
               <div className="flex flex-col">
-                <h3 className="text-xl font-bold text-white">{user.name}</h3>
-                <span className="text-xs font-mono text-slate-400 mt-1" dir="ltr">{user.phone}</span>
+                <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.name}</h3>
+                <span className={`text-xs font-mono mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} dir="ltr">{user.phone}</span>
               </div>
-              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-semibold border border-amber-500/20">
+              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400 text-xs font-semibold border border-amber-500/20">
                 <span>⭐ عضو مميز في توصيلة النجف</span>
               </div>
             </div>
 
-            <div className="w-full rounded-2xl bg-[#161C28] border border-slate-700/40 divide-y divide-slate-700/40 overflow-hidden">
+            <div className={`w-full rounded-2xl border divide-y overflow-hidden ${
+              isDark ? 'bg-[#161C28] border-slate-700/40 divide-slate-700/40' : 'bg-white border-slate-200 divide-slate-100 shadow-sm'
+            }`}>
               <button 
                 onClick={() => setActiveTab('trips')} 
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] cursor-pointer"
+                className={`w-full p-4 flex items-center justify-between transition-colors text-right min-h-[48px] cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-xl">🕒</span>
-                  <span className="text-sm font-semibold text-white">سجل رحلاتي واشتراكاتي</span>
+                  <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>سجل رحلاتي واشتراكاتي</span>
                 </div>
                 <span className="text-slate-400">←</span>
               </button>
               
               <button 
                 onClick={() => setIsPolicyModalOpen(true)} 
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] cursor-pointer"
+                className={`w-full p-4 flex items-center justify-between transition-colors text-right min-h-[48px] cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-xl">📜</span>
-                  <span className="text-sm font-semibold text-white">شروط الخدمة وسياسة الخصوصية</span>
+                  <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>شروط الخدمة وسياسة الخصوصية</span>
                 </div>
                 <span className="text-slate-400">←</span>
               </button>
 
               <button 
                 onClick={() => setActiveTab('safety')} 
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] cursor-pointer"
+                className={`w-full p-4 flex items-center justify-between transition-colors text-right min-h-[48px] cursor-pointer ${
+                  isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-xl">🆘</span>
-                  <span className="text-sm font-semibold text-white">مركز الأمان والطوارئ</span>
+                  <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>مركز الأمان والطوارئ</span>
                 </div>
                 <span className="text-slate-400">←</span>
               </button>
@@ -486,18 +561,20 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                 href="https://t.me/wsam_ta" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="w-full p-4 flex items-center justify-between hover:bg-slate-800/40 transition-colors text-right min-h-[48px] no-underline"
+                className={`w-full p-4 flex items-center justify-between transition-colors text-right min-h-[48px] no-underline ${
+                  isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-xl">🎧</span>
-                  <span className="text-sm font-semibold text-white">الدعم الفني المباشر</span>
+                  <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>الدعم الفني المباشر</span>
                 </div>
                 <span className="text-slate-400">←</span>
               </a>
 
               <button 
                 onClick={handleLogout} 
-                className="w-full p-4 flex items-center justify-between hover:bg-red-500/10 text-red-400 transition-colors text-right min-h-[48px] cursor-pointer"
+                className="w-full p-4 flex items-center justify-between hover:bg-red-500/10 text-red-500 dark:text-red-400 transition-colors text-right min-h-[48px] cursor-pointer"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-xl">🚪</span>
@@ -515,25 +592,31 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         {activeTab === 'trips' && (
           <div className="flex flex-col gap-4 animate-fade-in text-right">
             <div className="flex items-center justify-between pb-1">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <span>سجل رحلاتي</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">النجف الأشرف</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400">النجف الأشرف</span>
               </h2>
               <button
                 type="button"
                 onClick={() => setActiveTab('home')}
-                className="text-xs text-slate-400 hover:text-white min-h-[48px] px-2 flex items-center gap-1 cursor-pointer"
+                className={`text-xs min-h-[48px] px-2 flex items-center gap-1 cursor-pointer ${
+                  isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
               >
                 <span>← العودة للرئيسية</span>
               </button>
             </div>
 
-            <div className="w-full rounded-2xl bg-[#161C28] p-5 border border-slate-700/50 flex flex-col items-center text-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-[#080E1A] flex items-center justify-center p-2.5 border border-slate-700/50 shadow-inner">
+            <div className={`w-full rounded-2xl p-5 border flex flex-col items-center text-center gap-3 ${
+              isDark ? 'bg-[#161C28] border-slate-700/50' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center p-2.5 border shadow-inner ${
+                isDark ? 'bg-[#080E1A] border-slate-700/50' : 'bg-slate-100 border-slate-200'
+              }`}>
                 <img src="/logo.png?v=40" alt="توصيلة" className="w-full h-full object-contain drop-shadow" />
               </div>
-              <h3 className="text-base font-bold text-white">جاهز لمشوارك القادم؟</h3>
-              <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
+              <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>جاهز لمشوارك القادم؟</h3>
+              <p className={`text-xs leading-relaxed max-w-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 تظهر هنا سجلات مشاوير التكسي الفورية واشتراكات الخطوط اليومية بعد إتمامها وتوثيقها رسمياً.
               </p>
               <div className="flex gap-2 w-full pt-2">
@@ -547,7 +630,11 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
                 <button
                   type="button"
                   onClick={handleOpenMonthlyBooking}
-                  className="flex-1 min-h-[48px] rounded-xl bg-[#242A37] hover:bg-slate-700 text-amber-400 font-bold text-xs flex items-center justify-center cursor-pointer border border-slate-700/60"
+                  className={`flex-1 min-h-[48px] rounded-xl font-bold text-xs flex items-center justify-center cursor-pointer border ${
+                    isDark
+                      ? 'bg-[#242A37] hover:bg-slate-700 text-amber-400 border-slate-700/60'
+                      : 'bg-slate-100 hover:bg-slate-200 text-amber-600 border-slate-200'
+                  }`}
                 >
                   طلب خط دائمي 📅
                 </button>
@@ -562,39 +649,45 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         {activeTab === 'notifications' && (
           <div className="flex flex-col gap-3.5 animate-fade-in text-right">
             <div className="flex items-center justify-between pb-1">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <span>مركز الإشعارات</span>
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
               </h2>
               <button
                 type="button"
                 onClick={() => setActiveTab('home')}
-                className="text-xs text-slate-400 hover:text-white min-h-[48px] px-2 flex items-center gap-1 cursor-pointer"
+                className={`text-xs min-h-[48px] px-2 flex items-center gap-1 cursor-pointer ${
+                  isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
               >
                 <span>← العودة للرئيسية</span>
               </button>
             </div>
 
-            <div className="w-full rounded-2xl bg-[#161C28] p-4 border border-amber-500/20 flex flex-col gap-2">
+            <div className={`w-full rounded-2xl p-4 border flex flex-col gap-2 ${
+              isDark ? 'bg-[#161C28] border-amber-500/20' : 'bg-white border-amber-500/30 shadow-sm'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-bold">
                   تنويه الإدارة العامة 📢
                 </span>
-                <span className="text-[11px] text-slate-400">الآن</span>
+                <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الآن</span>
               </div>
-              <p className="text-xs text-slate-200 leading-relaxed pt-1">
+              <p className={`text-xs leading-relaxed pt-1 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 {announcementText}
               </p>
             </div>
 
-            <div className="w-full rounded-2xl bg-[#161C28] p-4 border border-slate-700/40 flex flex-col gap-2">
+            <div className={`w-full rounded-2xl p-4 border flex flex-col gap-2 ${
+              isDark ? 'bg-[#161C28] border-slate-700/40' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-bold">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
                   أهلاً بك في المنظومة 🚖
                 </span>
-                <span className="text-[11px] text-slate-400">منظومة النجف</span>
+                <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>منظومة النجف</span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 يسعدنا خدمتك عبر أحدث أسطول تكسي وخطوط شهرية ذكية في النجف الأشرف والكوفة.
               </p>
             </div>
@@ -603,7 +696,11 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
               href="https://t.me/tawseelaiq"
               target="_blank"
               rel="noopener noreferrer"
-              className="min-h-[48px] w-full px-4 py-3 rounded-2xl bg-gradient-to-r from-sky-600/30 via-sky-600/20 to-[#161C28] border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center justify-between no-underline"
+              className={`min-h-[48px] w-full px-4 py-3 rounded-2xl border text-xs font-bold flex items-center justify-between no-underline transition-all ${
+                isDark
+                  ? 'bg-gradient-to-r from-sky-600/30 via-sky-600/20 to-[#161C28] border-sky-500/40 text-sky-300 hover:text-sky-200'
+                  : 'bg-gradient-to-r from-sky-100 via-sky-50 to-white border-sky-300 text-sky-800 shadow-sm'
+              }`}
             >
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">✈️</span>
@@ -620,48 +717,66 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         {activeTab === 'safety' && (
           <div className="flex flex-col gap-4 animate-fade-in text-right">
             <div className="flex items-center justify-between pb-1">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <h2 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <span>مركز الأمان والطوارئ</span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400">SOS</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-500 dark:text-red-400">SOS</span>
               </h2>
               <button
                 type="button"
                 onClick={() => setActiveTab('home')}
-                className="text-xs text-slate-400 hover:text-white min-h-[48px] px-2 flex items-center gap-1 cursor-pointer"
+                className={`text-xs min-h-[48px] px-2 flex items-center gap-1 cursor-pointer ${
+                  isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                }`}
               >
                 <span>← العودة للرئيسية</span>
               </button>
             </div>
 
-            <div className="w-full rounded-2xl bg-gradient-to-br from-red-950/40 via-[#161C28] to-[#161C28] p-4 border border-red-500/30 flex flex-col gap-3">
+            <div className={`w-full rounded-2xl p-4 border flex flex-col gap-3 ${
+              isDark
+                ? 'bg-gradient-to-br from-red-950/40 via-[#161C28] to-[#161C28] border-red-500/30'
+                : 'bg-gradient-to-br from-red-50 via-white to-white border-red-200 shadow-sm'
+            }`}>
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center text-xl shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center text-xl shrink-0">
                   🆘
                 </div>
                 <div className="flex flex-col">
-                  <h3 className="text-base font-bold text-white">أرقام الطوارئ السريعة</h3>
-                  <span className="text-xs text-slate-400">اتصال مباشر ومجاني 24 ساعة</span>
+                  <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>أرقام الطوارئ السريعة</h3>
+                  <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>اتصال مباشر ومجاني 24 ساعة</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 pt-1">
                 <a
                   href="tel:104"
-                  className="min-h-[48px] rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 flex flex-col items-center justify-center p-2 text-center no-underline"
+                  className={`min-h-[48px] rounded-xl border flex flex-col items-center justify-center p-2 text-center no-underline transition ${
+                    isDark
+                      ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/40'
+                      : 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200'
+                  }`}
                 >
                   <span className="font-bold text-sm">104</span>
                   <span className="text-[10.5px]">شرطة النجدة</span>
                 </a>
                 <a
                   href="tel:122"
-                  className="min-h-[48px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 flex flex-col items-center justify-center p-2 text-center no-underline"
+                  className={`min-h-[48px] rounded-xl border flex flex-col items-center justify-center p-2 text-center no-underline transition ${
+                    isDark
+                      ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40'
+                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                  }`}
                 >
                   <span className="font-bold text-sm">122</span>
                   <span className="text-[10.5px]">الإسعاف</span>
                 </a>
                 <a
                   href="tel:07722154182"
-                  className="min-h-[48px] rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex flex-col items-center justify-center p-2 text-center no-underline"
+                  className={`min-h-[48px] rounded-xl border flex flex-col items-center justify-center p-2 text-center no-underline transition ${
+                    isDark
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                  }`}
                 >
                   <span className="font-bold text-sm">العمليات</span>
                   <span className="text-[10.5px]">توصيلة 🚖</span>
@@ -669,11 +784,15 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
               </div>
             </div>
 
-            <div className="w-full rounded-2xl bg-[#161C28] p-4 border border-slate-700/40 flex flex-col gap-2.5">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+            <div className={`w-full rounded-2xl p-4 border flex flex-col gap-2.5 ${
+              isDark ? 'bg-[#161C28] border-slate-700/40' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
+              <h4 className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <span>🛡️ معايير الحماية في توصيلة</span>
               </h4>
-              <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside leading-relaxed">
+              <ul className={`text-xs space-y-2 list-disc list-inside leading-relaxed ${
+                isDark ? 'text-slate-300' : 'text-slate-600'
+              }`}>
                 <li>كافة الكباتن مسجلون ومدققون أمنياً وبمستمسكات رسمية معتمدة.</li>
                 <li>تتبع مسار الرحلة لحظياً بدقة GPS عالية من انطلاق الرحلة وحتى الوصول.</li>
                 <li>إمكانية مشاركة تفاصيل الرحلة المباشرة مع عائلتك وأصدقائك عبر واتساب.</li>
@@ -688,13 +807,23 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
           مساحات لمس قياسية >= 48x48px لكل عنصر ومسافات أمان
           ==================================================================== */}
       <nav 
-        className="fixed bottom-3 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 bg-[#080E1A]/95 backdrop-blur-2xl rounded-2xl shadow-2xl p-1.5 flex items-center justify-around border border-slate-700/50"
+        className={`fixed bottom-3 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 backdrop-blur-2xl rounded-2xl shadow-2xl p-1.5 flex items-center justify-around border transition-all duration-200 ${
+          isDark
+            ? 'bg-[#080E1A]/95 border-slate-700/50 shadow-black/60'
+            : 'bg-white/95 border-slate-200/90 shadow-[0_10px_30px_rgba(0,0,0,0.12)]'
+        }`}
         aria-label="شريط التنقل الرئيسي"
       >
         <button 
           onClick={() => setActiveTab('home')} 
           className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
-            activeTab === 'home' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+            activeTab === 'home'
+              ? isDark
+                ? 'bg-[#242A37] text-amber-400 font-bold'
+                : 'bg-amber-50 text-amber-600 font-bold border border-amber-200/60'
+              : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-slate-900'
           }`} 
           type="button"
           aria-label="الرئيسية"
@@ -706,7 +835,13 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         <button 
           onClick={() => setActiveTab('trips')} 
           className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
-            activeTab === 'trips' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+            activeTab === 'trips'
+              ? isDark
+                ? 'bg-[#242A37] text-amber-400 font-bold'
+                : 'bg-amber-50 text-amber-600 font-bold border border-amber-200/60'
+              : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-slate-900'
           }`} 
           type="button"
           aria-label="رحلاتي"
@@ -718,7 +853,13 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         <button 
           onClick={() => setActiveTab('notifications')} 
           className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all relative cursor-pointer ${
-            activeTab === 'notifications' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+            activeTab === 'notifications'
+              ? isDark
+                ? 'bg-[#242A37] text-amber-400 font-bold'
+                : 'bg-amber-50 text-amber-600 font-bold border border-amber-200/60'
+              : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-slate-900'
           }`} 
           type="button"
           aria-label="الإشعارات"
@@ -731,7 +872,13 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         <button 
           onClick={() => setActiveTab('safety')} 
           className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
-            activeTab === 'safety' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+            activeTab === 'safety'
+              ? isDark
+                ? 'bg-[#242A37] text-amber-400 font-bold'
+                : 'bg-amber-50 text-amber-600 font-bold border border-amber-200/60'
+              : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-slate-900'
           }`} 
           type="button"
           aria-label="الأمان"
@@ -743,7 +890,13 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
         <button 
           onClick={() => setActiveTab('profile')} 
           className={`min-w-[64px] min-h-[48px] flex-1 py-1 px-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-[0.98] transition-all cursor-pointer ${
-            activeTab === 'profile' ? 'bg-[#242A37] text-amber-400 font-bold' : 'text-slate-400 hover:text-white'
+            activeTab === 'profile'
+              ? isDark
+                ? 'bg-[#242A37] text-amber-400 font-bold'
+                : 'bg-amber-50 text-amber-600 font-bold border border-amber-200/60'
+              : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-slate-900'
           }`} 
           type="button"
           aria-label="الحساب"
