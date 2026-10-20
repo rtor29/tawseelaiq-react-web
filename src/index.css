@@ -38,12 +38,13 @@ html {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: auto !important;
-  min-height: 100% !important;
+  min-height: 100dvh;
+  background-color: #080E1A !important;
   overflow-x: hidden !important;
-  overflow-y: visible !important; /* السماح للمستند بالتمدد الطبيعي */
+  overflow-y: visible !important;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  overscroll-behavior-y: none;
 }
 
 /* body هو كائن التمرير الوحيد لكامل التطبيق */
@@ -52,13 +53,13 @@ body {
   padding: 0;
   width: 100%;
   height: auto !important;
-  min-height: 100% !important;
+  min-height: 100dvh;
   overflow-x: hidden !important;
-  overflow-y: auto !important; /* هذا هو حاوي التمرير الحصري والوحيد */
-  touch-action: auto !important; /* السماح لمحرك أندرويد بالتعامل مع التمرير طبيعياً */
+  overflow-y: auto !important;
+  touch-action: auto !important;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: auto !important; /* إلغاء contain التي تجمد التمرير */
-  background-color: #F8FAFC;
+  overscroll-behavior-y: none;
+  background-color: #080E1A !important;
   color: #0F172A;
   font-family: var(--font-family);
   font-size: var(--app-font-size);
@@ -71,9 +72,9 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: auto !important;
-  min-height: 100% !important;
-  display: block !important; /* إلغاء flex-col التي تقيد تمدد العناصر */
+  min-height: 100dvh;
+  background-color: #080E1A !important;
+  display: block !important;
   overflow: visible !important;
 }
 

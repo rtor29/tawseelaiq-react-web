@@ -233,9 +233,15 @@ export default function DailyRoutePage() {
         const matches = (bDriverId && bDriverId === sDriverId) || (sPhone && bPhone && sPhone === bPhone);
         if (!matches) return false;
         const status = String(b.status || '').toLowerCase();
-        return !['rejected', 'declined', 'cancelled_by_driver'].includes(status);
+        return !['rejected', 'declined', 'cancelled_by_driver', 'cancelled'].includes(status);
       })
     : null;
+
+  // فحص وجود أي اشتراك خط دائمي نشط (قيد سائق واحد فقط)
+  const hasAnyActiveCommute = customerBookings.some((b: any) => {
+    const status = String(b.status || '').toLowerCase();
+    return ['confirmed', 'active', 'pending', 'cancel_requested_by_passenger', 'cancel_requested_by_driver', 'cancellation_pending'].includes(status);
+  });
 
   const isBookingPending = Boolean(
     matchingBooking &&
@@ -379,6 +385,11 @@ export default function DailyRoutePage() {
   // إرسال طلب حجز مقعد في الخط الدائمي للكابتن
   async function handleBookSeat() {
     if (!selectedDriver || isBooking || isAlreadySubscribed || isBookingPending) return;
+    // منع تعدد الاشتراكات — الراكب يملك اشتراكاً نشطاً بالفعل
+    if (hasAnyActiveCommute && !matchingBooking) {
+      show('لديك اشتراك خط دائمي نشط بالفعل. يجب إلغاء اشتراكك الحالي قبل الاشتراك في خط آخر.', 'error');
+      return;
+    }
     setIsBooking(true);
     try {
       const session = authStore.getSession();
@@ -864,6 +875,17 @@ export default function DailyRoutePage() {
                   </button>
                 </div>
               ) : (
+                hasAnyActiveCommute && !matchingBooking ? (
+                  <div className="space-y-2">
+                    <div className="w-full rounded-xl bg-red-500/15 border border-red-500/40 py-3.5 text-center text-[14px] font-black text-red-300 flex items-center justify-center gap-2">
+                      <span>لديك اشتراك نشط في خط آخر</span>
+                      <span className="text-[17px]">🚫</span>
+                    </div>
+                    <p className="rounded-lg bg-red-500/10 border border-red-500/25 px-3 py-1.5 text-center text-[12px] font-semibold text-red-300">
+                      يجب إلغاء اشتراكك الحالي وتأكيد الإلغاء قبل الاشتراك في خط آخر.
+                    </p>
+                  </div>
+                ) : (
                 <button
                   type="button"
                   disabled={isBooking}
@@ -879,6 +901,7 @@ export default function DailyRoutePage() {
                     </>
                   )}
                 </button>
+                )
               )}
 
               <div className="flex items-center gap-2">

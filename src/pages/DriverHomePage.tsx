@@ -80,20 +80,26 @@ export default function DriverHomePage() {
     return storage.getPoints() || 180;
   });
 
-  // حالة العمل الحالية: خمول | خط دائمي | تكسي (تُقرأ من التخزين المحلي أولاً)
-  const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi'>(() => {
+  // حالة العمل الحالية: خمول | خط دائمي | تكسي | كلاهما (تُقرأ من التخزين المحلي أولاً)
+  const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi' | 'both'>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('driver_work_status') : null;
-    return (saved === 'taxi' || saved === 'permanent' || saved === 'idle') ? saved : 'taxi';
+    return (saved === 'taxi' || saved === 'permanent' || saved === 'idle' || saved === 'both') ? saved as 'idle' | 'permanent' | 'taxi' | 'both' : 'taxi';
   });
 
   // إرسال تحديث حالة ونمط عمل السائق إلى الخادم مع إحداثيات GPS الحية فوراً
-  const sendDriverStatusUpdate = useCallback((statusToSync: 'idle' | 'permanent' | 'taxi') => {
+  const sendDriverStatusUpdate = useCallback((statusToSync: 'idle' | 'permanent' | 'taxi' | 'both') => {
     if (!driverId) return;
     const isOnline = statusToSync !== 'idle';
-    const workMode = statusToSync === 'idle' ? 'خمول' : statusToSync === 'permanent' ? 'خط دائمي' : 'مشوار قصير';
+    const workMode = statusToSync === 'idle' ? 'خمول'
+      : statusToSync === 'permanent' ? 'خط دائمي'
+      : statusToSync === 'both' ? 'كلاهما'
+      : 'مشوار قصير';
 
     const sendPayload = (lat: number, lng: number) => {
-      const modeKey = statusToSync === 'permanent' ? 'commute' : statusToSync === 'taxi' ? 'taxi' : 'idle';
+      const modeKey = statusToSync === 'permanent' ? 'commute'
+        : statusToSync === 'taxi' ? 'taxi'
+        : statusToSync === 'both' ? 'both'
+        : 'idle';
       const payload = {
         driverId: driverId || rawPhone,
         phoneNumber: rawPhone,
@@ -125,7 +131,7 @@ export default function DriverHomePage() {
     }
   }, [driverId, rawPhone]);
 
-  function handleSwitchWorkStatus(newStatus: 'idle' | 'permanent' | 'taxi') {
+  function handleSwitchWorkStatus(newStatus: 'idle' | 'permanent' | 'taxi' | 'both') {
     setWorkStatus(newStatus);
     try {
       localStorage.setItem('driver_work_status', newStatus);
@@ -136,6 +142,8 @@ export default function DriverHomePage() {
         ? 'تم تحويل الحالة إلى خمول (غير متصل) ⏸️'
         : newStatus === 'permanent'
         ? 'أنت الآن متاح للخطوط الدائمة والاشتراكات الشهرية 🚌'
+        : newStatus === 'both'
+        ? 'أنت الآن متاح للتكسي الفوري والخطوط الدائمية معاً 🚖🚌'
         : 'أنت الآن متصل ومتاح لاستقبال طلبات التكسي الفورية 🚖',
       'info'
     );
@@ -341,7 +349,7 @@ export default function DriverHomePage() {
         );
         if (activeData?.success && activeData.activeRide) {
           setActiveRide(activeData.activeRide);
-          setWorkStatus((prev) => (prev === 'idle' ? prev : 'taxi'));
+          // Don't override workStatus — driver may be in 'both' mode
         } else {
           setActiveRide(null);
         }
@@ -402,14 +410,14 @@ export default function DriverHomePage() {
     }
   }, [isChatOpen, latestPassengerMsg]);
 
-  // استطلاع الطلبات الواردة في الانتظار (taxi mode only)
+  // استطلاع الطلبات الواردة في الانتظار (taxi / both modes only)
   useEffect(() => {
     if (!driverId && !rawPhone) {
       setIncomingRequest(null);
       return;
     }
-    // Only poll for pending ride requests in taxi mode
-    if (workStatus !== 'taxi') {
+    // Only poll for pending ride requests when driver can accept taxi trips
+    if (workStatus !== 'taxi' && workStatus !== 'both') {
       setIncomingRequest(null);
       return;
     }
@@ -422,7 +430,7 @@ export default function DriverHomePage() {
           longitude: driverLoc.lng,
           heading: 0,
           tripStatus: 'Online',
-          workStatus: 'taxi',
+          workStatus: workStatus,
         })
         .catch(() => {});
     };
@@ -938,7 +946,7 @@ export default function DriverHomePage() {
         )}
 
         {/* تنبيه وجود طلبات حجز مقاعد جديدة في الخط الدائمي */}
-        {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && (
+        {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && workStatus !== 'both' && (
           <div
             onClick={() => handleSwitchWorkStatus('permanent')}
             className="mb-3 flex items-center justify-between rounded-2xl bg-amber-500/15 border border-amber-400/50 p-3 text-amber-300 shadow-xl cursor-pointer transition active:scale-[0.99] hover:bg-amber-500/20 animate-fade-in"
@@ -957,14 +965,14 @@ export default function DriverHomePage() {
           </div>
         )}
 
-        {/* أزرار التبديل الثلاثية لنمط العمل (Segmented Luxury Control) */}
+        {/* أزرار التبديل الرباعية لنمط العمل (Segmented Luxury Control) */}
         <section className="mb-3 text-right" dir="rtl">
-          <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-[#161C28]/90 rounded-2xl border border-white/10 shadow-lg" dir="rtl">
+          <div className="grid grid-cols-4 gap-1 p-1.5 bg-[#161C28]/90 rounded-2xl border border-white/10 shadow-lg" dir="rtl">
             {/* خمول */}
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('idle')}
-              className={`rounded-xl py-2.5 text-center text-xs sm:text-sm transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
+              className={`rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
                 workStatus === 'idle'
                   ? 'bg-slate-700/80 text-white shadow-md border border-slate-600'
                   : 'text-slate-400 hover:text-white'
@@ -973,42 +981,55 @@ export default function DriverHomePage() {
               خمول
             </button>
 
-            {/* خط دائمي */}
-            <button
-              type="button"
-              onClick={() => handleSwitchWorkStatus('permanent')}
-              className={`relative flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-center text-xs sm:text-sm transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] font-bold ${
-                workStatus === 'permanent'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {workStatus === 'permanent' && <span>✓</span>}
-              <span>خط دائمي</span>
-              {pendingSeatRequests.length > 0 && (
-                <span className="absolute -top-1 -start-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md animate-bounce">
-                  {pendingSeatRequests.length}
-                </span>
-              )}
-            </button>
-
             {/* تكسي فوري */}
             <button
               type="button"
               onClick={() => handleSwitchWorkStatus('taxi')}
-              className={`rounded-xl py-2.5 text-center text-xs sm:text-sm transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
+              className={`rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
                 workStatus === 'taxi'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              تكسي فوري
+              تكسي
+            </button>
+
+            {/* خط دائمي */}
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkStatus('permanent')}
+              className={`relative flex items-center justify-center gap-1 rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] font-bold ${
+                workStatus === 'permanent'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {pendingSeatRequests.length > 0 && (
+                <span className="absolute -top-1 -start-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md animate-bounce">
+                  {pendingSeatRequests.length}
+                </span>
+              )}
+              <span>خط دائمي</span>
+            </button>
+
+            {/* كلاهما */}
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkStatus('both')}
+              className={`relative rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex flex-col items-center justify-center font-bold leading-tight ${
+                workStatus === 'both'
+                  ? 'bg-gradient-to-b from-emerald-600/60 to-amber-500/40 text-white border border-emerald-400/40 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>كلاهما</span>
+              {workStatus === 'both' && <span className="text-[9px] opacity-70">🚖🚌</span>}
             </button>
           </div>
         </section>
 
         {/* 2. الخريطة الليلية ورادار البحث عن المشاوير (Nocturnal Radar Map) */}
-        {workStatus === 'taxi' && (
+        {(workStatus === 'taxi' || workStatus === 'both') && (
           <section className="mb-4 space-y-3">
             <div className="relative w-full h-[280px] sm:h-[320px] rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-[#0A101D]">
               <MapGL
@@ -1310,7 +1331,7 @@ export default function DriverHomePage() {
         )}
 
         {/* 5. وضع الخط الدائمي (Commute Tab) */}
-        {workStatus === 'permanent' && (
+        {(workStatus === 'permanent' || workStatus === 'both') && (
           <section className="mb-4 space-y-4">
             {/* طلبات حجز المقاعد الواردة */}
             {pendingSeatRequests.length > 0 && (
