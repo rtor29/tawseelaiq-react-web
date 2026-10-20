@@ -40,6 +40,7 @@ import { RouteLines, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { AppDrawer } from '../components/AppDrawer';
+import { RideMapBookingView } from '../components/RideMapBookingView';
 
 // التحميل الكسول لنافذة الدردشة لتقليل الحزمة الأولية
 const ChatModal = lazy(() => import('../components/ChatModal'));
@@ -1520,6 +1521,47 @@ export default function CustomerHomePage() {
   const routeLines: RouteLineData[] = routeCoordinates && routeCoordinates.length
     ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#3b82f6', width: 5.5 }]
     : [];
+
+  // شاشة الخريطة الليلية الفاخرة ولوحة التحكم السفلية (Midnight Executive Nocturnal Map)
+  const isNocturnalStage = (stage as any) === 'pickup' || (stage as any) === 'dropoff';
+  if (isNocturnalStage) {
+    return (
+      <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden font-cairo text-right select-none" dir="rtl">
+        <RideMapBookingView
+          mode="instant"
+          onBack={() => {
+            if (stage === 'dropoff') {
+              setStage('pickup');
+            } else {
+              navigate('/hub');
+            }
+          }}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+          initialPickupAddress={pickupName || DEFAULT_PICKUP_NAME}
+          initialDropoffAddress={dropoffName || DEFAULT_DROPOFF_NAME}
+          onConfirmPickup={(loc) => {
+            setPickup({ lat: loc.lat, lng: loc.lng });
+            setPickupName(loc.address);
+            handleConfirmPickup();
+          }}
+          onConfirmDropoff={(loc) => {
+            setDropoff({ lat: loc.lat, lng: loc.lng });
+            setDropoffName(loc.address);
+            handleConfirmDropoff();
+          }}
+          onRequestRide={(tier, details) => {
+            setSelectedTierId(tier);
+            setPickup({ lat: details.pickup.lat, lng: details.pickup.lng });
+            setPickupName(details.pickup.address);
+            setDropoff({ lat: details.dropoff.lat, lng: details.dropoff.lng });
+            setDropoffName(details.dropoff.address);
+            handleOrderTrip();
+          }}
+        />
+        <AppDrawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden bg-slate-100 select-none font-cairo flex flex-col" dir="rtl">
