@@ -232,6 +232,11 @@ export default function DriverHomePage() {
         lastIncomingIdRef.current = incomingRequest.id;
         setCountdownSeconds(15);
         playIncomingTripAlert();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try {
+            navigator.vibrate([200, 100, 200, 100, 300]);
+          } catch (_) {}
+        }
       }
       const timer = setInterval(() => {
         setCountdownSeconds((prev) => {
@@ -410,7 +415,8 @@ export default function DriverHomePage() {
 
   // استطلاع الطلبات الواردة في الانتظار (taxi / both modes only)
   useEffect(() => {
-    if (!driverId && !rawPhone) {
+    const currentTargetId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
+    if (!currentTargetId) {
       setIncomingRequest(null);
       return;
     }
@@ -423,7 +429,7 @@ export default function DriverHomePage() {
     const sendLocation = () => {
       http
         .post('/driver/location', {
-          driverId: driverId || rawPhone,
+          driverId: currentTargetId,
           latitude: driverLoc.lat,
           longitude: driverLoc.lng,
           heading: 0,
@@ -437,30 +443,45 @@ export default function DriverHomePage() {
     const interval = setInterval(async () => {
       if (document.hidden) return;
       try {
-        const targetId = driverId || rawPhone;
-        const { data: pendingData } = await http.get<{
-          success?: boolean;
-          requests?: IncomingRideRequest[];
-        }>(`/driver/${encodeURIComponent(targetId)}/pending-requests`);
+        const { data: resData } = await http.get<any>(
+          `/driver/${encodeURIComponent(currentTargetId)}/pending-requests`
+        );
 
-        if (pendingData?.success && pendingData.requests && pendingData.requests.length > 0) {
-          setIncomingRequest(pendingData.requests[0]);
+        const incoming = resData?.pendingRequests || resData?.requests || resData?.data || (Array.isArray(resData) ? resData : []);
+        if (Array.isArray(incoming) && incoming.length > 0) {
+          const req = incoming[0];
+          if (!lastIncomingIdRef.current || lastIncomingIdRef.current !== req.id) {
+            lastIncomingIdRef.current = req.id;
+            setCountdownSeconds(15);
+            playIncomingTripAlert();
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              try {
+                navigator.vibrate([200, 100, 200, 100, 300]);
+              } catch (_) {}
+            }
+          }
+          setIncomingRequest(req);
         } else {
+          if (lastIncomingIdRef.current) {
+            lastIncomingIdRef.current = null;
+          }
           setIncomingRequest(null);
         }
       } catch (_) {}
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [driverId, rawPhone, workStatus, driverLoc]);
+  }, [driverId, rawPhone, session?.userId, workStatus, driverLoc]);
 
   // قبول الطلب حقيقياً
   async function handleAcceptRide() {
-    if (!incomingRequest || !driverId) return;
+    if (!incomingRequest) return;
+    const currentId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
+    if (!currentId) return;
     try {
       const { data } = await http.post<{ success: boolean; request: any; message?: string }>('/ride/respond', {
         requestId: incomingRequest.id,
-        driverId,
+        driverId: currentId,
         action: 'accept',
       });
       if (data?.success) {
@@ -477,11 +498,12 @@ export default function DriverHomePage() {
 
   // رفض الطلب حقيقياً
   async function handleRejectRide() {
-    if (!incomingRequest || !driverId) return;
+    if (!incomingRequest) return;
+    const currentId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
     try {
       await http.post('/ride/respond', {
         requestId: incomingRequest.id,
-        driverId,
+        driverId: currentId,
         action: 'reject',
       });
       setIncomingRequest(null);
@@ -1708,9 +1730,9 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {/* بطاقة استقبال المشوار الواردة الفاخرة العائمة (Incoming Trip Dispatch Sheet - z-[999]) */}
+      {/* بطاقة استقبال المشوار الواردة الفاخرة العائمة (Incoming Trip Dispatch Sheet - z-[9999]) */}
       {incomingRequest && !activeRide && (
-        <div className="fixed inset-x-0 bottom-0 z-[999] p-4 max-w-lg mx-auto pointer-events-auto animate-slide-up" dir="rtl">
+        <div className="fixed inset-x-0 bottom-0 z-[9999] p-4 max-w-lg mx-auto pointer-events-auto animate-slide-up" dir="rtl">
           <div className="rounded-3xl border-2 border-amber-500 bg-[#161C28]/95 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.9)] backdrop-blur-2xl text-white space-y-3">
             {/* شريط العد التنازلي التفاعلي */}
             <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-1">
