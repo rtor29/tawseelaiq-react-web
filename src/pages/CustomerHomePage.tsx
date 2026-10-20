@@ -1550,7 +1550,8 @@ export default function CustomerHomePage() {
             handleConfirmDropoff();
           }}
           onRequestRide={(tier, details) => {
-            setSelectedTierId(tier);
+            const mappedTier: 'saving' | 'plus' | 'super' = tier === 'vip' ? 'plus' : tier;
+            setSelectedTierId(mappedTier);
             setPickup({ lat: details.pickup.lat, lng: details.pickup.lng });
             setPickupName(details.pickup.address);
             setDropoff({ lat: details.dropoff.lat, lng: details.dropoff.lng });

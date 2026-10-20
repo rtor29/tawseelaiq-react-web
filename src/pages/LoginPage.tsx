@@ -491,13 +491,13 @@ export default function LoginPage() {
           {/* خط التوهج الذهبي العلوي */}
           <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-80"></div>
 
-          {/* ترويسة الشعار مع حركة الدخول من اليمين */}
+          {/* ترويسة الشعار المحصورة بحاوية مقيدة بدقة لمنع أي تمدد أو تداخل */}
           <div className="flex flex-col items-center text-center pt-1">
-            <div className="relative mb-2 flex items-center justify-center animate-logo-entrance">
+            <div className="relative w-full flex items-center justify-center my-2 overflow-hidden">
               <img 
                 src="/logo.png?v=40" 
                 alt="شعار توصيلة" 
-                className="h-20 w-auto max-w-[200px] object-contain drop-shadow-md"
+                className="h-16 sm:h-20 w-auto max-w-[190px] object-contain mx-auto drop-shadow-md select-none animate-logo-entrance"
               />
             </div>
             

@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
@@ -60,7 +59,6 @@ interface IncomingRideRequest {
 
 export default function DriverHomePage() {
   const { show } = useToast();
-  const navigate = useNavigate();
   const session = authStore.getSession();
   const driverId = session?.userId || storage.getUserId() || '';
 
@@ -697,6 +695,15 @@ export default function DriverHomePage() {
     const text = encodeURIComponent(`مرحباً ${name}، أنا كابتن خطك الدائمي من توصيلة.`);
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
   }
+
+  const handleDriverLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('driver');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    sessionStorage.clear();
+    window.location.replace('/login');
+  };
 
   const isOnline = workStatus !== 'idle';
 
@@ -1338,15 +1345,7 @@ export default function DriverHomePage() {
           {/* تسجيل الخروج */}
           <button
             type="button"
-            onClick={() => {
-              authStore.clear();
-              storage.clearAll();
-              try {
-                localStorage.clear();
-                sessionStorage.clear();
-              } catch (_) {}
-              navigate('/login', { replace: true });
-            }}
+            onClick={handleDriverLogout}
             className="flex w-full items-center justify-between rounded-2xl p-3 bg-red-600/10 border border-red-500/30 hover:bg-red-600/20 text-red-400 transition cursor-pointer min-h-[52px]"
           >
             <div className="flex items-center gap-3">
