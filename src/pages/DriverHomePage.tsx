@@ -90,10 +90,6 @@ export default function DriverHomePage() {
   const sendDriverStatusUpdate = useCallback((statusToSync: 'idle' | 'permanent' | 'taxi' | 'both') => {
     if (!driverId) return;
     const isOnline = statusToSync !== 'idle';
-    const workMode = statusToSync === 'idle' ? 'خمول'
-      : statusToSync === 'permanent' ? 'خط دائمي'
-      : statusToSync === 'both' ? 'كلاهما'
-      : 'مشوار قصير';
 
     const sendPayload = (lat: number, lng: number) => {
       const modeKey = statusToSync === 'permanent' ? 'commute'
@@ -105,7 +101,9 @@ export default function DriverHomePage() {
         phoneNumber: rawPhone,
         isOnline,
         is_online: isOnline,
-        workMode,
+        workMode: modeKey,
+        work_mode: modeKey,
+        workStatus: modeKey === 'commute' ? 'permanent' : modeKey,
         mode: modeKey,
         current_mode: modeKey,
         latitude: lat,
@@ -839,11 +837,7 @@ export default function DriverHomePage() {
   const isOnline = workStatus !== 'idle';
 
   return (
-    <div
-      className="w-full min-h-screen bg-[#080E1A] text-[#DDE2F4] flex flex-col font-cairo selection:bg-amber-500 overflow-y-auto"
-      style={{ touchAction: 'pan-y' }}
-      dir="rtl"
-    >
+    <div className="w-full min-h-screen bg-[#080E1A] text-[#DDE2F4] flex flex-col font-cairo selection:bg-amber-500" dir="rtl">
       {/* 1. شريط المؤشرات العلوي للكابتن (Captain Top HUD Bar) */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 bg-[#161C28]/95 backdrop-blur-xl shadow-lg" dir="rtl">
         {/* اليمين: الشعار المفرغ ومعلومات الكابتن */}
@@ -897,7 +891,7 @@ export default function DriverHomePage() {
       {/* المحتوى الرئيسي */}
       <main 
         className="w-full max-w-md mx-auto px-4 pt-3 flex flex-col gap-4 flex-1"
-        style={{ paddingBottom: 'calc(130px + env(safe-area-inset-bottom, 24px))', touchAction: 'pan-y' }}
+        style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom, 32px))' }}
         dir="rtl"
       >
         {/* شريط الإحصائيات المدمج للموبايل */}

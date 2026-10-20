@@ -13,7 +13,7 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { realtime } from '../lib/realtime';
-import { searchPlaces, reverseGeocode, getDirections, applyArabicAndEnhancedLabels, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { searchPlaces, reverseGeocode, getDirections, applyArabicAndEnhancedLabels, enhanceDarkMapRoads, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import {
   calculateBearing,
   distanceMeters,
@@ -1655,7 +1655,7 @@ export default function CustomerHomePage() {
         <MapGL
           ref={mapRef}
           mapboxAccessToken={config.mapboxToken}
-          mapStyle={config.mapStyle}
+          mapStyle="mapbox://styles/mapbox/dark-v11"
           initialViewState={{
             longitude: DEFAULT_PICKUP.lng,
             latitude: DEFAULT_PICKUP.lat,
@@ -1666,6 +1666,7 @@ export default function CustomerHomePage() {
           onClick={handleMapClick}
           onLoad={(e) => {
             applyArabicAndEnhancedLabels(e.target);
+            enhanceDarkMapRoads(e.target);
             autoLocateUserOnMapReady(e.target);
           }}
         >

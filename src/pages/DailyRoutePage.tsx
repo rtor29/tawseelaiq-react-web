@@ -16,7 +16,7 @@ import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { AppDrawer } from '../components/AppDrawer';
 import { RouteLines } from '../components/map/MapPins';
-import { applyArabicAndEnhancedLabels, getDirections, searchPlaces, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { applyArabicAndEnhancedLabels, enhanceDarkMapRoads, getDirections, searchPlaces, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
 
@@ -323,7 +323,15 @@ export default function DailyRoutePage() {
       .get<any[]>(`/drivers/nearby?lat=${userLoc.lat}&lon=${userLoc.lng}&tripType=daily&rangeKm=50`)
       .then((res) => {
         const data = Array.isArray(res.data) ? res.data : [];
-        const mapped: DriverItem[] = data.map((d: any, idx: number) => {
+        const commuteOnly = data.filter((d: any) => {
+          const mode = String(d.current_mode || d.mode || d.work_mode || d.workStatus || '').toLowerCase();
+          const isBoth = mode === 'both' || mode === 'كلاهما';
+          const isTaxiOnly = (mode === 'taxi' || mode === 'مشوار قصير' || d.serviceType === 'ShortTrip') && !isBoth;
+          if (isTaxiOnly) return false;
+          if (mode === 'idle' || mode === 'offline' || mode === 'خمول') return false;
+          return true;
+        });
+        const mapped: DriverItem[] = commuteOnly.map((d: any, idx: number) => {
           const dLat = Number(d.currentLat ?? d.latitude ?? (userLoc.lat + 0.003 * (idx + 1)));
           const dLng = Number(d.currentLon ?? d.longitude ?? (userLoc.lng + 0.002 * (idx + 1)));
           return {
@@ -658,11 +666,12 @@ export default function DailyRoutePage() {
       <MapGL
         ref={mapRef}
         mapboxAccessToken={config.mapboxToken}
-        mapStyle={config.mapStyle}
+        mapStyle="mapbox://styles/mapbox/dark-v11"
         initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
         onClick={handleMapClick}
         onLoad={(e) => {
           applyArabicAndEnhancedLabels(e.target);
+          enhanceDarkMapRoads(e.target);
           autoLocateDailyRouteOnMapReady(e.target);
         }}
         style={{ width: '100%', height: '100%' }}

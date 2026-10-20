@@ -38,27 +38,25 @@ html {
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100dvh;
+  height: -webkit-fill-available;
   background-color: #080E1A !important;
   overflow-x: hidden !important;
   overflow-y: visible !important;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  overscroll-behavior-y: none;
 }
 
-/* body هو كائن التمرير الوحيد لكامل التطبيق */
+/* body هو كائن التمرير الوحيد لكامل التطبيق مع دعم كامل لإيماءات السحب على أندرويد */
 body {
   margin: 0;
   padding: 0;
   width: 100%;
-  height: auto !important;
+  min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden !important;
   overflow-y: auto !important;
-  touch-action: auto !important;
+  touch-action: pan-y !important;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: none;
   background-color: #080E1A !important;
   color: #0F172A;
   font-family: var(--font-family);
@@ -72,10 +70,16 @@ body {
   margin: 0;
   padding: 0;
   width: 100%;
-  min-height: 100dvh;
+  min-height: 100%;
   background-color: #080E1A !important;
   display: block !important;
   overflow: visible !important;
+}
+
+/* منع ابتلاع كانفاس خريطة Mapbox للسكرول على الهواتف */
+.mapboxgl-canvas-container,
+.mapboxgl-canvas {
+  touch-action: pan-y !important;
 }
 
 /* Dynamic Theme Variable Mapping for Tailwind Arbitrary Hex Classes */
