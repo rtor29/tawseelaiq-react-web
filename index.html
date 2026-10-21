@@ -9,13 +9,7 @@
       (function() {
         try {
           var saved = localStorage.getItem('tawseela_theme') || localStorage.getItem('tawseela_theme_mode');
-          var isLight = false;
-          if (saved === 'light') {
-            isLight = true;
-          } else if (saved && saved.indexOf('{') === 0) {
-            var parsed = JSON.parse(saved);
-            if (parsed.mode === 'light' || parsed.preset === 'light') isLight = true;
-          }
+          var isLight = (saved === 'light');
           var root = document.documentElement;
           if (isLight) {
             root.classList.add('light');
@@ -31,6 +25,10 @@
             root.classList.remove('light');
             root.style.backgroundColor = '#080E1A';
             root.style.colorScheme = 'dark';
+            var tc = document.querySelector('meta[name="theme-color"]');
+            if (tc) tc.setAttribute('content', '#080E1A');
+            var bg = document.querySelector('meta[name="background-color"]');
+            if (bg) bg.setAttribute('content', '#080E1A');
           }
         } catch (e) {}
       })();

@@ -95,7 +95,7 @@ export default function App() {
     void fetchAndApplyTheme();
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'tawseela_theme' || e.key === 'tawseela_web_theme') {
+      if (e.key === 'tawseela_admin_theme_config' || e.key === 'tawseela_web_theme') {
         void fetchAndApplyTheme();
       }
     };

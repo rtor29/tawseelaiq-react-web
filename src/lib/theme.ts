@@ -32,7 +32,8 @@ export const DEFAULT_THEME: ThemeConfig = {
   footerText: '© 2026 توصيله (Tawseela IQ) · النجف الأشرف',
 };
 
-const STORAGE_KEY = 'tawseela_theme';
+// مفتاح تخزين تكوين وهوية لوحة التحكم حصراً (الألوان، الخط، الشعار) لعدم تضاربها مع تفضيل الوضع الليلي والنهاري للمستخدم
+const STORAGE_KEY = 'tawseela_admin_theme_config';
 
 export function getCachedTheme(): ThemeConfig {
   if (typeof window === 'undefined') return DEFAULT_THEME;

@@ -1123,43 +1123,49 @@ export default function DriverHomePage() {
       </div>
 
       {/* 2. الترويسة العلوية العائمة (Top Floating HUD Header) - مطابقة لـ code_4.html و screen_3.png */}
-      <header className="fixed top-0 inset-x-0 z-50 pt-[calc(0.5rem+env(safe-area-inset-top,0.5rem))] pointer-events-none" dir="rtl">
-        <div className="flex justify-between items-center px-4 py-2 max-w-lg mx-auto w-full">
+      <header className="fixed top-0 inset-x-0 z-40 pt-safe px-4 h-16 flex items-center justify-between pointer-events-none" dir="rtl">
+        <div className="flex justify-between items-center max-w-lg mx-auto w-full">
           {/* زر الرئيسية - إعادة التمركز لموقع الكابتن */}
-          <button
-            type="button"
-            onClick={handleRecenterOrHome}
-            className={`pointer-events-auto min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center active:scale-95 transition-all cursor-pointer ${
-              isDark ? 'bg-[#161c28]/85 border border-[#f59e0b]/40 text-[#ffc174]' : 'bg-white border border-amber-400 text-amber-700 shadow-md'
-            }`}
-            aria-label="الرئيسية وتوسيط الخريطة"
-            title="الرئيسية"
-          >
-            <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-            </svg>
-          </button>
+          <div className="pointer-events-auto">
+            <button
+              type="button"
+              onClick={handleRecenterOrHome}
+              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl flex items-center justify-center active:scale-95 transition-all shadow-lg border cursor-pointer ${
+                isDark ? 'bg-[#161c28]/90 border-[#f59e0b]/40 text-[#ffc174]' : 'bg-white/95 border-amber-400 text-amber-700 shadow-md'
+              }`}
+              aria-label="الرئيسية"
+              title="الرئيسية"
+            >
+              <svg className="w-6 h-6 shrink-0 fill-current" viewBox="0 0 24 24">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+              </svg>
+            </button>
+          </div>
 
-          {/* تبديل الثيم وزر الملف الشخصي الموحد */}
+          {/* تبديل الثيم وزر حساب الكابتن الموحد */}
           <div className="pointer-events-auto flex items-center gap-2">
             <div className="hidden sm:block">
               <ThemeToggleButton />
             </div>
 
-            {/* زر القائمة الموحدة والبروفايل - يفتح AppDrawer */}
+            {/* زر حساب الكابتن والقائمة الموحدة - يفتح AppDrawer بأمان تام دون تسجيل خروج */}
             <button
               type="button"
-              onClick={() => setIsProfileOpen(true)}
-              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center active:scale-95 transition-all relative cursor-pointer ${
-                isDark ? 'bg-[#161c28]/85 border border-[#534434]/40 text-[#56e5a9]' : 'bg-white border border-emerald-400 text-emerald-700 shadow-md'
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsProfileOpen(true);
+              }}
+              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl shadow-lg flex items-center justify-center active:scale-95 transition-all relative border cursor-pointer ${
+                isDark ? 'bg-[#161c28]/90 border-[#534434]/40 text-[#56e5a9]' : 'bg-white/95 border-emerald-400 text-emerald-700 shadow-md'
               }`}
-              aria-label="الملف الشخصي والقائمة الموحدة"
-              title="القائمة الموحدة"
+              aria-label="حساب الكابتن"
+              title="حساب الكابتن"
             >
               {driverAvatar ? (
                 <img src={driverAvatar} alt="الملف" className="w-full h-full rounded-full object-cover" />
               ) : (
-                <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-6 h-6 shrink-0 fill-current" viewBox="0 0 24 24">
                   <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>
               )}
@@ -1171,15 +1177,19 @@ export default function DriverHomePage() {
         </div>
       </header>
 
-      {/* 3. المؤشرات الجانبية العائمة على الخريطة (Floating HUD Overlays) */}
-      <div className="fixed top-18 inset-x-0 pointer-events-none z-40 px-4 max-w-lg mx-auto w-full flex justify-between items-start" dir="rtl">
+      {/* 3. المؤشرات الجانبية العائمة على الخريطة (Floating HUD Overlays) - مفصولة رأسياً لمنع أي تداخل */}
+      <div className="fixed top-[calc(68px+env(safe-area-inset-top,12px))] inset-x-0 pointer-events-none z-30 px-4 max-w-lg mx-auto w-full flex justify-between items-start" dir="rtl">
         {/* اليمين: كبسولة عدد الكباتن والوجهة */}
         <div className="flex flex-col gap-2 pointer-events-auto">
-          <div className="bg-[#161c28]/90 backdrop-blur-md border border-[#56e5a9]/40 rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 text-xs text-[#56e5a9] font-bold">
+          <div className={`backdrop-blur-md border rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 text-xs font-bold ${
+            isDark ? 'bg-[#161c28]/90 border-[#56e5a9]/40 text-[#56e5a9]' : 'bg-white/95 border-emerald-400 text-emerald-700'
+          }`}>
             <span className={`w-2 h-2 rounded-full ${pollStatus === 'error' ? 'bg-red-500' : 'bg-[#56e5a9]'} animate-pulse`} />
             <span>٤ كباتن متوفرين قربك الآن ⚡</span>
           </div>
-          <div className="bg-[#242a37]/90 backdrop-blur-md border border-[#534434]/40 rounded-full px-3 py-1 shadow-md flex items-center gap-1.5 text-[11px] text-[#ffc174] font-medium">
+          <div className={`backdrop-blur-md border rounded-full px-3 py-1 shadow-md flex items-center gap-1.5 text-[11px] font-medium ${
+            isDark ? 'bg-[#242a37]/90 border-[#534434]/40 text-[#ffc174]' : 'bg-white/95 border-amber-300 text-amber-700'
+          }`}>
             <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
             <span>جامعة الكوفة</span>
           </div>
@@ -1190,10 +1200,11 @@ export default function DriverHomePage() {
           <button
             type="button"
             onClick={handleRecenterOrHome}
-            className={`min-h-[44px] min-w-[44px] h-11 w-11 rounded-full backdrop-blur-md shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
+            className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-md shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
               isDark ? 'bg-[#161c28]/85 border border-white/10 text-white hover:bg-[#242a37]' : 'bg-white border border-slate-300 text-slate-800 hover:bg-slate-100 shadow-md'
             } ${isLocating ? 'animate-spin text-amber-400' : ''}`}
             title="موقعي الحالي"
+            aria-label="موقعي الحالي"
           >
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
@@ -1202,10 +1213,11 @@ export default function DriverHomePage() {
           <button
             type="button"
             onClick={() => setShowLayersModal(true)}
-            className={`min-h-[44px] min-w-[44px] h-11 w-11 rounded-full backdrop-blur-md shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
+            className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-md shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
               isDark ? 'bg-[#161c28]/85 border border-white/10 text-white hover:bg-[#242a37]' : 'bg-white border border-slate-300 text-slate-800 hover:bg-slate-100 shadow-md'
             }`}
             title="طبقات الخريطة"
+            aria-label="طبقات الخريطة"
           >
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="m11.99 18.54-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27zM12 16l7.36-5.73L21 9.07l-9-7-9 7 1.63 1.27zm0-11.47L17.74 9 12 13.47 6.26 9z"/>
@@ -1214,8 +1226,9 @@ export default function DriverHomePage() {
           <button
             type="button"
             onClick={() => setShowSosAlert(true)}
-            className="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-[#93000a] border border-[#ffb4ab]/40 shadow-lg flex items-center justify-center text-[#ffdad6] active:scale-90 transition-transform animate-pulse cursor-pointer hover:bg-red-800"
+            className="min-h-[48px] min-w-[48px] h-12 w-12 rounded-full bg-[#93000a] border border-[#ffb4ab]/40 shadow-lg flex items-center justify-center text-[#ffdad6] active:scale-90 transition-transform animate-pulse cursor-pointer hover:bg-red-800"
             title="طوارئ SOS"
+            aria-label="طوارئ SOS"
           >
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 17.9c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.22 18.39 10.56 19 12 19s2.78-.61 4.34-1.59l1.9 1.9c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-.62-1.29C20.26 15.07 21 13.12 21 11c0-4.97-4.03-9-9-9zm-1 5h2v6h-2V7zm1 10c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
@@ -1605,19 +1618,27 @@ export default function DriverHomePage() {
             <div className="space-y-2 text-xs">
               <button
                 type="button"
-                onClick={() => { setSelectedMapStyle('mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'); setShowLayersModal(false); }}
+                onClick={() => { setSelectedMapStyle(null); setShowLayersModal(false); }}
                 className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
               >
-                <span>🌙 نمط توصيلة المعتمد (Tawseela Custom)</span>
-                {(!selectedMapStyle || selectedMapStyle.includes('cmvdwkv6q003801s82f9t02om')) && <span className="text-[#56e5a9] font-black">✓</span>}
+                <span>✨ النمط التلقائي (يتبع الوضع الليلي والنهاري)</span>
+                {!selectedMapStyle && <span className="text-[#56e5a9] font-black">✓</span>}
               </button>
               <button
                 type="button"
-                onClick={() => { setSelectedMapStyle('mapbox://styles/mapbox/navigation-night-v1'); setShowLayersModal(false); }}
+                onClick={() => { setSelectedMapStyle('mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db'); setShowLayersModal(false); }}
                 className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
               >
-                <span>🧭 الملاحة الليلية (Navigation Night)</span>
-                {selectedMapStyle?.includes('navigation') && <span className="text-[#56e5a9] font-black">✓</span>}
+                <span>🌙 نمط توصيلة الليلي المعتمد (Night Obsidian)</span>
+                {selectedMapStyle === 'mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db' && <span className="text-[#56e5a9] font-black">✓</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSelectedMapStyle('mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'); setShowLayersModal(false); }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
+              >
+                <span>☀️ نمط توصيلة النهاري المعتمد (Daylight Tawseela)</span>
+                {selectedMapStyle === 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om' && <span className="text-[#56e5a9] font-black">✓</span>}
               </button>
               <button
                 type="button"
@@ -1626,14 +1647,6 @@ export default function DriverHomePage() {
               >
                 <span>🛰️ الأقمار الصناعية (Satellite Streets)</span>
                 {selectedMapStyle?.includes('satellite') && <span className="text-[#56e5a9] font-black">✓</span>}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setSelectedMapStyle('mapbox://styles/mapbox/streets-v12'); setShowLayersModal(false); }}
-                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
-              >
-                <span>☀️ النهاري القياسي (Daylight Streets)</span>
-                {selectedMapStyle?.includes('streets-v12') && <span className="text-[#56e5a9] font-black">✓</span>}
               </button>
             </div>
           </div>

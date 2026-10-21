@@ -2,6 +2,9 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 
 export type ThemeMode = 'dark' | 'light';
 
+export const MAPBOX_DAY_STYLE = 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
+export const MAPBOX_NIGHT_STYLE = 'mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db';
+
 export interface ThemeContextValue {
   theme: ThemeMode;
   toggleTheme: () => void;
@@ -32,11 +35,15 @@ export function applyThemeToDom(theme: ThemeMode): void {
   if (theme === 'dark') {
     root.classList.add('dark');
     root.classList.remove('light');
+    root.style.backgroundColor = '#080E1A';
+    root.style.colorScheme = 'dark';
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#080E1A');
     document.querySelector('meta[name="background-color"]')?.setAttribute('content', '#080E1A');
   } else {
     root.classList.add('light');
     root.classList.remove('dark');
+    root.style.backgroundColor = '#F8FAFC';
+    root.style.colorScheme = 'light';
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#F8FAFC');
     document.querySelector('meta[name="background-color"]')?.setAttribute('content', '#F8FAFC');
   }
@@ -105,9 +112,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [theme]);
 
   const mapStyle = useMemo(() => {
-    return theme === 'light'
-      ? 'mapbox://styles/mapbox/light-v11'
-      : 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
+    return theme === 'light' ? MAPBOX_DAY_STYLE : MAPBOX_NIGHT_STYLE;
   }, [theme]);
 
   const value = useMemo(
@@ -133,7 +138,7 @@ export function useTheme(): ThemeContextValue {
       theme: fallbackTheme,
       toggleTheme: () => {},
       setTheme: () => {},
-      mapStyle: fallbackTheme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om',
+      mapStyle: fallbackTheme === 'light' ? MAPBOX_DAY_STYLE : MAPBOX_NIGHT_STYLE,
       isDark: fallbackTheme === 'dark',
     };
   }

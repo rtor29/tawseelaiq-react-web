@@ -6,6 +6,10 @@ export const NAJAF_CENTER = { lat: 31.9961, lon: 44.3168 } as const;
 // حدود محافظة النجف الأشرف للبحث الجغرافي الصارم
 export const NAJAF_BBOX = { west: 44.05, south: 31.75, east: 44.65, north: 32.35 } as const;
 
+// أنماط Mapbox المعتمدة لمنصة توصيلة للوضعين النهاري والليلي
+export const MAPBOX_DAY_STYLE = 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
+export const MAPBOX_NIGHT_STYLE = 'mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db';
+
 export interface AppConfig {
   appName: string;
   appVersion: string;
@@ -33,8 +37,8 @@ export const config: AppConfig = {
   realtimeMode: (import.meta.env.VITE_REALTIME_MODE || 'polling') as 'polling' | 'signalr' | 'socketio',
 
   mapboxToken: import.meta.env.VITE_MAPBOX_TOKEN || '',
-  mapStyle: import.meta.env.VITE_MAP_STYLE || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om',
-  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om',
+  mapStyle: import.meta.env.VITE_MAP_STYLE || MAPBOX_NIGHT_STYLE,
+  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || MAPBOX_NIGHT_STYLE,
 
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
 

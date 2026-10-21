@@ -7,6 +7,7 @@ import { endpoints, http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { useToast } from './Toast';
+import { useTheme } from '../context/ThemeContext';
 
 interface DrawerProps {
   open: boolean;
@@ -30,7 +31,9 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
     setAvatar(storage.getAvatar());
   }, [session, open]);
 
-  // التحقق من أن الحساب غير محظور
+  const { toggleTheme, isDark } = useTheme();
+
+  // التحقق من أن الحساب غير محظور — بدون طرد أو حظر قسري عند فشل الاتصال العرضي
   useEffect(() => {
     if (!open) return;
     const userId = storage.getUserId();
@@ -40,9 +43,8 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
       .then((res) => {
         if (res.data?.isBlocked === true) handleBlocked();
       })
-      .catch((err) => {
-        const status = err?.response?.status;
-        if (status === 403 || status === 404) handleBlocked();
+      .catch(() => {
+        // حماية تامة: لا نقوم بتسجيل الخروج أو الحظر عند فشل الاستعلام أو غياب نقطة النهاية
       });
   }, [open]);
 
@@ -70,6 +72,10 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
   }
 
   function handleLogout() {
+    if (!window.confirm('هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟')) {
+      return;
+    }
+    const currentTheme = localStorage.getItem('tawseela_theme') || localStorage.getItem('tawseela_theme_mode');
     authStore.clear();
     storage.clearAll();
     try {
@@ -78,7 +84,9 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
       localStorage.removeItem('auth');
       localStorage.removeItem('tawseela_auth');
       localStorage.removeItem('tawseela_session');
-      localStorage.clear();
+      if (currentTheme) {
+        localStorage.setItem('tawseela_theme', currentTheme);
+      }
       sessionStorage.clear();
     } catch (_) {}
     if (onClose) onClose();
@@ -320,6 +328,27 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </div>
+          </div>
+
+          {/* مظهر التطبيق (نهاري / ليلي) */}
+          <div
+            onClick={toggleTheme}
+            className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-amber-50/40 transition active:bg-amber-100/50 min-h-[52px]"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="text-amber-500 shrink-0 text-2xl flex items-center justify-center w-6 h-6">
+                {isDark ? '☀️' : '🌙'}
+              </div>
+              <div className="text-right">
+                <p className="text-[16px] font-black text-gray-900">مظهر التطبيق</p>
+                <p className="text-[12.5px] font-bold text-gray-500 mt-0.5">
+                  {isDark ? 'الوضع الليلي نشط (انقر للنهاري)' : 'الوضع النهاري نشط (انقر لليلي)'}
+                </p>
+              </div>
+            </div>
+            <span className="rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900 shrink-0">
+              {isDark ? '🌙 ليلي' : '☀️ نهاري'}
+            </span>
           </div>
 
           {/* حول توصيلة */}
