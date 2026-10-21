@@ -416,7 +416,12 @@ export default function DriverHomePage() {
           setActiveRide(activeData.activeRide);
           // Don't override workStatus — driver may be in 'both' mode
         } else {
-          setActiveRide(null);
+          // CRITICAL: Never nullify an ongoing trip due to a transient poll response!
+          setActiveRide((prev: any) => {
+            if (!prev) return null;
+            const isOngoing = ['accepted', 'arrived', 'in_progress', 'started', 'ontheway', 'Accepted', 'Arrived', 'InProgress', 'Started', 'OnTheWay'].includes(prev.status);
+            return isOngoing ? prev : null;
+          });
         }
       } catch (_) {}
     };
@@ -556,7 +561,17 @@ export default function DriverHomePage() {
         try {
           const data = JSON.parse(e.data);
           if (data?.pendingRequests) handleIncomingList(data.pendingRequests);
-          if (data?.activeRide !== undefined) setActiveRide(data.activeRide);
+          if (data?.activeRide !== undefined) {
+            if (data.activeRide) {
+              setActiveRide(data.activeRide);
+            } else {
+              setActiveRide((prev: any) => {
+                if (!prev) return null;
+                const isOngoing = ['accepted', 'arrived', 'in_progress', 'started', 'ontheway', 'Accepted', 'Arrived', 'InProgress', 'Started', 'OnTheWay'].includes(prev.status);
+                return isOngoing ? prev : null;
+              });
+            }
+          }
         } catch (_) {}
       });
 
@@ -570,7 +585,17 @@ export default function DriverHomePage() {
       es.addEventListener('driver_event', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          if (data?.activeRide !== undefined) setActiveRide(data.activeRide);
+          if (data?.activeRide !== undefined) {
+            if (data.activeRide) {
+              setActiveRide(data.activeRide);
+            } else {
+              setActiveRide((prev: any) => {
+                if (!prev) return null;
+                const isOngoing = ['accepted', 'arrived', 'in_progress', 'started', 'ontheway', 'Accepted', 'Arrived', 'InProgress', 'Started', 'OnTheWay'].includes(prev.status);
+                return isOngoing ? prev : null;
+              });
+            }
+          }
         } catch (_) {}
       });
 
@@ -991,7 +1016,7 @@ export default function DriverHomePage() {
         <MapGL
           ref={mapRef}
           mapboxAccessToken={config.mapboxToken}
-          mapStyle={selectedMapStyle || mapStyle || (isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12')}
+          mapStyle={selectedMapStyle || mapStyle || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'}
           initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
           cooperativeGestures={true}
           onLoad={(e) => {
@@ -1104,11 +1129,15 @@ export default function DriverHomePage() {
           <button
             type="button"
             onClick={handleRecenterOrHome}
-            className="pointer-events-auto min-h-[48px] min-w-[48px] h-12 w-12 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-[#f59e0b]/40 shadow-xl flex items-center justify-center text-[#ffc174] active:scale-95 transition-all cursor-pointer"
+            className={`pointer-events-auto min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center active:scale-95 transition-all cursor-pointer ${
+              isDark ? 'bg-[#161c28]/85 border border-[#f59e0b]/40 text-[#ffc174]' : 'bg-white border border-amber-400 text-amber-700 shadow-md'
+            }`}
             aria-label="الرئيسية وتوسيط الخريطة"
             title="الرئيسية"
           >
-            <span className="material-symbols-outlined text-2xl">home</span>
+            <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+            </svg>
           </button>
 
           {/* تبديل الثيم وزر الملف الشخصي الموحد */}
@@ -1121,18 +1150,22 @@ export default function DriverHomePage() {
             <button
               type="button"
               onClick={() => setIsProfileOpen(true)}
-              className="min-h-[48px] min-w-[48px] h-12 w-12 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-[#534434]/40 shadow-xl flex items-center justify-center text-[#56e5a9] active:scale-95 transition-all relative cursor-pointer"
+              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center active:scale-95 transition-all relative cursor-pointer ${
+                isDark ? 'bg-[#161c28]/85 border border-[#534434]/40 text-[#56e5a9]' : 'bg-white border border-emerald-400 text-emerald-700 shadow-md'
+              }`}
               aria-label="الملف الشخصي والقائمة الموحدة"
               title="القائمة الموحدة"
             >
               {driverAvatar ? (
                 <img src={driverAvatar} alt="الملف" className="w-full h-full rounded-full object-cover" />
               ) : (
-                <span className="material-symbols-outlined text-2xl">person</span>
+                <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
               )}
-              <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#161c28] ${
-                isOnline ? 'bg-[#56e5a9] animate-pulse' : 'bg-slate-500'
-              }`} />
+              <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 ${
+                isDark ? 'border-[#161c28]' : 'border-white'
+              } ${isOnline ? 'bg-[#56e5a9] animate-pulse' : 'bg-slate-400'}`} />
             </button>
           </div>
         </div>
@@ -1157,18 +1190,26 @@ export default function DriverHomePage() {
           <button
             type="button"
             onClick={handleRecenterOrHome}
-            className={`min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer hover:bg-[#242a37] ${isLocating ? 'animate-spin text-amber-400' : ''}`}
+            className={`min-h-[44px] min-w-[44px] h-11 w-11 rounded-full backdrop-blur-md shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
+              isDark ? 'bg-[#161c28]/85 border border-white/10 text-white hover:bg-[#242a37]' : 'bg-white border border-slate-300 text-slate-800 hover:bg-slate-100 shadow-md'
+            } ${isLocating ? 'animate-spin text-amber-400' : ''}`}
             title="موقعي الحالي"
           >
-            <span className="material-symbols-outlined text-[22px]">my_location</span>
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+            </svg>
           </button>
           <button
             type="button"
             onClick={() => setShowLayersModal(true)}
-            className="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer hover:bg-[#242a37]"
+            className={`min-h-[44px] min-w-[44px] h-11 w-11 rounded-full backdrop-blur-md shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
+              isDark ? 'bg-[#161c28]/85 border border-white/10 text-white hover:bg-[#242a37]' : 'bg-white border border-slate-300 text-slate-800 hover:bg-slate-100 shadow-md'
+            }`}
             title="طبقات الخريطة"
           >
-            <span className="material-symbols-outlined text-[22px]">layers</span>
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="m11.99 18.54-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27zM12 16l7.36-5.73L21 9.07l-9-7-9 7 1.63 1.27zm0-11.47L17.74 9 12 13.47 6.26 9z"/>
+            </svg>
           </button>
           <button
             type="button"
@@ -1176,7 +1217,9 @@ export default function DriverHomePage() {
             className="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-[#93000a] border border-[#ffb4ab]/40 shadow-lg flex items-center justify-center text-[#ffdad6] active:scale-90 transition-transform animate-pulse cursor-pointer hover:bg-red-800"
             title="طوارئ SOS"
           >
-            <span className="material-symbols-outlined text-[22px]">emergency</span>
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 17.9c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.22 18.39 10.56 19 12 19s2.78-.61 4.34-1.59l1.9 1.9c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41l-.62-1.29C20.26 15.07 21 13.12 21 11c0-4.97-4.03-9-9-9zm-1 5h2v6h-2V7zm1 10c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -1184,7 +1227,7 @@ export default function DriverHomePage() {
       {/* 4. بطاقة المشوار النشط العائمة (Floating Active Trip Control Card) */}
       {hasRealActiveTrip && activeRide && (
         <div className="fixed bottom-[108px] inset-x-0 z-35 px-4 max-w-lg mx-auto w-full pointer-events-auto" dir="rtl">
-          <div className="rounded-3xl border border-emerald-500/60 bg-[#161C28]/95 p-4 shadow-2xl backdrop-blur-2xl text-white animate-fade-in space-y-3">
+          <div className={`rounded-3xl border p-4 shadow-2xl backdrop-blur-2xl animate-fade-in space-y-3 ${isDark ? 'border-emerald-500/60 bg-[#161C28]/95 text-white' : 'border-emerald-500 bg-white text-slate-900 shadow-xl'}`}>
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300 border border-emerald-500/40">
@@ -1306,7 +1349,7 @@ export default function DriverHomePage() {
 
       {/* 5. الدرج السفلي العائم للأنماط الـ 4 (Floating Bottom Dock) - مطابقة لـ screen_3.png */}
       <div className="fixed bottom-0 inset-x-0 z-30 flex flex-col items-center pointer-events-none" dir="rtl">
-        <div className="pointer-events-auto w-full max-w-lg rounded-t-3xl bg-[#161c28]/95 backdrop-blur-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.6)] flex flex-col px-4 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0.75rem))] border-t border-[#534434]/30">
+        <div className={`pointer-events-auto w-full max-w-lg rounded-t-3xl backdrop-blur-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.5)] flex flex-col px-4 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0.75rem))] border-t ${isDark ? 'bg-[#161c28]/95 border-[#534434]/30 text-white' : 'bg-white/98 border-slate-200 text-slate-900 shadow-xl'}`}>
           {/* مقبض السحب لفتح/إغلاق المحتوى الإضافي */}
           <button
             type="button"
@@ -1326,10 +1369,14 @@ export default function DriverHomePage() {
               className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
                 workStatus === 'taxi'
                   ? 'bg-gradient-to-b from-[#f59e0b] to-[#d97707] text-[#161c28] font-black shadow-lg shadow-amber-500/30 scale-[1.02]'
-                  : 'bg-[#242a37]/80 text-[#ffc174] hover:bg-[#242a37] font-semibold border border-[#534434]/30'
+                  : isDark 
+                    ? 'bg-[#242a37]/80 text-[#ffc174] hover:bg-[#242a37] font-semibold border border-[#534434]/30' 
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold border border-slate-200 shadow-xs'
               }`}
             >
-              <span className="material-symbols-outlined text-2xl mb-0.5">local_taxi</span>
+              <svg className="w-6 h-6 shrink-0 mb-0.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+              </svg>
               <span className="text-xs">تكسي</span>
             </button>
 
@@ -1340,10 +1387,14 @@ export default function DriverHomePage() {
               className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
                 workStatus === 'permanent'
                   ? 'bg-gradient-to-b from-[#56e5a9] to-[#00a86b] text-[#161c28] font-black shadow-lg shadow-emerald-500/30 scale-[1.02]'
-                  : 'bg-[#242a37]/80 text-[#56e5a9] hover:bg-[#242a37] font-semibold border border-[#534434]/30'
+                  : isDark 
+                    ? 'bg-[#242a37]/80 text-[#56e5a9] hover:bg-[#242a37] font-semibold border border-[#534434]/30' 
+                    : 'bg-slate-100 text-emerald-800 hover:bg-slate-200 font-semibold border border-slate-200 shadow-xs'
               }`}
             >
-              <span className="material-symbols-outlined text-2xl mb-0.5">event_repeat</span>
+              <svg className="w-6 h-6 shrink-0 mb-0.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm-7-8h2v2h-2v-2zm-4 0h2v2H8v-2zm8 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm-4 0h2v2H8v-2zm8 0h2v2h-2v-2z"/>
+              </svg>
               <span className="text-xs">خط دائمي</span>
             </button>
 
@@ -1354,10 +1405,14 @@ export default function DriverHomePage() {
               className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
                 workStatus === 'both'
                   ? 'bg-gradient-to-b from-[#a855f7] to-[#7e22ce] text-white font-black shadow-lg shadow-purple-500/30 scale-[1.02]'
-                  : 'bg-[#242a37]/80 text-[#d8b4fe] hover:bg-[#242a37] font-semibold border border-[#534434]/30'
+                  : isDark 
+                    ? 'bg-[#242a37]/80 text-[#d8b4fe] hover:bg-[#242a37] font-semibold border border-[#534434]/30' 
+                    : 'bg-slate-100 text-purple-800 hover:bg-slate-200 font-semibold border border-slate-200 shadow-xs'
               }`}
             >
-              <span className="material-symbols-outlined text-2xl mb-0.5">auto_awesome</span>
+              <svg className="w-6 h-6 shrink-0 mb-0.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="m19 9 1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25z"/>
+              </svg>
               <span className="text-xs">كلاهما</span>
             </button>
 
@@ -1368,10 +1423,14 @@ export default function DriverHomePage() {
               className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
                 workStatus === 'idle'
                   ? 'bg-gradient-to-b from-[#64748b] to-[#475569] text-white font-black shadow-lg scale-[1.02]'
-                  : 'bg-[#242a37]/80 text-slate-400 hover:bg-[#242a37] font-semibold border border-white/5'
+                  : isDark 
+                    ? 'bg-[#242a37]/80 text-slate-400 hover:bg-[#242a37] font-semibold border border-white/5' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-semibold border border-slate-200 shadow-xs'
               }`}
             >
-              <span className="material-symbols-outlined text-2xl mb-0.5">pause_circle</span>
+              <svg className="w-6 h-6 shrink-0 mb-0.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+              </svg>
               <span className="text-xs">خمول</span>
             </button>
           </div>
@@ -1546,11 +1605,11 @@ export default function DriverHomePage() {
             <div className="space-y-2 text-xs">
               <button
                 type="button"
-                onClick={() => { setSelectedMapStyle('mapbox://styles/mapbox/dark-v11'); setShowLayersModal(false); }}
+                onClick={() => { setSelectedMapStyle('mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'); setShowLayersModal(false); }}
                 className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
               >
-                <span>🌙 الليلي التنفيذي (Midnight Dark)</span>
-                {(!selectedMapStyle || selectedMapStyle.includes('dark-v11')) && <span className="text-[#56e5a9] font-black">✓</span>}
+                <span>🌙 نمط توصيلة المعتمد (Tawseela Custom)</span>
+                {(!selectedMapStyle || selectedMapStyle.includes('cmvdwkv6q003801s82f9t02om')) && <span className="text-[#56e5a9] font-black">✓</span>}
               </button>
               <button
                 type="button"

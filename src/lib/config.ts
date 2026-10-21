@@ -33,8 +33,8 @@ export const config: AppConfig = {
   realtimeMode: (import.meta.env.VITE_REALTIME_MODE || 'polling') as 'polling' | 'signalr' | 'socketio',
 
   mapboxToken: import.meta.env.VITE_MAPBOX_TOKEN || '',
-  mapStyle: import.meta.env.VITE_MAP_STYLE || 'mapbox://styles/mapbox/dark-v11',
-  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || 'mapbox://styles/mapbox/navigation-night-v1',
+  mapStyle: import.meta.env.VITE_MAP_STYLE || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om',
+  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om',
 
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
 

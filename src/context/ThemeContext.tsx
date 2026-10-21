@@ -107,7 +107,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const mapStyle = useMemo(() => {
     return theme === 'light'
       ? 'mapbox://styles/mapbox/light-v11'
-      : 'mapbox://styles/mapbox/dark-v11';
+      : 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
   }, [theme]);
 
   const value = useMemo(
@@ -133,7 +133,7 @@ export function useTheme(): ThemeContextValue {
       theme: fallbackTheme,
       toggleTheme: () => {},
       setTheme: () => {},
-      mapStyle: fallbackTheme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11',
+      mapStyle: fallbackTheme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om',
       isDark: fallbackTheme === 'dark',
     };
   }
