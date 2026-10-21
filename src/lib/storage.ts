@@ -126,5 +126,45 @@ export const storage = {
   },
 };
 
-// تشغيل تنظيف المخلفات التجريبية فوراً عند بدء التطبيق
+export const APP_DATA_VERSION = '2026.10.21.v1';
+const DATA_VERSION_KEY = 'tawseela_data_version';
+
+export function enforceDataVersion(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const currentVersion = localStorage.getItem(DATA_VERSION_KEY);
+    if (currentVersion !== APP_DATA_VERSION) {
+      console.log(`[Storage] Data version migration: (${currentVersion} -> ${APP_DATA_VERSION}). Resetting stale test artifacts and sessions.`);
+      storage.clearAll();
+      storage.clearSession();
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (
+          k.includes('ride') || 
+          k.includes('trip') || 
+          k.includes('active') || 
+          k.includes('pending') || 
+          k.includes('chat') ||
+          k.startsWith('bench_') ||
+          k.startsWith('test_') ||
+          k.startsWith('mock_') ||
+          k.startsWith('sample_') ||
+          k === 'tawseela_test_state'
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      sessionStorage.clear();
+      localStorage.setItem(DATA_VERSION_KEY, APP_DATA_VERSION);
+    }
+  } catch (err) {
+    console.warn('[Storage] enforceDataVersion error:', err);
+  }
+}
+
+// تشغيل تنظيف ومطابقة إصدار البيانات فوراً عند بدء التطبيق
+enforceDataVersion();
 storage.cleanLegacyTestArtifacts();
