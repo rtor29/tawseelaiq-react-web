@@ -57,8 +57,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const show = useCallback((message: string, type: ToastType = 'info', durationMs = 3500) => {
+    if (!message || typeof message !== 'string') return;
+    const trimmed = message.trim();
+    // Filter out false-positive background polling/sync errors
+    if (
+      trimmed === 'الطلب غير موجود' || 
+      trimmed === 'المشوار غير موجود' || 
+      trimmed === 'الرحلة غير موجودة' ||
+      trimmed.includes('الطلب غير موجود') ||
+      trimmed.includes('المشوار غير موجود')
+    ) {
+      console.warn('[Toast Filtered False Negative]:', trimmed);
+      return;
+    }
     const id = nextId++;
-    setToasts((prev) => [...prev, { id, type, message }]);
+    setToasts((prev) => [...prev, { id, type, message: trimmed }]);
     const timer = window.setTimeout(() => {
       timersRef.current.delete(id);
       setToasts((prev) => prev.filter((t) => t.id !== id));

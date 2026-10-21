@@ -48,7 +48,17 @@ interface PendingSeatBooking {
 }
 
 export default function DriverHomePage() {
-  const { show } = useToast();
+  const { show: originalShow } = useToast();
+  const show = useCallback((msg: string, type?: 'success' | 'error' | 'info' | 'warning', duration?: number) => {
+    if (!msg || typeof msg !== 'string') return;
+    const trimmed = msg.trim();
+    if (trimmed.includes('الطلب غير موجود') || trimmed.includes('المشوار غير موجود') || trimmed.includes('الرحلة غير موجودة')) {
+      console.warn('[DriverUI Filtered Toast]:', trimmed);
+      return;
+    }
+    originalShow(msg, type, duration);
+  }, [originalShow]);
+
   const { mapStyle, isDark } = useTheme();
 
   // تحديث تباين الشوارع والتسميات عند تبديل الثيم للكابتن
@@ -462,11 +472,17 @@ export default function DriverHomePage() {
       if (document.hidden) return;
       try {
         const targetId = driverId || rawPhone;
+        if (!targetId || targetId === 'undefined' || targetId === 'null') return;
         const { data: activeData } = await http.get<{ success?: boolean; activeRide?: any }>(
           `/driver/${encodeURIComponent(targetId)}/active-ride`
         );
         if (activeData?.success && activeData.activeRide) {
-          setActiveRide(activeData.activeRide);
+          const r = activeData.activeRide;
+          r.pickupName = r.pickupName || r.pickupAddress || r.pickup_title || 'موقعي الحالي عبر الـ GPS';
+          r.pickupAddress = r.pickupAddress || r.pickupName || r.pickup_title || 'موقعي الحالي عبر الـ GPS';
+          r.dropoffName = r.dropoffName || r.dropoffAddress || r.dropoff_title || r.destination || r.destinationAddress || 'الوجهة المحددة';
+          r.dropoffAddress = r.dropoffAddress || r.dropoffName || r.dropoff_title || r.destination || r.destinationAddress || 'الوجهة المحددة';
+          setActiveRide(r);
           // Don't override workStatus — driver may be in 'both' mode
         } else {
           // CRITICAL: Never nullify an ongoing trip due to a transient poll response!
@@ -727,14 +743,26 @@ export default function DriverHomePage() {
     if (!currentId) return;
     const acceptedReq = incomingRequest;
     try {
-      const { data } = await http.post<{ success: boolean; request: any; message?: string }>('/ride/respond', {
+      const { data } = await http.post<{ success: boolean; request?: any; message?: string; alreadyAccepted?: boolean; notFound?: boolean }>('/ride/respond', {
         requestId: acceptedReq.id,
         driverId: currentId,
         action: 'accept',
       });
       if (data?.success) {
         show('تم قبول المشوار بنجاح! 🚖 توجه إلى موقع الراكب', 'success');
-        setActiveRide(data.request || acceptedReq);
+        const reqObj = data.request || acceptedReq;
+        reqObj.pickupName = reqObj.pickupName || reqObj.pickupAddress || reqObj.pickup_title || 'موقع الراكب';
+        reqObj.dropoffName = reqObj.dropoffName || reqObj.dropoffAddress || reqObj.dropoff_title || reqObj.destination || reqObj.destinationAddress || 'وجهة الراكب';
+        setActiveRide(reqObj);
+        const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
+        setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== accId));
+        if (pendingMarkersRef.current.has(accId)) {
+          pendingMarkersRef.current.get(accId)?.remove();
+          pendingMarkersRef.current.delete(accId);
+        }
+        lastIncomingIdRef.current = null;
+      } else if (data?.alreadyAccepted || data?.notFound) {
+        show('المشوار تم قبوله من كابتن آخر أو تم إلغاؤه', 'info');
         const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
         setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== accId));
         if (pendingMarkersRef.current.has(accId)) {
@@ -743,10 +771,21 @@ export default function DriverHomePage() {
         }
         lastIncomingIdRef.current = null;
       } else {
-        show('تعذر قبول الطلب', 'error');
+        show('تعذر قبول الطلب في الوقت الحالي', 'info');
       }
     } catch (err: any) {
-      show(err?.response?.data?.error || 'حدث خطأ في قبول الطلب', 'error');
+      const errMsg = err?.response?.data?.error || '';
+      if (errMsg && !errMsg.includes('غير موجود')) {
+        show(errMsg, 'error');
+      } else {
+        const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
+        setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== accId));
+        if (pendingMarkersRef.current.has(accId)) {
+          pendingMarkersRef.current.get(accId)?.remove();
+          pendingMarkersRef.current.delete(accId);
+        }
+        lastIncomingIdRef.current = null;
+      }
     }
   }
 
@@ -969,7 +1008,7 @@ export default function DriverHomePage() {
     if (mode === 'pickup') {
       const pLat = activeRide.pickupLat ?? activeRide.pickup_lat ?? activeRide.pickup?.lat;
       const pLon = activeRide.pickupLon ?? activeRide.pickup_lon ?? activeRide.pickup?.lng ?? activeRide.pickup?.lon;
-      const pName = activeRide.pickupName || 'موقع الراكب';
+      const pName = activeRide.pickupName || activeRide.pickupAddress || activeRide.pickup_title || activeRide.originAddress || 'موقع الراكب';
       if (pLat && pLon) {
         setNavCoordinates({ lat: Number(pLat), lng: Number(pLon) });
         setNavTargetName(pName);
@@ -980,7 +1019,7 @@ export default function DriverHomePage() {
     } else {
       const dLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
       const dLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
-      const dName = activeRide.dropoffName || 'وجهة الراكب';
+      const dName = activeRide.dropoffName || activeRide.dropoffAddress || activeRide.dropoff_title || activeRide.destination || activeRide.destinationAddress || 'وجهة الراكب';
       if (dLat && dLon) {
         setNavCoordinates({ lat: Number(dLat), lng: Number(dLon) });
         setNavTargetName(dName);
@@ -1343,10 +1382,10 @@ export default function DriverHomePage() {
               </div>
               <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
                 <p className="text-slate-300">
-                  🟢 من: <span className="font-bold text-white">{activeRide.pickupName}</span>
+                  🟢 من: <span className="font-bold text-white">{activeRide.pickupName || activeRide.pickupAddress || activeRide.pickup_title || activeRide.originAddress || 'موقعي الحالي عبر الـ GPS'}</span>
                 </p>
                 <p className="text-slate-300">
-                  🔴 إلى: <span className="font-bold text-white">{activeRide.dropoffName}</span>
+                  🔴 إلى: <span className="font-bold text-white">{activeRide.dropoffName || activeRide.dropoffAddress || activeRide.dropoff_title || activeRide.destination || activeRide.destinationAddress || 'الوجهة المحددة'}</span>
                 </p>
               </div>
             </div>
