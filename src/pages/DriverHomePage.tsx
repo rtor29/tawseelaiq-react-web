@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { useToast } from '../components/Toast';
-import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
+import { Map as MapGL, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import mapboxgl from 'mapbox-gl';
 import { config } from '../lib/config';
 import { RouteLines, PickupPin, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin } from '../components/map/MapPins';
 import { AppDrawer } from '../components/AppDrawer';
@@ -47,6 +48,8 @@ interface PendingSeatBooking {
 
 interface IncomingRideRequest {
   id: string;
+  rideId?: string;
+  status?: string;
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
@@ -66,6 +69,37 @@ interface IncomingRideRequest {
   routeCoordinates?: [number, number][];
   pickupLocation?: any;
   pickupLng?: number;
+}
+
+// دالة توليد عنصر دبوس طلب التكسي بنقاء تام وعزل عن دورات ريندر React لمنع الوميض
+function createPendingRideMarkerElement(req: IncomingRideRequest, onClick: () => void): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'cursor-pointer group flex flex-col items-center select-none';
+  el.title = 'طلب تكسي جديد';
+
+  const tierBadge = req.tier === 'vip' ? '👑 VIP' : req.tier === 'women' ? '🌸 نسائي' : '🚖 تكسي';
+  const fareFormatted = Number(req.fare || req.price || 3500).toLocaleString();
+
+  el.innerHTML = `
+    <div class="bg-[#161c28]/95 border-2 border-amber-400 text-amber-400 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-xl whitespace-nowrap flex items-center gap-1 mb-1 animate-bounce">
+      <span>${tierBadge}</span>
+      <span>•</span>
+      <span>${fareFormatted} د.ع</span>
+    </div>
+    <div class="relative flex items-center justify-center">
+      <span class="absolute w-8 h-8 rounded-full bg-amber-400/30 animate-ping"></span>
+      <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 border-2 border-[#161c28] text-slate-950 flex items-center justify-center font-black text-sm shadow-xl">
+        🙋
+      </div>
+    </div>
+  `;
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick();
+  });
+
+  return el;
 }
 
 export default function DriverHomePage() {
@@ -247,6 +281,98 @@ export default function DriverHomePage() {
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number }>({ lat: 32.0298, lng: 44.3285 });
   const [isLocating, setIsLocating] = useState(false);
   const [driverRouteCoordinates, setDriverRouteCoordinates] = useState<[number, number][] | null>(null);
+
+  // 1. إدارة دورة حياة دبابيس الخريطة بمرجع دائم (Mapbox Markers Ref Map) لمنع الوميض والتكرار
+  const pendingMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+
+  // مزامنة دبابيس طلبات التكسي المعلقة مع الخريطة باستخدام Diffing ذكي
+  useEffect(() => {
+    const rawMap = mapRef.current?.getMap?.() as mapboxgl.Map | undefined;
+    if (!rawMap) return;
+
+    const currentMarkers = pendingMarkersRef.current;
+    const activePendingIds = new Set(pendingRequests.map((r) => String(r.id || r.rideId)));
+
+    // 1. إزالة الدبابيس التي تم إلغاؤها أو قبولها
+    currentMarkers.forEach((marker, id) => {
+      if (!activePendingIds.has(id)) {
+        marker.remove();
+        currentMarkers.delete(id);
+      }
+    });
+
+    // 2. إضافة الدبابيس الجديدة فقط دون إعادة بناء القديمة
+    pendingRequests.forEach((req) => {
+      const id = String(req.id || req.rideId);
+      if (!currentMarkers.has(id)) {
+        const pLat = Number(
+          req.pickupLat ||
+            (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lat : 0) ||
+            driverLoc.lat + 0.004
+        );
+        const pLng = Number(
+          req.pickupLon ||
+            req.pickupLng ||
+            (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lon : 0) ||
+            driverLoc.lng + 0.003
+        );
+
+        if (pLat && pLng) {
+          const el = createPendingRideMarkerElement(req, () => {
+            if (req.routeCoordinates && req.routeCoordinates.length > 0) {
+              setDriverRouteCoordinates(req.routeCoordinates);
+            }
+          });
+
+          try {
+            const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+              .setLngLat([pLng, pLat])
+              .addTo(rawMap);
+
+            currentMarkers.set(id, marker);
+          } catch (err) {
+            console.warn('[Mapbox] Could not add pending marker:', err);
+          }
+        }
+      }
+    });
+  }, [pendingRequests, driverLoc]);
+
+  // تنظيف كافة الدبابيس المعلقة عند الخروج
+  useEffect(() => {
+    return () => {
+      pendingMarkersRef.current.forEach((marker) => marker.remove());
+      pendingMarkersRef.current.clear();
+    };
+  }, []);
+
+  // خطوط الإرشاد المنقطة بين الكابتن والركاب المعلقين (Memoized لمنع وميض الخريطة)
+  const pendingGuideLines = useMemo(() => {
+    return pendingRequests.map((req) => {
+      const pLat = Number(
+        req.pickupLat ||
+          (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lat : 0) ||
+          driverLoc.lat + 0.004
+      );
+      const pLng = Number(
+        req.pickupLon ||
+          req.pickupLng ||
+          (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lon : 0) ||
+          driverLoc.lng + 0.003
+      );
+      return {
+        id: `guide-line-${req.id || req.rideId}`,
+        coordinates: [
+          [driverLoc.lng, driverLoc.lat],
+          [pLng, pLat],
+        ] as [number, number][],
+        color: '#f59e0b',
+        casingColor: '#f59e0b',
+        width: 2.5,
+        dashed: true,
+      };
+    });
+  }, [pendingRequests, driverLoc.lat, driverLoc.lng]);
 
   // تتبع موقع السائق وتوسيط الخريطة
   useEffect(() => {
@@ -511,12 +637,22 @@ export default function DriverHomePage() {
     const handleIncomingList = (incoming: any) => {
       setPollStatus('connected');
       const validList: IncomingRideRequest[] = Array.isArray(incoming) ? incoming : [];
-      setPendingRequests(validList);
+
+      // State Debouncing: Compare items by unique ID & status to prevent unnecessary re-render loops
+      setPendingRequests((prev) => {
+        const prevKeys = prev.map((r) => `${r.id || (r as any).rideId}:${r.status || 'pending'}`).sort().join('|');
+        const nextKeys = validList.map((r) => `${r.id || (r as any).rideId}:${r.status || 'pending'}`).sort().join('|');
+        if (prevKeys === nextKeys) {
+          return prev; // Reference stability - prevents map and component re-render loops
+        }
+        return validList;
+      });
 
       if (validList.length > 0) {
         const req = validList[0];
-        if (!lastIncomingIdRef.current || lastIncomingIdRef.current !== req.id) {
-          lastIncomingIdRef.current = req.id;
+        const reqId = String(req.id || (req as any).rideId);
+        if (!lastIncomingIdRef.current || lastIncomingIdRef.current !== reqId) {
+          lastIncomingIdRef.current = reqId;
           setCountdown(20);
           try {
             playIncomingTripAlert();
@@ -578,8 +714,35 @@ export default function DriverHomePage() {
       es.addEventListener('dispatch', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          if (data?.pendingRequests) handleIncomingList(data.pendingRequests);
-        } catch (_) {}
+          const evType = data.event || data.type;
+
+          if (evType === 'ride_cancelled' || evType === 'ride_taken') {
+            const cancelledId = String(data.rideId || data.requestId || data.id || '');
+            if (cancelledId) {
+              // مسح فوري من مصفوفة الطلبات
+              setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== cancelledId));
+
+              // إزالة الدبوس فورياً من الخريطة
+              if (pendingMarkersRef.current.has(cancelledId)) {
+                pendingMarkersRef.current.get(cancelledId)?.remove();
+                pendingMarkersRef.current.delete(cancelledId);
+              }
+
+              // تصفير معرف الطلب المنبثق لإغلاق البطاقة فوراً
+              if (lastIncomingIdRef.current === cancelledId) {
+                lastIncomingIdRef.current = null;
+              }
+
+              if (evType === 'ride_cancelled') {
+                show('قام الراكب بإلغاء طلب المشوار ✕', 'info');
+              }
+            }
+          } else if (data?.pendingRequests) {
+            handleIncomingList(data.pendingRequests);
+          }
+        } catch (err) {
+          console.error('[SSE:dispatch] Error handling dispatch event:', err);
+        }
       });
 
       es.addEventListener('driver_event', (e: MessageEvent) => {
@@ -629,7 +792,12 @@ export default function DriverHomePage() {
       if (data?.success) {
         show('تم قبول المشوار بنجاح! 🚖 توجه إلى موقع الراكب', 'success');
         setActiveRide(data.request || acceptedReq);
-        setPendingRequests((prev) => prev.filter((r) => r.id !== acceptedReq.id));
+        const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
+        setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== accId));
+        if (pendingMarkersRef.current.has(accId)) {
+          pendingMarkersRef.current.get(accId)?.remove();
+          pendingMarkersRef.current.delete(accId);
+        }
         lastIncomingIdRef.current = null;
       } else {
         show('تعذر قبول الطلب', 'error');
@@ -643,7 +811,7 @@ export default function DriverHomePage() {
   async function handleRejectRide() {
     if (!incomingRequest) return;
     const currentId = currentTargetId;
-    const rejectedId = incomingRequest.id;
+    const rejectedId = String(incomingRequest.id || (incomingRequest as any).rideId);
     try {
       await http.post('/ride/respond', {
         requestId: rejectedId,
@@ -651,7 +819,11 @@ export default function DriverHomePage() {
         action: 'reject',
       });
     } catch (_) {}
-    setPendingRequests((prev) => prev.filter((r) => r.id !== rejectedId));
+    setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== rejectedId));
+    if (pendingMarkersRef.current.has(rejectedId)) {
+      pendingMarkersRef.current.get(rejectedId)?.remove();
+      pendingMarkersRef.current.delete(rejectedId);
+    }
     lastIncomingIdRef.current = null;
     show('تم رفض الطلب', 'info');
   }
@@ -1070,55 +1242,10 @@ export default function DriverHomePage() {
             />
           )}
 
-          {/* دبابيس طلبات التكسي الحية المعلقة على الخريطة مباشرة مع الخطوط المرشدة */}
-          {pendingRequests.map((req) => {
-            const pLat = Number(req.pickupLat || (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lat : 0) || (driverLoc.lat + 0.004));
-            const pLng = Number(req.pickupLon || req.pickupLng || (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lon : 0) || (driverLoc.lng + 0.003));
-            return (
-              <div key={req.id}>
-                <Marker longitude={pLng} latitude={pLat} anchor="bottom">
-                  <div
-                    onClick={() => {
-                      if (req.routeCoordinates && req.routeCoordinates.length > 0) {
-                        setDriverRouteCoordinates(req.routeCoordinates);
-                      }
-                    }}
-                    className="cursor-pointer group flex flex-col items-center select-none"
-                    title="طلب تكسي جديد"
-                  >
-                    <div className="bg-[#161c28]/95 border-2 border-amber-400 text-amber-400 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-xl whitespace-nowrap flex items-center gap-1 mb-1 animate-bounce">
-                      <span>{req.tier === 'vip' ? '👑 VIP' : req.tier === 'women' ? '🌸 نسائي' : '🚖 تكسي'}</span>
-                      <span>•</span>
-                      <span>{Number(req.fare || req.price || 3500).toLocaleString()} د.ع</span>
-                    </div>
-                    <div className="relative flex items-center justify-center">
-                      <span className="absolute w-8 h-8 rounded-full bg-amber-400/30 animate-ping" />
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 border-2 border-[#161c28] text-slate-950 flex items-center justify-center font-black text-sm shadow-xl">
-                        🙋
-                      </div>
-                    </div>
-                  </div>
-                </Marker>
-
-                {/* خط مرشد منقط بين الكابتن وموقع الراكب */}
-                <RouteLines
-                  lines={[
-                    {
-                      id: `guide-line-${req.id}`,
-                      coordinates: [
-                        [driverLoc.lng, driverLoc.lat],
-                        [pLng, pLat],
-                      ],
-                      color: '#f59e0b',
-                      casingColor: '#f59e0b',
-                      width: 2.5,
-                      dashed: true,
-                    },
-                  ]}
-                />
-              </div>
-            );
-          })}
+          {/* خطوط مرشدة منقطة بين الكابتن والركاب المعلقين (Memoized & Diffed) */}
+          {pendingGuideLines.length > 0 && (
+            <RouteLines lines={pendingGuideLines} />
+          )}
         </MapGL>
       </div>
 

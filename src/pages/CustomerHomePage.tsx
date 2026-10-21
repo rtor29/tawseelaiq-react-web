@@ -1569,6 +1569,7 @@ export default function CustomerHomePage() {
       try {
         await http.post('/ride/cancel', {
           requestId: rideRequestId,
+          rideId: rideRequestId,
           reason: cancelReason,
         });
         show('تم إلغاء الرحلة', 'info');
