@@ -6,7 +6,8 @@ import { useToast } from '../components/Toast';
 import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { config } from '../lib/config';
-import { RouteLines } from '../components/map/MapPins';
+import { RouteLines, PickupPin, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin } from '../components/map/MapPins';
+import { AppDrawer } from '../components/AppDrawer';
 import { applyMapEnhancements } from '../lib/mapbox';
 import { playIncomingTripAlert } from '../lib/sound';
 import { useTheme } from '../context/ThemeContext';
@@ -60,6 +61,11 @@ interface IncomingRideRequest {
   isRoundTrip?: boolean;
   secondDestination?: string;
   stopDuration?: number;
+  tier?: string;
+  price?: number;
+  routeCoordinates?: [number, number][];
+  pickupLocation?: any;
+  pickupLng?: number;
 }
 
 export default function DriverHomePage() {
@@ -224,6 +230,17 @@ export default function DriverHomePage() {
 
   // نافذة الطوارئ SOS
   const [showSosAlert, setShowSosAlert] = useState(false);
+
+  // نافذة الحساب الشخصي وطبقات الخريطة والدرج السفلي (screen_3.png)
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showLayersModal, setShowLayersModal] = useState(false);
+  const [selectedMapStyle, setSelectedMapStyle] = useState<string | null>(null);
+  const [isBottomDockExpanded, setIsBottomDockExpanded] = useState(false);
+  const driverAvatar = storage.getAvatar() || null;
+
+  function handleRecenterOrHome() {
+    handleRecenterDriverMap();
+  }
 
   // الخريطة والموقع
   const mapRef = useRef<MapRef | null>(null);
@@ -963,811 +980,648 @@ export default function DriverHomePage() {
 
   return (
     <div 
-      className={`w-full min-h-[100dvh] flex flex-col font-cairo selection:bg-amber-500 transition-colors duration-200 ${
+      className={`relative w-full h-[100dvh] overflow-hidden font-cairo select-none ${
         isDark ? 'bg-[#080E1A] text-[#DDE2F4]' : 'bg-[#F8FAFC] text-[#0F172A]'
       }`} 
-      style={{ minHeight: '100dvh', backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }}
+      style={{ minHeight: '100dvh', touchAction: 'pan-y' }}
       dir="rtl"
     >
-      {/* 1. شريط المؤشرات العلوي للكابتن (Captain Top HUD Bar) */}
-      <header className={`sticky top-0 z-30 flex items-center justify-between border-b px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-xl shadow-lg transition-colors ${
-        isDark ? 'bg-[#161C28]/95 border-white/10 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
-      }`} dir="rtl">
-        {/* اليمين: الشعار المفرغ ومعلومات الكابتن */}
-        <div className="flex items-center gap-2.5">
-          <img
-            src="/logo.png?v=40"
-            alt="توصيلة"
-            className="h-8 max-w-[190px] w-auto object-contain select-none pointer-events-none drop-shadow"
+      {/* 1. خريطة تفاعلية تغطي كامل الشاشة (Midnight Executive Mapbox Canvas) */}
+      <div className="absolute inset-0 w-full h-full z-0">
+        <MapGL
+          ref={mapRef}
+          mapboxAccessToken={config.mapboxToken}
+          mapStyle={selectedMapStyle || mapStyle || (isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/streets-v12')}
+          initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
+          cooperativeGestures={true}
+          onLoad={(e) => {
+            applyMapEnhancements(e.target, isDark);
+          }}
+          style={{ width: '100%', height: '100%' }}
+        >
+          {/* مسار الملاحة الانسيابي الذهبي مع الهالة النيونية */}
+          {driverRouteCoordinates && driverRouteCoordinates.length > 0 && (
+            <RouteLines
+              lines={[
+                {
+                  id: 'driver-route-line',
+                  coordinates: driverRouteCoordinates,
+                  color: '#F59E0B',
+                  casingColor: '#F59E0B',
+                  width: 3.0,
+                },
+              ]}
+            />
+          )}
+
+          {/* موقع الكابتن الحالي مع الرادار الزمردي النابض */}
+          <PickupPin point={driverLoc} />
+
+          {/* دبوس أقرب كابتن مع كبسولة «٣ دقيقة» النطاطة */}
+          <NearestDriverPin
+            point={{ lat: driverLoc.lat + 0.0022, lng: driverLoc.lng + 0.0028 }}
+            duration="٣ دقيقة"
           />
-          <div className="text-right">
-            <p className={`text-[14.5px] font-black leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{driverName}</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[11px] font-bold text-amber-500 dark:text-amber-400">⭐ 4.9</span>
-              <span className="text-slate-400 dark:text-slate-500 text-[10px]">•</span>
-              <span className="text-[10.5px] font-bold text-emerald-500 dark:text-emerald-400">كابتن معتمد</span>
-              <span className="text-slate-400 dark:text-slate-500 text-[10px]">•</span>
-              <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`} dir="ltr">{formattedPhone}</span>
-            </div>
-          </div>
-        </div>
 
-        {/* اليسار: مفتاح الاتصال السريع، زر تبديل الثيم، وبطاقة الأرباح */}
-        <div className="flex items-center gap-2">
-          {/* كبسولة الأرباح السريعة */}
-          <div className={`hidden sm:flex flex-col text-left font-mono px-2.5 py-1 rounded-xl border ${
-            isDark ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'
-          }`}>
-            <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>أرباح اليوم</span>
-            <span className="text-xs font-bold text-amber-500 dark:text-amber-400">{driverBalance} د.ع</span>
-          </div>
+          {/* دبابيس الكباتن المحيطة باللون الذهبي الهادئ */}
+          <SurroundingDriverPin point={{ lat: driverLoc.lat - 0.0025, lng: driverLoc.lng - 0.0032 }} />
+          <SurroundingDriverPin point={{ lat: driverLoc.lat + 0.0031, lng: driverLoc.lng - 0.0038 }} />
+          <SurroundingDriverPin point={{ lat: driverLoc.lat - 0.0018, lng: driverLoc.lng + 0.0039 }} />
 
-          {/* زر تبديل الوضع النهاري والليلي الشامل */}
-          <ThemeToggleButton />
+          {/* راية الوجهة المعتمدة: جامعة الكوفة */}
+          <DestinationFlagPin
+            point={{ lat: 32.0298, lng: 44.3725 }}
+            name="جامعة الكوفة"
+          />
 
-          {/* مفتاح الاتصال السريع (Online/Offline Toggle Pill) - Target >= 48px */}
-          <button
-            type="button"
-            onClick={() => handleSwitchWorkStatus(isOnline ? 'idle' : 'taxi')}
-            className={`min-h-[48px] px-3.5 py-2 rounded-full flex items-center gap-2 transition-all cursor-pointer active:scale-95 border ${
-              isOnline
-                ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/20'
-                : isDark
-                ? 'bg-slate-800 text-slate-400 border-slate-700/60'
-                : 'bg-slate-100 text-slate-600 border-slate-300'
-            }`}
-            title="تبديل حالة الاتصال"
-            aria-label="تبديل الاتصال"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              {isOnline && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOnline ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
-            </span>
-            <span className="text-xs font-black">{isOnline ? 'متصل' : 'خمول'}</span>
-          </button>
-        </div>
-      </header>
+          {/* وجهة المشوار النشط إذا كان موجوداً */}
+          {activeRide && (activeRide.dropoffLat || activeRide.destinationLat) && (
+            <DestinationFlagPin
+              point={{
+                lat: Number(activeRide.dropoffLat || activeRide.destinationLat || 32.0298),
+                lng: Number(activeRide.dropoffLng || activeRide.dropoffLon || activeRide.destinationLon || 44.3725),
+              }}
+              name={activeRide.dropoffName || activeRide.destination || 'وجهة الراكب'}
+            />
+          )}
 
-      {/* المحتوى الرئيسي */}
-      <main 
-        className="w-full max-w-md mx-auto px-4 pt-3 flex flex-col gap-4 flex-1"
-        style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom, 32px))' }}
-        dir="rtl"
-      >
-        {/* شريط الإحصائيات المدمج للموبايل */}
-        <div className="grid grid-cols-3 gap-2 mb-3 sm:hidden">
-          <div className={`rounded-2xl p-2.5 text-center shadow-md border ${
-            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-white border-slate-200 shadow-sm'
-          }`}>
-            <span className={`text-[10px] block mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>أرباح اليوم</span>
-            <span className="text-xs font-black text-amber-500 dark:text-amber-400 font-mono">{driverBalance}</span>
-          </div>
-          <div className={`rounded-2xl p-2.5 text-center shadow-md border ${
-            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-white border-slate-200 shadow-sm'
-          }`}>
-            <span className={`text-[10px] block mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>التقييم</span>
-            <span className="text-xs font-black text-emerald-500 dark:text-emerald-400">⭐ 4.9</span>
-          </div>
-          <div className={`rounded-2xl p-2.5 text-center shadow-md border ${
-            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-white border-slate-200 shadow-sm'
-          }`}>
-            <span className={`text-[10px] block mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>النقاط</span>
-            <span className={`text-xs font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{driverPoints}</span>
-          </div>
-        </div>
-
-        {/* تنبيه وصول رسالة من الراكب */}
-        {latestPassengerMsg && activeRide && (
-          <div
-            onClick={() => setIsChatOpen(true)}
-            className={`mb-3 flex items-center justify-between rounded-2xl border p-3 shadow-xl cursor-pointer transition active:scale-[0.99] animate-fade-in ${
-              isDark
-                ? 'bg-[#161C28] border-amber-500/40 text-white hover:border-amber-400'
-                : 'bg-white border-amber-500/50 text-slate-900 hover:border-amber-500 shadow-md'
-            }`}
-            dir="rtl"
-          >
-            <div className="flex items-center gap-2.5 text-right">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-500 dark:text-amber-400 text-lg">
-                💬
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] font-bold text-amber-500 dark:text-amber-400">
-                  رسالة جديدة من الراكب ({activeRide.customerName || 'الراكب'}):
-                </p>
-                <p className={`text-[13px] font-semibold truncate max-w-[190px] ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {latestPassengerMsg.text}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {unreadCount > 0 && (
-                <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
-              <span className="rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300 px-3 py-1.5 text-xs font-bold flex items-center gap-1 border border-amber-500/30">
-                <span>فتح المحادثة</span>
-                <span>➔</span>
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* تنبيه وجود طلبات حجز مقاعد جديدة في الخط الدائمي */}
-        {pendingSeatRequests.length > 0 && workStatus !== 'permanent' && workStatus !== 'both' && (
-          <div
-            onClick={() => handleSwitchWorkStatus('permanent')}
-            className={`mb-3 flex items-center justify-between rounded-2xl border p-3 shadow-xl cursor-pointer transition active:scale-[0.99] animate-fade-in ${
-              isDark
-                ? 'bg-amber-500/15 border-amber-400/50 text-amber-300 hover:bg-amber-500/20'
-                : 'bg-amber-50 border-amber-400 text-amber-900 hover:bg-amber-100 shadow-md'
-            }`}
-            dir="rtl"
-          >
-            <div className="text-right">
-              <p className={`text-[13px] font-bold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                <span>💺</span>
-                <span>لديك {pendingSeatRequests.length} طلب حجز مقعد في الخط الدائمي!</span>
-              </p>
-              <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-300/80' : 'text-amber-700'}`}>اضغط هنا لمعاينة بيانات الراكب واتخاذ القرار</p>
-            </div>
-            <span className="rounded-xl bg-amber-500 text-slate-950 font-black px-3 py-1.5 text-xs shadow-md shrink-0">
-              معاينة ➔
-            </span>
-          </div>
-        )}
-
-        {/* أزرار التبديل الرباعية لنمط العمل (Segmented Luxury Control) */}
-        <section className="mb-3 text-right" dir="rtl">
-          <div className={`grid grid-cols-4 gap-1 p-1.5 rounded-2xl border shadow-lg ${
-            isDark ? 'bg-[#161C28]/90 border-white/10' : 'bg-slate-200/80 border-slate-300'
-          }`} dir="rtl">
-            {/* خمول */}
-            <button
-              type="button"
-              onClick={() => handleSwitchWorkStatus('idle')}
-              className={`rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
-                workStatus === 'idle'
-                  ? isDark
-                    ? 'bg-slate-700/80 text-white shadow-md border border-slate-600'
-                    : 'bg-white text-slate-800 shadow-md border border-slate-300'
-                  : isDark
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              خمول
-            </button>
-
-            {/* تكسي فوري */}
-            <button
-              type="button"
-              onClick={() => handleSwitchWorkStatus('taxi')}
-              className={`rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex items-center justify-center font-bold ${
-                workStatus === 'taxi'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                  : isDark
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              تكسي
-            </button>
-
-            {/* خط دائمي */}
-            <button
-              type="button"
-              onClick={() => handleSwitchWorkStatus('permanent')}
-              className={`relative flex items-center justify-center gap-1 rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] font-bold ${
-                workStatus === 'permanent'
-                  ? isDark
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50 shadow-md'
-                    : 'bg-amber-100 text-amber-800 border border-amber-300 shadow-md'
-                  : isDark
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {pendingSeatRequests.length > 0 && (
-                <span className="absolute -top-1 -start-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md animate-bounce">
-                  {pendingSeatRequests.length}
-                </span>
-              )}
-              <span>خط دائمي</span>
-            </button>
-
-            {/* كلاهما */}
-            <button
-              type="button"
-              onClick={() => handleSwitchWorkStatus('both')}
-              className={`relative rounded-xl py-2 text-center text-[11px] sm:text-xs transition-all duration-200 cursor-pointer active:scale-95 min-h-[48px] flex flex-col items-center justify-center font-bold leading-tight ${
-                workStatus === 'both'
-                  ? 'bg-gradient-to-b from-emerald-600/60 to-amber-500/40 text-white border border-emerald-400/40 shadow-md'
-                  : isDark
-                  ? 'text-slate-400 hover:text-white'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <span>كلاهما</span>
-              {workStatus === 'both' && <span className="text-[9px] opacity-70">🚖🚌</span>}
-            </button>
-          </div>
-        </section>
-
-        {/* 2. الخريطة الليلية ورادار البحث عن المشاوير (Nocturnal Radar Map) */}
-        {(workStatus === 'taxi' || workStatus === 'both') && (
-          <section className="space-y-3">
-            <div className={`relative w-full h-[280px] sm:h-[320px] rounded-3xl overflow-hidden shadow-2xl border touch-pan-y ${
-              isDark ? 'border-white/10 bg-[#0A101D]' : 'border-slate-200 bg-slate-100 shadow-md'
-            }`}>
-              <MapGL
-                ref={mapRef}
-                mapboxAccessToken={config.mapboxToken}
-                mapStyle={mapStyle}
-                initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
-                cooperativeGestures={true}
-                onLoad={(e) => {
-                  applyMapEnhancements(e.target, isDark);
-                }}
-                style={{ width: '100%', height: '100%' }}
-              >
-                {/* مسار الملاحة الانسيابي النحيف (Sleek Slim Polyline - 2.8px) */}
-                {driverRouteCoordinates && driverRouteCoordinates.length > 0 && (
-                  <RouteLines
-                    lines={[
-                      {
-                        id: 'driver-route-line',
-                        coordinates: driverRouteCoordinates,
-                        color: '#F59E0B',
-                      },
-                    ]}
-                  />
-                )}
-
-                {/* سيارة الكابتن التفاعلية مع موجة الرادار النابضة */}
-                <Marker longitude={driverLoc.lng} latitude={driverLoc.lat} anchor="center">
-                  <div className="relative flex items-center justify-center">
-                    <div className="animate-ping absolute h-12 w-12 rounded-full bg-amber-500/25" />
-                    <div className="h-9 w-9 rounded-full bg-[#1A202C] border-2 border-amber-400 shadow-2xl flex items-center justify-center text-amber-400 text-base font-bold">
-                      🚖
+          {/* دبابيس طلبات التكسي الحية المعلقة على الخريطة مباشرة مع الخطوط المرشدة */}
+          {pendingRequests.map((req) => {
+            const pLat = Number(req.pickupLat || (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lat : 0) || (driverLoc.lat + 0.004));
+            const pLng = Number(req.pickupLon || req.pickupLng || (req.pickupLocation && typeof req.pickupLocation === 'object' ? req.pickupLocation.lon : 0) || (driverLoc.lng + 0.003));
+            return (
+              <div key={req.id}>
+                <Marker longitude={pLng} latitude={pLat} anchor="bottom">
+                  <div
+                    onClick={() => {
+                      if (req.routeCoordinates && req.routeCoordinates.length > 0) {
+                        setDriverRouteCoordinates(req.routeCoordinates);
+                      }
+                    }}
+                    className="cursor-pointer group flex flex-col items-center select-none"
+                    title="طلب تكسي جديد"
+                  >
+                    <div className="bg-[#161c28]/95 border-2 border-amber-400 text-amber-400 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-xl whitespace-nowrap flex items-center gap-1 mb-1 animate-bounce">
+                      <span>{req.tier === 'vip' ? '👑 VIP' : req.tier === 'women' ? '🌸 نسائي' : '🚖 تكسي'}</span>
+                      <span>•</span>
+                      <span>{Number(req.fare || req.price || 3500).toLocaleString()} د.ع</span>
+                    </div>
+                    <div className="relative flex items-center justify-center">
+                      <span className="absolute w-8 h-8 rounded-full bg-amber-400/30 animate-ping" />
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 border-2 border-[#161c28] text-slate-950 flex items-center justify-center font-black text-sm shadow-xl">
+                        🙋
+                      </div>
                     </div>
                   </div>
                 </Marker>
-              </MapGL>
 
-              {/* شارة حالة الرادار العائمة */}
-              <div className="absolute top-3 right-3 z-20 pointer-events-none">
-                <div className={`flex items-center gap-1.5 backdrop-blur-xl border px-3 py-1.5 rounded-full shadow-lg ${
-                  isDark ? 'bg-[#161C28]/90 border-emerald-500/30 text-white' : 'bg-white/90 border-emerald-500/40 text-slate-900'
-                }`}>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-                  </span>
-                  <span className="font-bold text-[11px]">رادار المشاوير نشط</span>
-                </div>
+                {/* خط مرشد منقط بين الكابتن وموقع الراكب */}
+                <RouteLines
+                  lines={[
+                    {
+                      id: `guide-line-${req.id}`,
+                      coordinates: [
+                        [driverLoc.lng, driverLoc.lat],
+                        [pLng, pLat],
+                      ],
+                      color: '#f59e0b',
+                      casingColor: '#f59e0b',
+                      width: 2.5,
+                      dashed: true,
+                    },
+                  ]}
+                />
               </div>
+            );
+          })}
+        </MapGL>
+      </div>
 
-              {/* أزرار التحكم الجانبية العائمة: GPS و SOS - Touch Targets >= 48px */}
-              <div className="absolute left-3 bottom-3 z-30 flex flex-col gap-2">
-                {/* زر SOS للطوارئ */}
-                <button
-                  type="button"
-                  onClick={() => setShowSosAlert((prev) => !prev)}
-                  className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-red-600/90 text-white shadow-xl shadow-red-600/30 border border-red-400/40 flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
-                  title="طوارئ وأمان الكابتن"
-                  aria-label="طوارئ"
-                >
-                  <span className="text-base font-bold">🆘</span>
-                </button>
+      {/* 2. الترويسة العلوية العائمة (Top Floating HUD Header) - مطابقة لـ code_4.html و screen_3.png */}
+      <header className="fixed top-0 inset-x-0 z-50 pt-[calc(0.5rem+env(safe-area-inset-top,0.5rem))] pointer-events-none" dir="rtl">
+        <div className="flex justify-between items-center px-4 py-2 max-w-lg mx-auto w-full">
+          {/* زر الرئيسية - إعادة التمركز لموقع الكابتن */}
+          <button
+            type="button"
+            onClick={handleRecenterOrHome}
+            className="pointer-events-auto min-h-[48px] min-w-[48px] h-12 w-12 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-[#f59e0b]/40 shadow-xl flex items-center justify-center text-[#ffc174] active:scale-95 transition-all cursor-pointer"
+            aria-label="الرئيسية وتوسيط الخريطة"
+            title="الرئيسية"
+          >
+            <span className="material-symbols-outlined text-2xl">home</span>
+          </button>
 
-                {/* زر إعادة التمركز */}
-                <button
-                  type="button"
-                  onClick={handleRecenterDriverMap}
-                  disabled={isLocating}
-                  className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-full text-amber-500 dark:text-amber-400 border border-amber-500/40 shadow-xl backdrop-blur-xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer ${
-                    isDark ? 'bg-[#161C28]/95' : 'bg-white/95 border-amber-400'
-                  } ${
-                    isLocating ? 'animate-spin border-amber-400 ring-2 ring-amber-400/30' : ''
-                  }`}
-                  title="تحديد موقعي الفعلي"
-                  aria-label="تحديد موقعي"
-                >
-                  <span className="text-lg">🎯</span>
-                </button>
-              </div>
-
-              {/* نافذة الطوارئ للكابتن */}
-              {showSosAlert && (
-                <div className={`absolute inset-x-3 bottom-16 z-40 border rounded-2xl p-3.5 shadow-2xl backdrop-blur-2xl animate-fade-in flex flex-col gap-2 ${
-                  isDark ? 'bg-[#161C28]/95 border-red-500/40 text-white' : 'bg-white/95 border-red-400 text-slate-900'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-red-500 dark:text-red-400 flex items-center gap-1.5">
-                      <span>🚨</span>
-                      <span>غرفة طوارئ وعمليات الكباتن - النجف</span>
-                    </span>
-                    <button onClick={() => setShowSosAlert(false)} className={`text-xs p-1 ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}>✕</button>
-                  </div>
-                  <p className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                    عند إرسال النداء، سيتم إرسال إحداثيات سيارتك الحية مباشرة إلى غرفة العمليات المركزية لإرسال المساعدة.
-                  </p>
-                  <a
-                    href="tel:911"
-                    className="w-full min-h-[48px] py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/30"
-                  >
-                    <span>📞</span>
-                    <span>اتصال فوري بغرفة العمليات</span>
-                  </a>
-                </div>
-              )}
+          {/* تبديل الثيم وزر الملف الشخصي الموحد */}
+          <div className="pointer-events-auto flex items-center gap-2">
+            <div className="hidden sm:block">
+              <ThemeToggleButton />
             </div>
 
-            {/* 3. بطاقة المشوار النشط (Active Trip Captain Control Dock) */}
-            {hasRealActiveTrip && activeRide ? (
-              <div className={`rounded-3xl border p-4 shadow-2xl backdrop-blur-2xl animate-fade-in ${
-                isDark ? 'border-emerald-500/60 bg-[#161C28]/95 text-white' : 'border-emerald-500 bg-white/98 text-slate-900 shadow-xl'
-              }`}>
-                <div className={`flex items-center justify-between pb-3 mb-3 border-b ${
-                  isDark ? 'border-white/10' : 'border-slate-200'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-600 dark:text-emerald-300 border border-emerald-500/40">
-                      {activeRide.status === 'Arrived'
-                        ? 'وصلت إلى موقع الراكب 📍'
-                        : (activeRide.status === 'InProgress' || activeRide.status === 'in_progress')
-                        ? 'في الطريق إلى الوجهة 🚗'
-                        : 'مشوار نشط • بالانتظار 🚖'}
-                    </span>
-                    <button
-                      type="button"
-                      title="فتح الملاحة الخارجية"
-                      onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
-                      className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-sky-500/20 text-sky-500 dark:text-sky-400 border border-sky-500/30 active:scale-95 transition cursor-pointer"
-                    >
-                      🧭
-                    </button>
-                  </div>
-                  <span className="text-base font-black text-amber-500 dark:text-amber-400 font-mono">
-                    {Number(String(activeRide.fare || activeRide.price || '3500').replace(/[^0-9]/g, '')).toLocaleString()} د.ع
-                  </span>
-                </div>
+            {/* زر القائمة الموحدة والبروفايل - يفتح AppDrawer */}
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(true)}
+              className="min-h-[48px] min-w-[48px] h-12 w-12 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-[#534434]/40 shadow-xl flex items-center justify-center text-[#56e5a9] active:scale-95 transition-all relative cursor-pointer"
+              aria-label="الملف الشخصي والقائمة الموحدة"
+              title="القائمة الموحدة"
+            >
+              {driverAvatar ? (
+                <img src={driverAvatar} alt="الملف" className="w-full h-full rounded-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-2xl">person</span>
+              )}
+              <span className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-[#161c28] ${
+                isOnline ? 'bg-[#56e5a9] animate-pulse' : 'bg-slate-500'
+              }`} />
+            </button>
+          </div>
+        </div>
+      </header>
 
-                <div className="text-right space-y-1.5 mb-4 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      الراكب: {activeRide.customerName || 'راكب توصيلة'}
-                    </span>
-                    <span className="text-amber-500 dark:text-amber-400 text-xs">⭐ 5.0</span>
-                  </div>
-                  <div className={`p-2.5 rounded-2xl border space-y-1 ${
-                    isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
-                      🟢 من: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{activeRide.pickupName}</span>
-                    </p>
-                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
-                      🔴 إلى: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{activeRide.dropoffName}</span>
-                    </p>
-                  </div>
-                </div>
+      {/* 3. المؤشرات الجانبية العائمة على الخريطة (Floating HUD Overlays) */}
+      <div className="fixed top-18 inset-x-0 pointer-events-none z-40 px-4 max-w-lg mx-auto w-full flex justify-between items-start" dir="rtl">
+        {/* اليمين: كبسولة عدد الكباتن والوجهة */}
+        <div className="flex flex-col gap-2 pointer-events-auto">
+          <div className="bg-[#161c28]/90 backdrop-blur-md border border-[#56e5a9]/40 rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 text-xs text-[#56e5a9] font-bold">
+            <span className={`w-2 h-2 rounded-full ${pollStatus === 'error' ? 'bg-red-500' : 'bg-[#56e5a9]'} animate-pulse`} />
+            <span>٤ كباتن متوفرين قربك الآن ⚡</span>
+          </div>
+          <div className="bg-[#242a37]/90 backdrop-blur-md border border-[#534434]/40 rounded-full px-3 py-1 shadow-md flex items-center gap-1.5 text-[11px] text-[#ffc174] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+            <span>جامعة الكوفة</span>
+          </div>
+        </div>
 
-                {/* أزرار مراحل الرحلة والتواصل - Touch Targets >= 48px */}
-                <div className="space-y-2.5">
-                  {/* أزرار الاتصال والمراسلة والملاحة السريعة */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {activeRide.customerPhone && (
-                      <button
-                        type="button"
-                        onClick={() => window.open(`tel:${activeRide.customerPhone}`)}
-                        className="min-h-[48px] py-2 px-2 rounded-xl bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-emerald-600/30 transition cursor-pointer active:scale-95"
-                      >
-                        <span>📞</span>
-                        <span>اتصال</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
-                      className="min-h-[48px] py-2 px-2 rounded-xl bg-sky-600/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
-                    >
-                      <span>🧭</span>
-                      <span>ملاحة</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsChatOpen(true)}
-                      className="min-h-[48px] py-2 px-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-amber-500/30 transition cursor-pointer active:scale-95 relative"
-                    >
-                      <span>💬</span>
-                      <span>محادثة</span>
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-1 -start-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white animate-pulse">
-                          {unreadCount}
-                        </span>
-                      )}
-                    </button>
-                  </div>
+        {/* اليسار: أدوات التحكم بالخريطة والطوارئ */}
+        <div className="flex flex-col gap-2.5 pointer-events-auto">
+          <button
+            type="button"
+            onClick={handleRecenterOrHome}
+            className={`min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer hover:bg-[#242a37] ${isLocating ? 'animate-spin text-amber-400' : ''}`}
+            title="موقعي الحالي"
+          >
+            <span className="material-symbols-outlined text-[22px]">my_location</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLayersModal(true)}
+            className="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-[#161c28]/85 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer hover:bg-[#242a37]"
+            title="طبقات الخريطة"
+          >
+            <span className="material-symbols-outlined text-[22px]">layers</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSosAlert(true)}
+            className="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-[#93000a] border border-[#ffb4ab]/40 shadow-lg flex items-center justify-center text-[#ffdad6] active:scale-90 transition-transform animate-pulse cursor-pointer hover:bg-red-800"
+            title="طوارئ SOS"
+          >
+            <span className="material-symbols-outlined text-[22px]">emergency</span>
+          </button>
+        </div>
+      </div>
 
-                  {/* الزر الرئيسي العريض لمرحلة الرحلة (Slide / Large Action Button) - 56px */}
-                  {activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? (
-                    <button
-                      type="button"
-                      onClick={handleDriverArrived}
-                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
-                    >
-                      <span>📍</span>
-                      <span>أنا في موقع الراكب (وصلت)</span>
-                    </button>
-                  ) : activeRide.status === 'Arrived' ? (
-                    <div className="flex flex-col gap-2.5 w-full">
-                      <button
-                        type="button"
-                        onClick={handleTriggerHorn}
-                        disabled={isTriggeringHorn}
-                        className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer border border-amber-300 disabled:opacity-60"
-                      >
-                        <span className="text-xl animate-bounce">📢</span>
-                        <span>{isTriggeringHorn ? 'جاري التنبيه...' : 'تنبيه الراكب (بيب بيب 🚖)'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleDriverStartRide}
-                        className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
-                      >
-                        <span className="text-xl">🚗💨</span>
-                        <span>بدء المشوار والانطلاق</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleInitiateCompleteRide}
-                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
-                    >
-                      <span>🏁</span>
-                      <span>إنهاء الرحلة واحتساب الأجرة</span>
-                    </button>
-                  )}
-                </div>
+      {/* 4. بطاقة المشوار النشط العائمة (Floating Active Trip Control Card) */}
+      {hasRealActiveTrip && activeRide && (
+        <div className="fixed bottom-[108px] inset-x-0 z-35 px-4 max-w-lg mx-auto w-full pointer-events-auto" dir="rtl">
+          <div className="rounded-3xl border border-emerald-500/60 bg-[#161C28]/95 p-4 shadow-2xl backdrop-blur-2xl text-white animate-fade-in space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-black text-emerald-300 border border-emerald-500/40">
+                  {activeRide.status === 'Arrived'
+                    ? 'وصلت إلى موقع الراكب 📍'
+                    : (activeRide.status === 'InProgress' || activeRide.status === 'in_progress')
+                    ? 'في الطريق إلى الوجهة 🚗'
+                    : 'مشوار نشط • بالانتظار 🚖'}
+                </span>
+                <button
+                  type="button"
+                  title="فتح الملاحة الخارجية"
+                  onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
+                  className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 active:scale-95 transition cursor-pointer"
+                >
+                  🧭
+                </button>
               </div>
-            ) : shouldShowDispatchSheet && incomingRequest ? (
-              /* 4. بطاقة استقبال المشوار الواردة الفاخرة (Incoming Trip Dispatch Sheet) */
-              <div className={`rounded-3xl border-2 border-amber-500 p-5 shadow-[0_-12px_40px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-fade-in space-y-3 ${
-                isDark ? 'bg-[#161C28]/95 text-white' : 'bg-white/98 text-slate-900 shadow-2xl'
-              }`}>
-                {/* شريط العد التنازلي التفاعلي */}
-                <div className={`w-full h-2 rounded-full overflow-hidden mb-1 ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
-                  <div
-                    className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
-                    style={{ width: `${(countdown / 20) * 100}%` }}
-                  />
-                </div>
+              <span className="text-base font-black text-amber-400 font-mono">
+                {Number(String(activeRide.fare || activeRide.price || '3500').replace(/[^0-9]/g, '')).toLocaleString()} د.ع
+              </span>
+            </div>
 
-                <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-500 dark:text-amber-300 px-3 py-1 text-xs font-black animate-pulse">
-                      طلب مشوار جديد ({countdown} ثانية) 🚖
-                    </span>
-                    {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
-                      <span className="rounded-full bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs">
-                        ⚡ ذروة
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-xl font-black text-amber-500 dark:text-amber-400 font-mono">
-                    {Number(incomingRequest.fare || 0).toLocaleString()} د.ع
+            <div className="text-right space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-sm text-white">
+                  الراكب: {activeRide.customerName || 'راكب توصيلة'}
+                </span>
+                <span className="text-amber-400 text-xs font-bold">⭐ 5.0</span>
+              </div>
+              <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
+                <p className="text-slate-300">
+                  🟢 من: <span className="font-bold text-white">{activeRide.pickupName}</span>
+                </p>
+                <p className="text-slate-300">
+                  🔴 إلى: <span className="font-bold text-white">{activeRide.dropoffName}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* أزرار الاتصال والمراسلة والملاحة السريعة */}
+            <div className="grid grid-cols-3 gap-2">
+              {activeRide.customerPhone && (
+                <button
+                  type="button"
+                  onClick={() => window.open(`tel:${activeRide.customerPhone}`)}
+                  className="min-h-[48px] py-2 px-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-emerald-600/30 transition cursor-pointer active:scale-95"
+                >
+                  <span>📞</span>
+                  <span>اتصال</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
+                className="min-h-[48px] py-2 px-2 rounded-xl bg-sky-600/20 text-sky-400 border border-sky-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
+              >
+                <span>🧭</span>
+                <span>ملاحة</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsChatOpen(true)}
+                className="min-h-[48px] py-2 px-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-amber-500/30 transition cursor-pointer active:scale-95 relative"
+              >
+                <span>💬</span>
+                <span>محادثة</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -start-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white animate-pulse">
+                    {unreadCount}
                   </span>
-                </div>
+                )}
+              </button>
+            </div>
 
-                <div className="text-right space-y-1.5 text-xs">
-                  <p className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    الراكب: {incomingRequest.customerName || 'راكب توصيلة'}
-                  </p>
-                  <div className={`p-3 rounded-2xl border space-y-1 ${
-                    isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
-                      🟢 من: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{incomingRequest.pickupName}</span>
-                    </p>
-                    <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>
-                      🔴 إلى: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{incomingRequest.dropoffName}</span>
-                    </p>
-                    {incomingRequest.isRoundTrip && (
-                      <p className="text-amber-500 dark:text-amber-400 font-bold flex items-center gap-1.5 pt-0.5">
-                        <span>🔄</span>
-                        <span>رحلة ذهاب وإياب</span>
-                      </p>
-                    )}
-                    {incomingRequest.secondDestination && (
-                      <p className="text-amber-600 dark:text-amber-300 flex items-center gap-1.5 pt-0.5">
-                        <span>📍</span>
-                        <span>محطة إضافية: <b className={isDark ? 'text-white' : 'text-slate-900'}>{incomingRequest.secondDestination}</b></span>
-                      </p>
-                    )}
-                    {incomingRequest.stopDuration ? (
-                      <p className="text-amber-600 dark:text-amber-300 flex items-center gap-1.5 pt-0.5">
-                        <span>⏱️</span>
-                        <span>توقف في الطريق: <b className={isDark ? 'text-white' : 'text-slate-900'}>{incomingRequest.stopDuration} دقائق</b></span>
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* أزرار القبول والرفض - مسافات أمان >= 12px */}
-                <div className="flex flex-col gap-3 pt-1">
-                  {/* زر القبول العريض الفاخر (56px) */}
-                  <button
-                    type="button"
-                    onClick={handleAcceptRide}
-                    className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo"
-                  >
-                    <span>🚖</span>
-                    <span>{`قبول المشوار 🚖 (${Number(incomingRequest.fare || 0).toLocaleString()} د.ع)`}</span>
-                  </button>
-
-                  {/* زر الرفض والتجاهل (48px) */}
-                  <button
-                    type="button"
-                    onClick={handleRejectRide}
-                    className={`w-full min-h-[48px] h-12 rounded-2xl border font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer ${
-                      isDark
-                        ? 'bg-[#242A37] text-slate-400 hover:text-white border-slate-700/60'
-                        : 'bg-slate-100 text-slate-700 hover:text-slate-900 border-slate-300'
-                    }`}
-                  >
-                    <span>رفض وتجاهل ✕</span>
-                  </button>
-                </div>
+            {/* الزر الرئيسي العريض لمرحلة الرحلة (56px) */}
+            {activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? (
+              <button
+                type="button"
+                onClick={handleDriverArrived}
+                className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
+              >
+                <span>📍</span>
+                <span>أنا في موقع الراكب (وصلت)</span>
+              </button>
+            ) : activeRide.status === 'Arrived' ? (
+              <div className="flex flex-col gap-2.5 w-full">
+                <button
+                  type="button"
+                  onClick={handleTriggerHorn}
+                  disabled={isTriggeringHorn}
+                  className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer border border-amber-300 disabled:opacity-60"
+                >
+                  <span className="text-xl animate-bounce">📢</span>
+                  <span>{isTriggeringHorn ? 'جاري التنبيه...' : 'تنبيه الراكب (بيب بيب 🚖)'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDriverStartRide}
+                  className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
+                >
+                  <span className="text-xl">🚗💨</span>
+                  <span>بدء المشوار والانطلاق</span>
+                </button>
               </div>
             ) : (
-              /* بانتظار المشاوير والرادار */
-              <div className={`rounded-3xl border p-5 text-center shadow-xl backdrop-blur-xl ${
-                isDark ? 'border-white/10 bg-[#161C28]/90 text-white' : 'border-slate-200 bg-white/95 text-slate-900 shadow-md'
-              }`}>
-                <div className="relative flex items-center justify-center h-16 w-16 mx-auto mb-2">
-                  <span className="absolute h-16 w-16 rounded-full bg-amber-500/20 animate-ping" />
-                  <span className={`relative h-11 w-11 rounded-full border flex items-center justify-center text-amber-500 dark:text-amber-400 text-xl font-bold shadow-lg ${
-                    isDark ? 'bg-[#1A202C] border-amber-400' : 'bg-white border-amber-400'
-                  }`}>
-                    🚖
-                  </span>
-                </div>
-                <h4 className={`text-sm font-bold mb-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>أنت في وضع الجاهزية</h4>
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>جاري مسح النجف وبانتظار أقرب مشوار لك...</p>
+              <button
+                type="button"
+                onClick={handleInitiateCompleteRide}
+                className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
+              >
+                <span>🏁</span>
+                <span>إنهاء الرحلة واحتساب الأجرة</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
-                {/* شريط التشخيص الحي المصغر (Live Diagnostic Chip) */}
-                <div className={`mt-3.5 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full border text-[10.5px] font-mono max-w-fit mx-auto shadow-sm backdrop-blur-md select-none ${
-                  isDark ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
-                }`}>
-                  <span>حالة الاستعلام:</span>
-                  <span className={pollStatus === 'connected' ? 'text-emerald-500 dark:text-emerald-400 font-bold' : pollStatus === 'error' ? 'text-red-500 dark:text-red-400 font-bold' : 'text-amber-500 dark:text-amber-400 font-bold'}>
-                    {pollStatus === 'connected' ? '[متصل 🟢]' : pollStatus === 'error' ? '[غير متصل 🔴]' : '[جاري الفحص 🟡]'}
-                  </span>
-                  <span className={isDark ? 'text-white/20' : 'text-slate-300'}>•</span>
-                  <span>المعرف:</span>
-                  <span className={`font-bold max-w-[110px] truncate ${isDark ? 'text-white' : 'text-slate-900'}`} title={currentTargetId}>
-                    [{currentTargetId || 'غير محدد'}]
-                  </span>
-                  <span className={isDark ? 'text-white/20' : 'text-slate-300'}>•</span>
-                  <span>الطلبات المعلقة:</span>
-                  <span className={`font-bold ${pendingRequests.length > 0 ? 'text-amber-500 dark:text-amber-400 animate-pulse' : isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                    [{pendingRequests.length}]
-                  </span>
+      {/* 5. الدرج السفلي العائم للأنماط الـ 4 (Floating Bottom Dock) - مطابقة لـ screen_3.png */}
+      <div className="fixed bottom-0 inset-x-0 z-30 flex flex-col items-center pointer-events-none" dir="rtl">
+        <div className="pointer-events-auto w-full max-w-lg rounded-t-3xl bg-[#161c28]/95 backdrop-blur-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.6)] flex flex-col px-4 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0.75rem))] border-t border-[#534434]/30">
+          {/* مقبض السحب لفتح/إغلاق المحتوى الإضافي */}
+          <button
+            type="button"
+            onClick={() => setIsBottomDockExpanded(!isBottomDockExpanded)}
+            className="w-full py-1 flex items-center justify-center focus:outline-none cursor-pointer"
+            aria-label="توسيع أو تصغير اللوحة"
+          >
+            <div className="w-10 h-1.5 rounded-full bg-[#534434]/70 hover:bg-[#ffc174]/80 transition-colors" />
+          </button>
+
+          {/* شبكة الأنماط الـ 4 المعتمدة */}
+          <div className="grid grid-cols-4 gap-2 py-2">
+            {/* نمط 1: تكسي */}
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkStatus('taxi')}
+              className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
+                workStatus === 'taxi'
+                  ? 'bg-gradient-to-b from-[#f59e0b] to-[#d97707] text-[#161c28] font-black shadow-lg shadow-amber-500/30 scale-[1.02]'
+                  : 'bg-[#242a37]/80 text-[#ffc174] hover:bg-[#242a37] font-semibold border border-[#534434]/30'
+              }`}
+            >
+              <span className="material-symbols-outlined text-2xl mb-0.5">local_taxi</span>
+              <span className="text-xs">تكسي</span>
+            </button>
+
+            {/* نمط 2: خط دائمي */}
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkStatus('permanent')}
+              className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
+                workStatus === 'permanent'
+                  ? 'bg-gradient-to-b from-[#56e5a9] to-[#00a86b] text-[#161c28] font-black shadow-lg shadow-emerald-500/30 scale-[1.02]'
+                  : 'bg-[#242a37]/80 text-[#56e5a9] hover:bg-[#242a37] font-semibold border border-[#534434]/30'
+              }`}
+            >
+              <span className="material-symbols-outlined text-2xl mb-0.5">event_repeat</span>
+              <span className="text-xs">خط دائمي</span>
+            </button>
+
+            {/* نمط 3: كلاهما */}
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkStatus('both')}
+              className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
+                workStatus === 'both'
+                  ? 'bg-gradient-to-b from-[#a855f7] to-[#7e22ce] text-white font-black shadow-lg shadow-purple-500/30 scale-[1.02]'
+                  : 'bg-[#242a37]/80 text-[#d8b4fe] hover:bg-[#242a37] font-semibold border border-[#534434]/30'
+              }`}
+            >
+              <span className="material-symbols-outlined text-2xl mb-0.5">auto_awesome</span>
+              <span className="text-xs">كلاهما</span>
+            </button>
+
+            {/* نمط 4: خمول */}
+            <button
+              type="button"
+              onClick={() => handleSwitchWorkStatus('idle')}
+              className={`flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer min-h-[56px] ${
+                workStatus === 'idle'
+                  ? 'bg-gradient-to-b from-[#64748b] to-[#475569] text-white font-black shadow-lg scale-[1.02]'
+                  : 'bg-[#242a37]/80 text-slate-400 hover:bg-[#242a37] font-semibold border border-white/5'
+              }`}
+            >
+              <span className="material-symbols-outlined text-2xl mb-0.5">pause_circle</span>
+              <span className="text-xs">خمول</span>
+            </button>
+          </div>
+
+          {/* المحتوى القابل للتوسيع (Expandable Drawer Content) */}
+          {isBottomDockExpanded && (
+            <div className="mt-2.5 pt-3 border-t border-[#534434]/30 max-h-[50vh] overflow-y-auto space-y-3 pb-2 animate-fade-in">
+              {/* إحصائيات سريعة للكابتن */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-[#242a37]/60 rounded-xl p-2.5 text-center border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">مشاوير اليوم</span>
+                  <span className="text-base font-black text-[#56e5a9]">٥ مشاوير</span>
+                </div>
+                <div className="bg-[#242a37]/60 rounded-xl p-2.5 text-center border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">أرباح اليوم</span>
+                  <span className="text-base font-black text-[#ffc174]">{driverBalance} د.ع</span>
+                </div>
+                <div className="bg-[#242a37]/60 rounded-xl p-2.5 text-center border border-white/5">
+                  <span className="text-[10px] text-slate-400 block">نقاط الولاء</span>
+                  <span className="text-base font-black text-amber-400">{driverPoints} ⭐</span>
+                  <span className="text-[9px] text-slate-400 block font-mono mt-0.5">{formattedPhone}</span>
                 </div>
               </div>
-            )}
-          </section>
-        )}
 
-        {/* 5. وضع الخط الدائمي (Commute Tab) */}
-        {(workStatus === 'permanent' || workStatus === 'both') && (
-          <section className="mb-4 space-y-4">
-            {/* طلبات حجز المقاعد الواردة */}
-            {pendingSeatRequests.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="rounded-full bg-amber-500 text-slate-950 px-3 py-0.5 text-xs font-black animate-pulse">
-                    {pendingSeatRequests.length} طلب جديد
-                  </span>
-                  <h3 className="text-sm font-bold text-white">طلبات حجز المقاعد الواردة 💺</h3>
-                </div>
-
-                {pendingSeatRequests.map((req) => (
-                  <div
-                    key={req.id || req.bookingId}
-                    className="rounded-3xl border-2 border-emerald-500/60 bg-[#161C28]/95 p-5 shadow-2xl backdrop-blur-xl space-y-3 animate-fade-in"
-                  >
-                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                      <span className="rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-3 py-1 text-xs font-bold flex items-center gap-1.5 animate-pulse">
-                        <span>📢</span>
-                        <span>طلب اشتراك خط دائمي جديد</span>
-                      </span>
-                      <span className="text-xs font-bold text-slate-300">
-                        {req.seatsBooked || 1} مقعد
-                      </span>
-                    </div>
-
-                    <div className="text-xs space-y-1.5 text-right">
-                      <p className="font-bold text-white text-sm">
-                        الطالب / الموظف: <span className="text-amber-400">{req.customerName || 'راكب خط دائمي'}</span>
-                      </p>
-                      <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5 text-slate-300">
-                        <p>🟢 منطقة الانطلاق: <span className="text-white font-bold">{req.pickupLocation}</span></p>
-                        <p>🔴 الكلية / الدائرة: <span className="text-white font-bold">{req.dropoffLocation}</span></p>
-                        <div className="flex items-center justify-between pt-1 border-t border-white/10 text-xs">
-                          <span className="text-slate-400">نوع الوردية: <span className="text-white font-bold">صباحي</span></span>
-                          <span className="text-emerald-400 font-bold font-mono text-sm">{Number(req.totalFare || 30000).toLocaleString()} د.ع / شهرياً</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* أزرار الموافقة والاعتذار - مسافات أمان 12px */}
-                    <div className="flex flex-col gap-3 pt-1">
-                      {/* زر القبول الأخضر الزمردي 54px */}
-                      <button
-                        type="button"
-                        onClick={() => handleAcceptSeatBooking(req.id || req.bookingId || '')}
-                        className="w-full min-h-[54px] h-[54px] rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 active:scale-[0.98] transition cursor-pointer"
-                      >
-                        <span>📅</span>
-                        <span>موافقة على إضافة الراكب للخط</span>
-                      </button>
-                      {/* زر الاعتذار 48px */}
-                      <button
-                        type="button"
-                        onClick={() => handleRejectSeatBooking(req.id || req.bookingId || '')}
-                        className="w-full min-h-[48px] h-12 rounded-2xl bg-[#242A37] text-slate-400 hover:text-white border border-slate-700 font-bold text-sm flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
-                      >
-                        <span>اعتذار (المقاعد ممتلئة) ✕</span>
-                      </button>
-                    </div>
+              {/* طلبات حجز المقاعد الواردة في الخط الدائمي */}
+              {pendingSeatRequests.length > 0 && (
+                <div className="bg-[#242a37]/70 rounded-2xl p-3 border border-emerald-500/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="rounded-full bg-amber-500 text-slate-950 px-2.5 py-0.5 text-[10px] font-black animate-pulse">
+                      {pendingSeatRequests.length} طلب جديد
+                    </span>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                      <span>📢</span>
+                      <span>طلبات حجز مقاعد الخط الدائمي</span>
+                    </h4>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* ركاب الخط المشتركون */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-white text-center">
-                ركاب الخط الدائمي ({subscribers.length})
-              </h3>
-
-              {subscribers.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-slate-700 p-6 text-center bg-[#161C28]/60">
-                  <p className="text-xs font-bold text-slate-300">لا يوجد ركاب مشتركين حالياً في خطك الدائمي</p>
-                  <p className="text-[11px] text-slate-500 mt-1">ستظهر اشتراكات الركاب هنا تلقائياً بعد قبول الحجز</p>
-                </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {subscribers.map((sub) => (
-                    <div
-                      key={sub.id}
-                      className={`rounded-2xl border bg-[#161C28] p-3.5 shadow-lg space-y-2 ${
-                        sub.cancellationPending ? 'border-amber-400/80 bg-amber-500/10' : 'border-white/10'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
-                            className="min-h-[48px] px-3 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 transition"
-                          >
-                            <span>واتساب</span>
-                            <span>💬</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDriverCancelSubscriber(sub.id, sub.name)}
-                            className="min-h-[48px] px-3 rounded-xl bg-red-600/20 text-red-400 border border-red-500/30 flex items-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 transition hover:bg-red-600/40"
-                          >
-                            <span>إلغاء</span>
-                            <span>✕</span>
-                          </button>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-white text-sm">{sub.name}</p>
-                          <p className="text-xs text-slate-400">{sub.from} ➔ {sub.to}</p>
-                        </div>
+                  {pendingSeatRequests.map((req) => (
+                    <div key={req.id || req.bookingId} className="bg-[#161c28] p-3 rounded-xl border border-white/10 space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-white font-bold">
+                        <span>{req.customerName || 'راكب خط'}</span>
+                        <span className="text-emerald-400 font-mono">{Number(req.totalFare || 30000).toLocaleString()} د.ع</span>
                       </div>
-
-                      {/* معالجة طلب الإلغاء */}
-                      {sub.cancellationPending && (
-                        <div className="pt-2 border-t border-amber-400/30 space-y-2">
-                          <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs">
-                            <span className="font-bold">طلب الراكب إلغاء الاشتراك: </span>
-                            <span>{sub.cancellationReason || 'ظروف شخصية'}</span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleRejectCancellation(sub.id)}
-                              className="min-h-[44px] rounded-xl bg-white/10 text-slate-300 text-xs font-bold hover:bg-white/20 transition cursor-pointer"
-                            >
-                              رفض الإلغاء
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenApproveModal(sub)}
-                              className="min-h-[44px] rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition cursor-pointer"
-                            >
-                              الموافقة على الإلغاء
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      <div className="text-[11px] text-slate-400">
+                        <span>من {req.pickupLocation} ➔ إلى {req.dropoffLocation}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleAcceptSeatBooking(req.id || req.bookingId || '')}
+                          className="py-2 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 transition cursor-pointer"
+                        >
+                          موافقة ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRejectSeatBooking(req.id || req.bookingId || '')}
+                          className="py-2 rounded-lg bg-[#242a37] text-slate-400 hover:text-white border border-white/10 font-bold text-xs transition cursor-pointer"
+                        >
+                          اعتذار ✕
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-          </section>
-        )}
 
-        {/* 6. القائمة السفلية والخدمات للكابتن */}
-        <section className="pt-3 border-t border-white/10 space-y-1.5" dir="rtl">
-          {/* محادثة مع الراكب */}
-          <button
-            type="button"
-            onClick={() => {
-              if (activeRide) setIsChatOpen(true);
-              else show('لا يوجد مشوار نشط حالياً مع راكب لمحادثته', 'info');
-            }}
-            className="flex w-full items-center justify-between rounded-2xl p-3 bg-[#161C28]/80 border border-white/10 hover:border-amber-400/40 transition cursor-pointer min-h-[52px]"
-          >
-            <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-amber-400">
-                💬
-                {unreadCount > 0 && <span className="absolute -top-1 -start-1 h-3 w-3 rounded-full bg-red-500" />}
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-white block">محادثة الراكب</span>
-                <span className="text-xs text-slate-400">
-                  {activeRide?.customerName ? `مع: ${activeRide.customerName}` : 'مراسلة الركاب أثناء الرحلات'}
-                </span>
-              </div>
-            </div>
-            <span className="text-slate-500 text-xs">➔</span>
-          </button>
+              {/* مشتركو الخط الدائمي */}
+              {(workStatus === 'permanent' || workStatus === 'both') && (
+                <div className="bg-[#242a37]/50 rounded-2xl p-3 border border-[#56e5a9]/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-[#56e5a9] flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-base">groups</span>
+                      <span>ركاب الخط الدائمي المشتركون ({subscribers.length})</span>
+                    </h4>
+                  </div>
+                  {subscribers.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 text-center py-2">لا يوجد مشتركون حالياً في هذا الخط</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                      {subscribers.map((sub) => (
+                        <div key={sub.id} className="space-y-1.5">
+                          <div className="flex items-center justify-between bg-[#161c28]/80 p-2.5 rounded-xl text-xs border border-white/5">
+                          <div className="text-right">
+                            <span className="font-bold text-white block">{sub.name}</span>
+                            <span className="text-slate-400 text-[10px]">{sub.from} ➔ {sub.to}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenWhatsApp(sub.phone, sub.name)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold cursor-pointer"
+                              title="محادثة واتساب"
+                            >
+                              واتساب 💬
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDriverCancelSubscriber(sub.id, sub.name)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-500/30 text-xs font-bold cursor-pointer hover:bg-red-600/40"
+                              title="إلغاء الاشتراك"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                        {sub.cancellationPending && (
+                          <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs space-y-1.5">
+                            <span className="font-bold">طلب الراكب إلغاء الاشتراك: {sub.cancellationReason || 'ظروف شخصية'}</span>
+                            <div className="grid grid-cols-2 gap-1.5 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleRejectCancellation(sub.id)}
+                                className="py-1 rounded bg-white/10 text-slate-300 text-[11px] font-bold"
+                              >
+                                رفض
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApproveModal(sub)}
+                                className="py-1 rounded bg-red-600 text-white text-[11px] font-bold"
+                              >
+                                موافقة
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-          {/* سجل الرحلات */}
-          <button
-            type="button"
-            onClick={() => show('سجل الرحلات والمشاوير المكتملة', 'info')}
-            className="flex w-full items-center justify-between rounded-2xl p-3 bg-[#161C28]/80 border border-white/10 hover:border-amber-400/40 transition cursor-pointer min-h-[52px]"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-slate-300">
-                🚖
-              </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-white block">سجل الرحلات</span>
-                <span className="text-xs text-slate-400">المشاوير والأرباح المحققة</span>
+              {/* أزرار الخدمات الإضافية وتسجيل الخروج */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileOpen(true)}
+                  className="flex-1 py-2.5 bg-[#242a37] hover:bg-[#2c3343] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base text-[#56e5a9]">account_circle</span>
+                  <span>الملف الشخصي</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDriverLogout}
+                  className="flex-1 py-2.5 bg-red-950/40 hover:bg-red-900/50 text-red-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-red-500/30 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base">logout</span>
+                  <span>تسجيل الخروج</span>
+                </button>
               </div>
             </div>
-            <span className="text-slate-500 text-xs">➔</span>
-          </button>
+          )}
+        </div>
+      </div>
 
-          {/* تسجيل الخروج */}
-          <button
-            type="button"
-            onClick={handleDriverLogout}
-            className="flex w-full items-center justify-between rounded-2xl p-3 bg-red-600/10 border border-red-500/30 hover:bg-red-600/20 text-red-400 transition cursor-pointer min-h-[52px]"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-600/20 text-red-400">
-                🚪
-              </div>
-              <span className="text-sm font-bold">تسجيل الخروج</span>
+      {/* 6. نافذة تغيير نمط وطبقات الخريطة (Layer Switcher Modal) */}
+      {showLayersModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in" dir="rtl">
+          <div className="w-full max-w-xs rounded-3xl bg-[#161c28] border border-white/10 p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <h3 className="text-sm font-black text-white">نمط وطبقات الخريطة</h3>
+              <button
+                type="button"
+                onClick={() => setShowLayersModal(false)}
+                className="text-slate-400 hover:text-white p-1 text-sm cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
-            <span className="text-red-400 text-xs">➔</span>
-          </button>
-        </section>
-      </main>
+            <div className="space-y-2 text-xs">
+              <button
+                type="button"
+                onClick={() => { setSelectedMapStyle('mapbox://styles/mapbox/dark-v11'); setShowLayersModal(false); }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
+              >
+                <span>🌙 الليلي التنفيذي (Midnight Dark)</span>
+                {(!selectedMapStyle || selectedMapStyle.includes('dark-v11')) && <span className="text-[#56e5a9] font-black">✓</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSelectedMapStyle('mapbox://styles/mapbox/navigation-night-v1'); setShowLayersModal(false); }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
+              >
+                <span>🧭 الملاحة الليلية (Navigation Night)</span>
+                {selectedMapStyle?.includes('navigation') && <span className="text-[#56e5a9] font-black">✓</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSelectedMapStyle('mapbox://styles/mapbox/satellite-streets-v12'); setShowLayersModal(false); }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
+              >
+                <span>🛰️ الأقمار الصناعية (Satellite Streets)</span>
+                {selectedMapStyle?.includes('satellite') && <span className="text-[#56e5a9] font-black">✓</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSelectedMapStyle('mapbox://styles/mapbox/streets-v12'); setShowLayersModal(false); }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
+              >
+                <span>☀️ النهاري القياسي (Daylight Streets)</span>
+                {selectedMapStyle?.includes('streets-v12') && <span className="text-[#56e5a9] font-black">✓</span>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. نافذة الطوارئ والدعم السريع (SOS Emergency Modal) */}
+      {showSosAlert && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in" dir="rtl">
+          <div className="w-full max-w-sm rounded-3xl bg-[#161c28] border-2 border-red-500/80 p-5 shadow-2xl text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-red-500/20 text-red-500 text-3xl mx-auto flex items-center justify-center animate-pulse border border-red-500/40">
+              🚨
+            </div>
+            <div>
+              <h3 className="text-base font-black text-white">طوارئ الكابتن والدعم المباشر</h3>
+              <p className="text-xs text-slate-300 mt-1">هل أنت بحاجة إلى مساعدة أمنية أو طارئة عاجلة في النجف الأشرف؟</p>
+            </div>
+            <div className="flex flex-col gap-2.5 pt-2">
+              <a
+                href="tel:104"
+                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+              >
+                <span>📞</span>
+                <span>الاتصال بشرطة النجدة (104)</span>
+              </a>
+              <a
+                href="tel:07800000000"
+                className="w-full py-3 rounded-xl bg-[#242a37] hover:bg-[#2c3343] text-[#ffc174] font-bold text-sm flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+              >
+                <span>🎧</span>
+                <span>غرفة عمليات منصة توصيلة</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowSosAlert(false)}
+                className="w-full py-2 text-xs text-slate-400 hover:text-white cursor-pointer"
+              >
+                إلغاء وإغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. القائمة الجانبية الموحدة (AppDrawer) */}
+      <AppDrawer open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+
 
       {/* نافذة المحادثة المباشرة مع الراكب */}
       {activeRide && (
