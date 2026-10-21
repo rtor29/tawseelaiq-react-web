@@ -232,6 +232,17 @@ export default function CustomerHomePage() {
   const [stopDuration, setStopDuration] = useState<number | null>(null);
   const [isAddingStop, setIsAddingStop] = useState(false);
   const [isRoundTrip, setIsRoundTrip] = useState(false);
+  const [roundTripWaitMinutes, setRoundTripWaitMinutes] = useState<number>(15);
+  const [returnDestinationAddress, setReturnDestinationAddress] = useState<string>('');
+  const [isExternalNavActive, setIsExternalNavActive] = useState<boolean>(false);
+  const [lastKnownDriverLocation, setLastKnownDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [customerWaitSeconds, setCustomerWaitSeconds] = useState<number>(0);
+  const [maxWaitExceeded, setMaxWaitExceeded] = useState<boolean>(false);
+  const [isFareConfirmedByCustomer, setIsFareConfirmedByCustomer] = useState<boolean>(false);
+  const [isSubmittingConfirmFare, setIsSubmittingConfirmFare] = useState<boolean>(false);
+  const [completedRideBreakdown, setCompletedRideBreakdown] = useState<any>(null);
+  const lastCustomerEventIdRef = useRef<string>('');
+  const processedCustomerEventIdsRef = useRef<Set<string>>(new Set());
 
   // نافذة القسائم والخصم
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
@@ -309,6 +320,7 @@ export default function CustomerHomePage() {
     savingFare?: number;
     plusFare?: number;
     selectedFare?: number;
+    breakdown?: any;
     surgeBadge?: { text: string; type: string; percent?: number; reason?: string } | null;
     discountBadge?: { text: string; type: string; amountIqd?: number } | null;
   }>({});
@@ -966,9 +978,9 @@ export default function CustomerHomePage() {
           distanceKm: dist,
           durationMins: dur,
           vehicleType: selectedTierId,
-          isRoundTrip,
+          isRoundTrip: Boolean(isRoundTrip),
           hasSecondStop: Boolean(secondDestination.trim()),
-          stopDuration: stopDuration || 0,
+          stopDuration: isRoundTrip ? roundTripWaitMinutes : (stopDuration || 0),
           promoCode: appliedPromo ? 'PROMO20' : ''
         });
 
@@ -992,6 +1004,7 @@ export default function CustomerHomePage() {
           savingFare,
           plusFare,
           selectedFare: mainFare,
+          breakdown: mainData.breakdown || null,
           surgeBadge: mainData.surgeBadge || null,
           discountBadge: mainData.discountBadge || null
         });
@@ -1002,36 +1015,31 @@ export default function CustomerHomePage() {
 
     fetchDynamicPricing();
     return () => { isCancelled = true; };
-  }, [stage, pickup.lat, pickup.lng, dropoff.lat, dropoff.lng, selectedTierId, isRoundTrip, secondDestination, stopDuration, appliedPromo]);
+  }, [stage, pickup.lat, pickup.lng, dropoff.lat, dropoff.lng, selectedTierId, isRoundTrip, roundTripWaitMinutes, secondDestination, stopDuration, appliedPromo]);
 
-  // حساب سعر كل فئة بدقة وفق الخيارات المحددة (مع الأخذ بالاعتبار محرك التسعير الديناميكي)
+  // استعراض سعر الفئة المحدد رسمياً من الخادم بدون أي حسابات رياضية على العميل
   const getTierPrice = (tier: RideTier) => {
-    let p = tier.id === 'saving'
+    if (selectedTierId === tier.id && dynamicPricingData.selectedFare) {
+      return dynamicPricingData.selectedFare;
+    }
+    return tier.id === 'saving'
       ? (dynamicPricingData.savingFare || tier.basePrice)
       : tier.id === 'plus'
       ? (dynamicPricingData.plusFare || tier.basePrice)
       : (dynamicPricingData.superFare || tier.basePrice);
-
-    if (!dynamicPricingData.selectedFare) {
-      if (isRoundTrip) p *= 1.85;
-      if (secondDestination.trim()) p += 1000;
-      if (stopDuration) p += 500;
-      if (appliedPromo) p = Math.max(1000, Math.round(p * 0.8));
-      p = Math.max(tier.id === 'plus' ? 3500 : 3000, Math.ceil(p / 250) * 250);
-    }
-    return p;
   };
 
   const currentTier = RIDE_TIERS.find((t) => t.id === selectedTierId) || RIDE_TIERS[0];
   const calculatedPrice = getTierPrice(currentTier);
 
-  // طلب التكسي النهائي — إرسال حقيقي للخادم
+  // طلب التكسي النهائي — إرسال حقيقي للخادم مع Idempotency-Key
   async function handleOrderTrip() {
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
     try {
       const dist = distanceKm(pickup, dropoff);
       const userId = session?.userId || storage.getUserId() || 'cust-' + Date.now();
+      const idempotencyKey = `order-${userId}-${Date.now()}`;
       const { data } = await http.post<{
         success: boolean;
         request?: {
@@ -1059,10 +1067,15 @@ export default function CustomerHomePage() {
         durationMins: Math.max(5, Math.round(dist * 2.5)),
         vehicleType: selectedTierId === 'plus' ? 'vip' : 'eco',
         isRoundTrip: Boolean(isRoundTrip),
+        tripType: isRoundTrip ? 'ROUND_TRIP' : 'ONE_WAY',
         secondDestination: secondDestination.trim(),
         hasSecondStop: Boolean(secondDestination.trim()),
-        stopDuration: stopDuration || 0,
+        stopDuration: isRoundTrip ? roundTripWaitMinutes : (stopDuration || 0),
+        expectedWaitMinutes: isRoundTrip ? roundTripWaitMinutes : 0,
+        returnDestination: isRoundTrip ? (returnDestinationAddress.trim() || pickupName) : undefined,
         rangeKm: 25,
+      }, {
+        headers: { 'Idempotency-Key': idempotencyKey }
       });
 
       if (data.success && data.request) {
@@ -1215,6 +1228,71 @@ export default function CustomerHomePage() {
     }
   }
 
+  // عداد وقت الانتظار اللحظي للعميل في محطة الذهاب
+  useEffect(() => {
+    const isWaiting = (rideStatus || '').toLowerCase() === 'waiting_at_destination';
+    if (!isWaiting) {
+      setCustomerWaitSeconds(0);
+      return;
+    }
+    const waitStartedAt = completedRideBreakdown?.waitStartedAt || Date.now();
+    const updateWait = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - new Date(waitStartedAt).getTime()) / 1000));
+      setCustomerWaitSeconds(elapsed);
+    };
+    updateWait();
+    const timer = setInterval(updateWait, 1000);
+    return () => clearInterval(timer);
+  }, [rideStatus, completedRideBreakdown?.waitStartedAt]);
+
+  // تأكيد أو الاعتراض على الكروة نقداً من طرف الراكب
+  const handleCustomerConfirmFare = async (confirmed: boolean = true) => {
+    if (isSubmittingConfirmFare) return;
+    const rideId = completedDriverInfo?.rideId || rideRequestId || (completedRideBreakdown?.id);
+    if (!rideId) {
+      show('معرّف المشوار غير متوفر', 'error');
+      return;
+    }
+
+    setIsSubmittingConfirmFare(true);
+    try {
+      const idempotencyKey = `confirm-fare-${rideId}-${Date.now()}`;
+      const { data } = await http.post<{ success: boolean; reconciliationStatus?: string; reviewFlag?: boolean; error?: string }>(
+        '/ride/confirm-fare',
+        {
+          requestId: rideId,
+          rideId,
+          confirmed,
+          note: confirmed ? undefined : 'اعتراض من الراكب على قيمة الكروة'
+        },
+        {
+          headers: { 'Idempotency-Key': idempotencyKey }
+        }
+      );
+
+      if (data?.success) {
+        setIsFareConfirmedByCustomer(confirmed);
+        setCompletedRideBreakdown((prev: any) => ({
+          ...prev,
+          riderConfirmed: confirmed,
+          reconciliationStatus: data.reconciliationStatus || (confirmed ? 'settled' : 'pending_review'),
+          reviewFlag: data.reviewFlag
+        }));
+        if (confirmed) {
+          show('تم تأكيد دفع الكروة نقداً بنجاح! شكراً لك 💵✨', 'success');
+        } else {
+          show('تم تسجيل اعتراضك وسيقوم فريق المتابعة بمراجعة المشوار 🛡️', 'warning');
+        }
+      } else {
+        show(data?.error || 'تعذر تأكيد الكروة، يرجى المحاولة ثانية', 'error');
+      }
+    } catch (err: any) {
+      show('تعذر تأكيد الكروة حالياً', 'error');
+    } finally {
+      setIsSubmittingConfirmFare(false);
+    }
+  };
+
   // إرسال شكوى أو بلاغ مباشر
   async function handleSubmitComplaint() {
     if (!complaintText.trim()) {
@@ -1347,7 +1425,7 @@ export default function CustomerHomePage() {
         show('تم قبول رحلتك من قبل الكابتن! 🚖 الكابتن في طريقه إليك', 'success');
         mapRef.current?.flyTo({ center: [pickup.lng, pickup.lat], zoom: 15.5, duration: 700 });
       }
-    } else if (status === 'arrived') {
+    } else if (status === 'arrived' || status === 'driver_arrived') {
       setRideStatus('Arrived');
       if (stage !== 'driver_arriving') {
         setStage('driver_arriving');
@@ -1358,7 +1436,7 @@ export default function CustomerHomePage() {
         show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
         playCarHornBeep();
       }
-    } else if (status === 'inprogress' || status === 'in_progress') {
+    } else if (status === 'inprogress' || status === 'in_progress' || status === 'in_trip') {
       if (rideStatus !== 'InProgress' && rideStatus !== 'in_progress') {
         setRideStatus('InProgress');
         if (stage !== 'driver_arriving') {
@@ -1369,12 +1447,28 @@ export default function CustomerHomePage() {
           mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
         }
       }
-    } else if (req.status === 'Completed' || req.status === 'completed' || req.status === 'RideCompleted') {
+    } else if (status === 'waiting_at_destination' || status === 'captain_waiting_at_destination') {
+      setRideStatus('WAITING_AT_DESTINATION');
+      if (req.waitStartedAt) {
+        setCompletedRideBreakdown((prev: any) => ({ ...prev, waitStartedAt: req.waitStartedAt }));
+      }
+      show('وصلتم إلى المحطة الأولى! بدأ وقت الانتظار ⏳', 'info', 5000);
+    } else if (status === 'in_trip_return') {
+      setRideStatus('IN_TRIP_RETURN');
+      show('انطلقت رحلة العودة الآن إلى نقطة الانطلاق 🔄', 'info', 5000);
+    } else if (
+      status === 'completed' ||
+      status === 'ridecompleted' ||
+      status === 'arrived_return' ||
+      (status === 'arrived_destination' && !req.isRoundTrip && req.tripType !== 'ROUND_TRIP')
+    ) {
+      setRideStatus(req.status || 'Completed');
+      setCompletedRideBreakdown(req);
       triggerDriverRatingModal(req);
-    } else if (req.status === 'Cancelled' || req.status === 'NoDriversAvailable') {
+    } else if (status === 'cancelled' || status === 'nodriversavailable' || status === 'no_drivers') {
       hasNotifiedArrivalRef.current = false;
       localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
-      show(req.status === 'Cancelled' ? 'تم إلغاء الرحلة' : 'لم يتم العثور على سائق متوفر حالياً', 'warning');
+      show(status.includes('cancel') ? 'تم إلغاء الرحلة' : 'نعتذر منك، لم يتوفر كابتن متاح حالياً 🚖 يمكنك إعادة المحاولة', 'warning', 6000);
       setStage('ride_options');
       setRideRequestId(null);
       setAssignedDriverInfo(null);
@@ -1382,7 +1476,7 @@ export default function CustomerHomePage() {
       setRouteCoordinates(null);
     }
 
-    if (status === 'accepted' || status === 'arrived' || status === 'inprogress' || status === 'in_progress') {
+    if (status === 'accepted' || status === 'arrived' || status === 'driver_arrived' || status === 'inprogress' || status === 'in_progress' || status === 'in_trip' || status === 'waiting_at_destination' || status === 'in_trip_return') {
       if (req.assignedDriverName || req.assignedDriverPhone || req.driverName || req.driverPhone) {
         setAssignedDriverInfo((prev) => ({
           ...prev,
@@ -1407,8 +1501,10 @@ export default function CustomerHomePage() {
   useEffect(() => {
     if (!rideRequestId || (stage !== 'searching' && stage !== 'driver_arriving')) return;
 
+    let isSseConnected = false;
+
     const checkStatus = async () => {
-      if (document.hidden) return;
+      if (document.hidden || isSseConnected) return;
       try {
         const { data } = await http.get<{
           success: boolean;
@@ -1422,18 +1518,37 @@ export default function CustomerHomePage() {
     };
 
     void checkStatus();
-    // احتياط نبض كل 20 ثانية بدلاً من الاقتراع الكثيف
+    // احتياط نبض كل 20 ثانية فقط في حال انقطاع SSE
     const interval = setInterval(checkStatus, 20000);
 
     // اتصال SSE اللحظي لتلقي تحديثات المشوار وموقع السائق فوراً
     let es: EventSource | null = null;
     try {
-      const streamUrl = `${config.apiBaseUrl}/ride/${encodeURIComponent(rideRequestId)}/stream`;
+      const token = storage.getToken() || localStorage.getItem('token') || '';
+      const lastIdQuery = lastCustomerEventIdRef.current ? `&lastEventId=${encodeURIComponent(lastCustomerEventIdRef.current)}` : '';
+      const streamUrl = `${config.apiBaseUrl}/ride/${encodeURIComponent(rideRequestId)}/stream?token=${encodeURIComponent(token)}${lastIdQuery}`;
       es = new EventSource(streamUrl);
+
+      es.onopen = () => {
+        isSseConnected = true;
+      };
+
+      const handleCustomerEventId = (e: MessageEvent, data: any) => {
+        const id = e.lastEventId || data?.eventId || data?.id;
+        if (id) {
+          const str = String(id);
+          if (processedCustomerEventIdsRef.current.has(str)) return false;
+          processedCustomerEventIdsRef.current.add(str);
+          lastCustomerEventIdRef.current = str;
+        }
+        return true;
+      };
 
       es.addEventListener('init', (e: MessageEvent) => {
         try {
+          isSseConnected = true;
           const data = JSON.parse(e.data);
+          if (!handleCustomerEventId(e, data)) return;
           if (data?.request) {
             handleRideStateChange(data.request);
           }
@@ -1442,12 +1557,41 @@ export default function CustomerHomePage() {
 
       es.addEventListener('trip_update', (e: MessageEvent) => {
         try {
+          isSseConnected = true;
           const data = JSON.parse(e.data);
+          if (!handleCustomerEventId(e, data)) return;
+
+          const evType = data?.event || data?.type;
+
+          if (evType === 'no_drivers_available' || data?.status === 'NoDriversAvailable' || data?.status === 'NO_DRIVERS') {
+            show('نعتذر منك، لم يتوفر كابتن متاح حالياً 🚖 يمكنك إعادة المحاولة', 'warning', 6000);
+            localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+            setStage('ride_options');
+            setRideRequestId(null);
+            return;
+          }
+
+          if (evType === 'external_nav_active') {
+            setIsExternalNavActive(true);
+            if (data?.lastKnownLocation) {
+              setLastKnownDriverLocation(data.lastKnownLocation);
+              handleDriverPositionUpdate({ lat: data.lastKnownLocation.lat, lng: data.lastKnownLocation.lon });
+            }
+          } else if (evType === 'external_nav_ended') {
+            setIsExternalNavActive(false);
+          }
+
+          if (evType === 'max_wait_exceeded') {
+            setMaxWaitExceeded(true);
+            show('تم تجاوز الحد الأقصى لوقت الانتظار المسموح به ⚠️', 'warning', 7000);
+          }
+
           if (data?.request) {
             handleRideStateChange(data.request);
           } else if (data?.status) {
             handleRideStateChange(data);
           }
+
           if (data?.event === 'driver_location' && data.location) {
             handleDriverPositionUpdate({ lat: data.location.lat, lng: data.location.lon }, data.location.heading);
           }
@@ -1455,7 +1599,7 @@ export default function CustomerHomePage() {
       });
 
       es.onerror = () => {
-        // EventSource will automatically retry connecting
+        isSseConnected = false;
       };
     } catch (sseErr) {
       console.warn('[SSE] Ride EventSource init error, falling back:', sseErr);
@@ -1467,7 +1611,7 @@ export default function CustomerHomePage() {
         es.close();
       }
     };
-  }, [rideRequestId, stage, handleRideStateChange, handleDriverPositionUpdate]);
+  }, [rideRequestId, stage, handleRideStateChange, handleDriverPositionUpdate, show]);
 
   // اشتراك لحظي في أحداث الرحلة وموقع السائق عبر SignalR / Realtime
   useEffect(() => {
@@ -1731,6 +1875,56 @@ export default function CustomerHomePage() {
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 border border-white/30 text-white text-xs font-bold shrink-0">
                 <span>📢</span>
                 <span>في الانتظار</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* شريط تنبيه الملاحة الخارجية العائم */}
+        {isExternalNavActive && (stage === 'driver_arriving' || Boolean(rideRequestId)) && (
+          <div className="absolute top-4 inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
+            <div className="w-full max-w-md bg-blue-950/95 text-blue-200 px-4 py-2.5 rounded-2xl shadow-lg border border-blue-400/40 flex items-center justify-between gap-3 backdrop-blur-md">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xl shrink-0 animate-pulse">🧭</span>
+                <div className="flex flex-col text-right min-w-0">
+                  <span className="text-[13px] font-bold text-white">الكابتن يستخدم تطبيق ملاحة خارجي</span>
+                  <span className="text-[11px] text-blue-300">
+                    الموقع يُحدّث كل 10 ثوانٍ من آخر نقطة معروفة {lastKnownDriverLocation ? `(${lastKnownDriverLocation.lat.toFixed(4)}, ${lastKnownDriverLocation.lng.toFixed(4)})` : ''}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold px-2 py-1 rounded-lg bg-blue-500/20 text-blue-200 border border-blue-400/30 shrink-0">
+                ملاحة نشطة
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* شريط عداد الانتظار في المحطة الأولى لرحلات الذهاب والإياب */}
+        {((rideStatus || '').toLowerCase() === 'waiting_at_destination') && (
+          <div className="absolute top-4 inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
+            <div className={`w-full max-w-md px-4 py-3 rounded-2xl shadow-xl border-2 backdrop-blur-md flex items-center justify-between gap-3 ${
+              maxWaitExceeded 
+                ? 'bg-red-950/95 border-red-500/80 text-white' 
+                : 'bg-gradient-to-r from-amber-950/95 via-slate-900/95 to-amber-950/95 border-amber-500/50 text-amber-200'
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-2xl shrink-0">{maxWaitExceeded ? '⚠️' : '⏳'}</span>
+                <div className="flex flex-col text-right min-w-0">
+                  <span className="text-[13.5px] font-black text-white">
+                    {maxWaitExceeded ? 'تم تجاوز الحد الأقصى للانتظار' : 'الكابتن بانتظارك في المحطة الأولى'}
+                  </span>
+                  <span className="text-[11.5px] font-medium text-slate-300">
+                    {maxWaitExceeded 
+                      ? 'يحق للكابتن إنهاء المشوار أو متابعة الانتظار' 
+                      : (customerWaitSeconds <= 600 ? 'وقت الانتظار الحالي (ضمن الـ 10 دقائق المجانية)' : 'يتم احتساب رسوم انتظار إضافية')}
+                  </span>
+                </div>
+              </div>
+              <div className="text-left shrink-0">
+                <div className="text-lg font-mono font-black text-amber-400">
+                  {Math.floor(customerWaitSeconds / 60)}:{(customerWaitSeconds % 60).toString().padStart(2, '0')}
+                </div>
               </div>
             </div>
           </div>
@@ -2321,7 +2515,7 @@ export default function CustomerHomePage() {
         )}
 
         {/* 8. بطاقة تفاصيل الرحلة التفاعلية متعددة الارتفاعات الفاخرة */}
-        {(stage === 'driver_arriving' || Boolean(rideRequestId && ['accepted', 'arrived', 'inprogress', 'in_progress'].includes((rideStatus || '').toLowerCase()))) && (
+        {(stage === 'driver_arriving' || Boolean(rideRequestId && ['accepted', 'arrived', 'inprogress', 'in_progress', 'waiting_at_destination', 'in_trip_return'].includes((rideStatus || '').toLowerCase()))) && (
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -2380,11 +2574,17 @@ export default function CustomerHomePage() {
                   const lowerSt = (rideStatus || '').toLowerCase();
                   const isArr = lowerSt === 'arrived';
                   const isInProg = lowerSt === 'inprogress' || lowerSt === 'in_progress';
+                  const isWait = lowerSt === 'waiting_at_destination';
+                  const isReturn = lowerSt === 'in_trip_return';
 
                   return (
                     <div
                       className={`w-full rounded-xl py-2 px-3.5 text-center select-none border transition-colors ${
-                        isInProg
+                        isWait
+                          ? 'bg-amber-950/70 border-amber-500/60 text-amber-200'
+                          : isReturn
+                          ? 'bg-blue-950/70 border-blue-500/60 text-blue-200'
+                          : isInProg
                           ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
                           : isArr
                           ? 'bg-amber-950/60 border-amber-500/50 text-amber-200 shadow-xs'
@@ -2392,7 +2592,16 @@ export default function CustomerHomePage() {
                       }`}
                     >
                       <div className="flex items-center justify-center gap-2">
-                        {isInProg ? (
+                        {isWait ? (
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[13.5px] font-black text-amber-300">الكابتن بانتظارك في المحطة الأولى ⏳</span>
+                            <span className="text-[13px] font-mono font-black text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/40">
+                              {Math.floor(customerWaitSeconds / 60)}:{(customerWaitSeconds % 60).toString().padStart(2, '0')}
+                            </span>
+                          </div>
+                        ) : isReturn ? (
+                          <span className="text-[14px] font-black">رحلة العودة جارية الآن إلى نقطة الانطلاق 🔄</span>
+                        ) : isInProg ? (
                           <span className="text-[14px] font-black">في الطريق إلى الوجهة 🚗💨</span>
                         ) : isArr ? (
                           <div className="flex items-center justify-between w-full">
@@ -2512,19 +2721,25 @@ export default function CustomerHomePage() {
               </div>
 
               {/* تفاصيل حالة الرحلة الفرعية */}
-              {Boolean(rideStatus && ['arrived', 'inprogress', 'in_progress'].includes(rideStatus.toLowerCase())) && (
+              {Boolean(rideStatus && ['arrived', 'inprogress', 'in_progress', 'waiting_at_destination', 'in_trip_return'].includes(rideStatus.toLowerCase())) && (
                 <div className="text-center">
                   {rideStatus?.toLowerCase() === 'arrived' && (
-                    <p className="text-[12px] text-amber-700/90 font-medium">بانتظار تأكيد السائق لبدء الرحلة ⏳</p>
+                    <p className="text-[12px] text-amber-400 font-medium">بانتظار تأكيد السائق لبدء الرحلة ⏳</p>
                   )}
                   {(rideStatus?.toLowerCase() === 'inprogress' || rideStatus?.toLowerCase() === 'in_progress') && (
-                    <p className="text-[12px] text-emerald-700/90 font-medium">الرحلة جارية الآن نحو وجهتك المحددة ✨</p>
+                    <p className="text-[12px] text-emerald-400 font-medium">الرحلة جارية الآن نحو وجهتك المحددة ✨</p>
+                  )}
+                  {rideStatus?.toLowerCase() === 'waiting_at_destination' && (
+                    <p className="text-[12px] text-amber-400 font-medium">الكابتن متوقف في المحطة الأولى بانتظارك ⏳</p>
+                  )}
+                  {rideStatus?.toLowerCase() === 'in_trip_return' && (
+                    <p className="text-[12px] text-blue-400 font-medium">الرحلة جارية الآن للعودة إلى نقطة الانطلاق 🔄</p>
                   )}
                 </div>
               )}
 
               {/* زر إلغاء الرحلة متاح للراكب لحين بدء الرحلة فعلياً */}
-              {(!rideStatus || (rideStatus !== 'InProgress' && rideStatus !== 'in_progress' && rideStatus !== 'Completed')) && (
+              {(!rideStatus || (!['inprogress', 'in_progress', 'waiting_at_destination', 'in_trip_return', 'completed'].includes(rideStatus.toLowerCase()))) && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -2746,6 +2961,49 @@ export default function CustomerHomePage() {
                   />
                 </button>
               </div>
+
+              {/* خيارات تفاصيل الذهاب والإياب */}
+              {isRoundTrip && (
+                <div className="p-4 rounded-2xl bg-[#0B101B] border border-amber-500/30 space-y-3.5 animate-fade-in mb-3" dir="rtl">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-400 mb-2 text-right">
+                      مدة الانتظار المتوقعة في المحطة:
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[15, 30, 45, 60].map((mins) => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setRoundTripWaitMinutes(mins)}
+                          className={`min-h-[48px] py-2 px-1 text-center rounded-xl text-xs font-black transition cursor-pointer border ${
+                            roundTripWaitMinutes === mins
+                              ? 'bg-amber-500 text-[#090D16] border-amber-500 shadow-md scale-102'
+                              : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-amber-500/40'
+                          }`}
+                        >
+                          {mins} دقيقة
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2 text-right leading-relaxed">
+                      💡 أول 10 دقائق انتظار مجانية، ثم يُحسب رسم الانتظار الفعلي ديناميكياً.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5 text-right">
+                      وجهة العودة (افتراضياً: نفس موقع الانطلاق):
+                    </label>
+                    <input
+                      type="text"
+                      value={returnDestinationAddress}
+                      onChange={(e) => setReturnDestinationAddress(e.target.value)}
+                      placeholder={pickupName || 'نفس نقطة الانطلاق'}
+                      className="w-full min-h-[48px] px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 text-right"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -3291,6 +3549,108 @@ export default function CustomerHomePage() {
                   </span>
                   <span className="text-[9.5px] font-bold text-amber-400/70 block">النجف</span>
                 </div>
+              </div>
+            </div>
+
+            {/* ملخص الكروة وتأكيد الدفع نقداً للراكب */}
+            <div className="rounded-2xl bg-[#0B101B] border border-amber-500/30 p-4 mb-4 text-right" dir="rtl">
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800">
+                <span className="text-xs font-bold text-slate-400">ملخص حساب المشوار الرسمي</span>
+                {completedRideBreakdown?.needsReconciliationReview ? (
+                  <span className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    ⏳ بانتظار التسوية
+                  </span>
+                ) : isFareConfirmedByCustomer ? (
+                  <span className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    ✅ تم تأكيد الكروة
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-amber-400">
+                    الدفع نقداً للكابتن
+                  </span>
+                )}
+              </div>
+
+              {/* بنود الحساب التفصيلية */}
+              <div className="space-y-1.5 text-xs text-slate-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">أجرة الذهاب:</span>
+                  <span className="font-mono font-bold text-white">
+                    {(completedRideBreakdown?.leg1Fare || completedRideBreakdown?.fare || calculatedPrice || 0).toLocaleString()} د.ع
+                  </span>
+                </div>
+
+                {(completedRideBreakdown?.isRoundTrip || completedRideBreakdown?.tripType === 'ROUND_TRIP') && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">أجرة الإياب:</span>
+                    <span className="font-mono font-bold text-white">
+                      {(completedRideBreakdown?.leg2Fare || 0).toLocaleString()} د.ع
+                    </span>
+                  </div>
+                )}
+
+                {((completedRideBreakdown?.waitFee || 0) > 0 || (completedRideBreakdown?.actualWaitMinutes || 0) > 0) && (
+                  <div className="flex justify-between items-center text-amber-400">
+                    <span>رسوم الانتظار ({completedRideBreakdown?.actualWaitMinutes || 0} دقيقة):</span>
+                    <span className="font-mono font-bold">
+                      +{(completedRideBreakdown?.waitFee || 0).toLocaleString()} د.ع
+                    </span>
+                  </div>
+                )}
+
+                {(completedRideBreakdown?.discountAmount || 0) > 0 && (
+                  <div className="flex justify-between items-center text-emerald-400">
+                    <span>خصم القسيمة:</span>
+                    <span className="font-mono font-bold">
+                      -{(completedRideBreakdown?.discountAmount || 0).toLocaleString()} د.ع
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 mt-2 border-t border-slate-800">
+                  <span className="text-sm font-black text-white">المبلغ الإجمالي المستحق:</span>
+                  <span className="text-base font-mono font-black text-amber-400">
+                    {(completedRideBreakdown?.totalFare || completedRideBreakdown?.finalFare || calculatedPrice || 0).toLocaleString()} د.ع
+                  </span>
+                </div>
+              </div>
+
+              {/* زر تأكيد استلام ودفع الكروة نقداً (56px) أو الاعتراض */}
+              <div className="mt-3.5 pt-3 border-t border-slate-800/80">
+                {!isFareConfirmedByCustomer ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      disabled={isSubmittingConfirmFare}
+                      onClick={() => handleCustomerConfirmFare(true)}
+                      className="w-full min-h-[56px] rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:brightness-110 active:scale-[0.98] text-white font-black text-[15px] shadow-[0_4px_16px_rgba(16,185,129,0.3)] transition cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isSubmittingConfirmFare ? (
+                        <span>جاري التأكيد...</span>
+                      ) : (
+                        <>
+                          <span className="text-lg">💵</span>
+                          <span>تأكيد دفع الكروة نقداً للكابتن</span>
+                        </>
+                      )}
+                    </button>
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        disabled={isSubmittingConfirmFare}
+                        onClick={() => handleCustomerConfirmFare(false)}
+                        className="text-xs text-amber-400/90 hover:text-amber-300 underline cursor-pointer py-1"
+                      >
+                        لدي اعتراض على المبلغ المطلوب ⚠️
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-1 text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+                    <span>✅</span>
+                    <span>تم تأكيد دفع الكروة نقداً للكابتن بنجاح</span>
+                  </div>
+                )}
               </div>
             </div>
 
