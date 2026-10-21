@@ -170,11 +170,23 @@ export default function DriverHomePage() {
   const [activeRide, setActiveRide] = useState<any | null>(null);
   const activeTrip = activeRide;
 
-  // تحرير المشوار الجديد من قيود المشاوير السابقة (completed / cancelled / null لا تمنع الطلب الجديد)
+  // دالة موحدة لفحص الحالات النشطة التي تمنع استقبال طلب جديد
+  const isRideActiveStatus = useCallback((status?: string | null) => {
+    if (!status) return false;
+    const s = String(status).toLowerCase().trim();
+    return [
+      'accepted', 'driver_arrived', 'arrived', 'ontheway', 'on_the_way',
+      'started', 'in_trip', 'inprogress', 'in_progress',
+      'arrived_destination', 'waiting_at_destination', 'captain_waiting_at_destination',
+      'in_trip_return', 'arrived_return'
+    ].includes(s);
+  }, []);
+
+  // منع استقبال أي طلب جديد إذا كان هناك مشوار نشط أو في وضع الانتظار
   const hasRealActiveTrip = Boolean(
     activeTrip &&
     activeTrip.status &&
-    ['accepted', 'arrived', 'in_progress', 'started', 'ontheway', 'Accepted', 'Arrived', 'InProgress', 'Started', 'OnTheWay'].includes(activeTrip.status)
+    isRideActiveStatus(activeTrip.status)
   );
   const shouldShowDispatchSheet = Boolean(pendingRequests && pendingRequests.length > 0 && !hasRealActiveTrip);
   const incomingRequest = shouldShowDispatchSheet ? pendingRequests[0] : null;
@@ -194,6 +206,19 @@ export default function DriverHomePage() {
   const lastSeenMsgIdRef = useRef<string | null>(null);
   const lastIncomingIdRef = useRef<string | null>(null);
 
+  // حالات إجراءات دورة الرحلة والملاحة الخارجية ومعدل تحديث الموقع
+  const [isActionInFlight, setIsActionInFlight] = useState(false);
+  const [proximityError, setProximityError] = useState<string | null>(null);
+  const [waitElapsedSeconds, setWaitElapsedSeconds] = useState(0);
+  const isExternalNavActiveRef = useRef<boolean>(false);
+  const lastEventIdRef = useRef<string>('');
+  const processedEventIdsRef = useRef<Set<string>>(new Set());
+
+  // محدد معدل تحديث موقع الكابتن (الحد الأقصى 30 طلب لكل 30 ثانية)
+  const lastLocationSentTimeRef = useRef<number>(0);
+  const isSendingLocationRef = useRef<boolean>(false);
+  const backoffUntilRef = useRef<number>(0);
+
   // إرسال تحديث حالة ونمط العمل إلى الخادم فور تحميل الصفحة لأول مرة
   useEffect(() => {
     sendDriverStatusUpdate(workStatus);
@@ -202,6 +227,7 @@ export default function DriverHomePage() {
   // نافذة ملخص الأجرة وتحصيل الكاش
   const [isFareModalOpen, setIsFareModalOpen] = useState(false);
   const [finalFareAmount, setFinalFareAmount] = useState<string>('3,500');
+  const [receivedFareInput, setReceivedFareInput] = useState<string>('3500');
 
   // نافذة الملاحة الخارجية
   const [isNavModalOpen, setIsNavModalOpen] = useState(false);
@@ -609,10 +635,18 @@ export default function DriverHomePage() {
     const lastSseDisconnectTimeRef = { current: 0 };
     let es: EventSource | null = null;
 
-    // إرسال موقع السائق بشكل مستقل عبر HTTP دون المساس بقناة SSE
+    // إرسال موقع السائق بشكل مخنوق وصارم (محدد بمعدل أقصى طلب واحد كل 3 ثوانٍ لمنع تجاوز حد 30/30s)
     const sendLocation = () => {
       const curLoc = driverLocRef.current;
-      if (!curLoc) return;
+      if (!curLoc || !currentTargetId) return;
+      const now = Date.now();
+      if (now < backoffUntilRef.current) return;
+      if (now - lastLocationSentTimeRef.current < 2500) return;
+      if (isSendingLocationRef.current) return;
+
+      isSendingLocationRef.current = true;
+      lastLocationSentTimeRef.current = now;
+
       http
         .post('/driver/location', {
           driverId: currentTargetId,
@@ -622,7 +656,18 @@ export default function DriverHomePage() {
           tripStatus: 'Online',
           workStatus: workStatus,
         })
-        .catch(() => {});
+        .then(() => {
+          backoffUntilRef.current = 0;
+        })
+        .catch((err: any) => {
+          if (err?.response?.status === 429) {
+            backoffUntilRef.current = Date.now() + 5000;
+            console.warn('[DriverLocation] Rate limited (429), backing off 5s');
+          }
+        })
+        .finally(() => {
+          isSendingLocationRef.current = false;
+        });
     };
 
     const fetchPending = async () => {
@@ -647,9 +692,11 @@ export default function DriverHomePage() {
       }
     };
 
-    // اتصال SSE اللحظي الفوري
+    // اتصال SSE اللحظي الفوري عبر المسار الرسمي المعياري
     try {
-      const streamUrl = `${config.apiBaseUrl}/driver/stream?driverId=${encodeURIComponent(currentTargetId)}`;
+      const token = storage.getToken() || localStorage.getItem('token') || '';
+      const lastIdQuery = lastEventIdRef.current ? `&lastEventId=${encodeURIComponent(lastEventIdRef.current)}` : '';
+      const streamUrl = `${config.apiBaseUrl}/events/driver/${encodeURIComponent(currentTargetId)}?token=${encodeURIComponent(token)}${lastIdQuery}`;
       es = new EventSource(streamUrl);
 
       es.onopen = () => {
@@ -657,11 +704,26 @@ export default function DriverHomePage() {
         setPollStatus('connected');
       };
 
+      const handleIncomingEventId = (e: MessageEvent, data: any) => {
+        const evId = e.lastEventId || data?.eventId || data?.id;
+        if (evId) {
+          const idStr = String(evId);
+          if (processedEventIdsRef.current.has(idStr)) {
+            return false;
+          }
+          processedEventIdsRef.current.add(idStr);
+          lastEventIdRef.current = idStr;
+        }
+        return true;
+      };
+
       es.addEventListener('init', (e: MessageEvent) => {
         try {
           sseConnectedRef.current = true;
           setPollStatus('connected');
           const data = JSON.parse(e.data);
+          if (!handleIncomingEventId(e, data)) return;
+
           if (data?.pendingRequests) {
             updatePendingRequestsSafely(data.pendingRequests);
           }
@@ -671,8 +733,7 @@ export default function DriverHomePage() {
             } else {
               setActiveRide((prev: any) => {
                 if (!prev) return null;
-                const isOngoing = ['accepted', 'arrived', 'in_progress', 'started', 'ontheway', 'Accepted', 'Arrived', 'InProgress', 'Started', 'OnTheWay'].includes(prev.status);
-                return isOngoing ? prev : null;
+                return isRideActiveStatus(prev.status) ? prev : null;
               });
             }
           }
@@ -682,8 +743,9 @@ export default function DriverHomePage() {
       es.addEventListener('dispatch', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          const evType = data.event || data.type;
+          if (!handleIncomingEventId(e, data)) return;
 
+          const evType = data.event || data.type;
           if (evType === 'ride_cancelled' || evType === 'ride_taken') {
             const cancelledId = String(data.rideId || data.requestId || data.id || '');
             handleRideCancelled(cancelledId);
@@ -698,14 +760,15 @@ export default function DriverHomePage() {
       es.addEventListener('driver_event', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
+          if (!handleIncomingEventId(e, data)) return;
+
           if (data?.activeRide !== undefined) {
             if (data.activeRide) {
               setActiveRide(data.activeRide);
             } else {
               setActiveRide((prev: any) => {
                 if (!prev) return null;
-                const isOngoing = ['accepted', 'arrived', 'in_progress', 'started', 'ontheway', 'Accepted', 'Arrived', 'InProgress', 'Started', 'OnTheWay'].includes(prev.status);
-                return isOngoing ? prev : null;
+                return isRideActiveStatus(prev.status) ? prev : null;
               });
             }
           }
@@ -724,7 +787,8 @@ export default function DriverHomePage() {
 
     // استعلام احتياطي دوري كل 5 ثوانٍ (يكتم نفسه فورياً ولا يرسل أي طلب HTTP طالما أن SSE متصل)
     const pollInterval = setInterval(fetchPending, 5000);
-    const locInterval = setInterval(sendLocation, 10000);
+    // إرسال موقع مخنوق بفاصل 3 ثوانٍ (مع مراعاة حد 30 طلب / 30 ثانية الصارم)
+    const locInterval = setInterval(sendLocation, 3000);
     sendLocation();
 
     return () => {
@@ -734,7 +798,7 @@ export default function DriverHomePage() {
         es.close();
       }
     };
-  }, [currentTargetId, workStatus, updatePendingRequestsSafely, handleRideCancelled]);
+  }, [currentTargetId, workStatus, updatePendingRequestsSafely, handleRideCancelled, isRideActiveStatus]);
 
   // قبول الطلب حقيقياً
   async function handleAcceptRide() {
@@ -921,32 +985,96 @@ export default function DriverHomePage() {
     }
   }
 
-  // السائق وصل لنقطة انطلاق الراكب (يطلق نغمة الهورن لدى الراكب)
+  // السائق وصل لنقطة انطلاق الراكب (مع فحص القرب ومعالجة 400 وزر تحديث موقعي)
   async function handleDriverArrived() {
     const currentId = driverId || rawPhone;
-    if (!activeRide || !currentId) return;
+    if (!activeRide || !currentId || isActionInFlight) return;
+    setIsActionInFlight(true);
+    setProximityError(null);
+
+    const curLoc = driverLocRef.current;
     try {
-      const { data } = await http.post<{ success: boolean; message?: string }>('/ride/arrived', {
+      const { data } = await http.post<{
+        success: boolean;
+        message?: string;
+        error?: string;
+        distanceMeters?: number;
+        radiusMeters?: number;
+      }>('/ride/arrived', {
         requestId: activeRide.id,
         driverId: currentId,
         driverPhone: rawPhone,
+        latitude: curLoc?.lat,
+        longitude: curLoc?.lng,
+        currentLat: curLoc?.lat,
+        currentLon: curLoc?.lng,
+      }, {
+        headers: { 'Idempotency-Key': `arrived-${activeRide.id}-${Date.now()}` }
       });
+
       if (data?.success) {
         show('تم إشعار الراكب بوصولك وإطلاق تنبيه الهورن بنجاح 📍🚖', 'success');
-        setActiveRide((prev: any) => ({ ...prev, status: 'Arrived' }));
+        setActiveRide((prev: any) => ({ ...prev, status: 'DRIVER_ARRIVED' }));
+        setProximityError(null);
       } else {
-        show(data?.message || 'تعذر تأكيد الوصول', 'error');
+        const errMsg = data?.error || data?.message || 'تعذر تأكيد الوصول';
+        show(errMsg, 'error');
+        if (errMsg.includes('نصف القطر') || errMsg.includes('بعيد') || (data?.distanceMeters && data.distanceMeters > 1000)) {
+          setProximityError(`أنت بعيد عن نقطة الانطلاق (${data?.distanceMeters || 'مسافة بعيدة'}م). يرجى الاقتراب أو تحديث موقعك.`);
+        }
       }
     } catch (err: any) {
-      show(err?.response?.data?.error || 'حدث خطأ أثناء تأكيد الوصول', 'error');
+      const status = err?.response?.status;
+      const errData = err?.response?.data;
+      const errMsg = errData?.error || errData?.message || 'تعذر تأكيد الوصول لنقطة الراكب';
+      show(errMsg, 'error');
+      if (status === 400 && (errMsg.includes('نصف القطر') || errMsg.includes('بعيد') || errData?.distanceMeters)) {
+        setProximityError(
+          `أنت بعيد عن نقطة الانطلاق (${errData?.distanceMeters ? `${Math.round(errData.distanceMeters)} متر` : 'خارج النطاق المسموح'}). يرجى الاقتراب أو تحديث موقعك.`
+        );
+      }
+    } finally {
+      setIsActionInFlight(false);
     }
   }
+
+  // تحديث موقع الكابتن وإعادة المحاولة بعد رفض القرب
+  const handleRefreshLocationAndRetryProximity = () => {
+    setIsLocating(true);
+    setProximityError(null);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setDriverLoc(loc);
+          driverLocRef.current = loc;
+          mapRef.current?.flyTo({ center: [loc.lng, loc.lat], zoom: 16, duration: 800 });
+          setIsLocating(false);
+          http.post('/driver/location', {
+            driverId: currentTargetId,
+            latitude: loc.lat,
+            longitude: loc.lng,
+            heading: 0,
+            tripStatus: 'Online',
+            workStatus: workStatus,
+          }).catch(() => {});
+          show('تم تحديث موقعك بنجاح 📍 يمكنك الضغط على "أنا في موقع الراكب" الآن', 'success', 3000);
+        },
+        () => {
+          setIsLocating(false);
+          show('تعذر تحديد الموقع بدقة، يرجى التأكد من تشغيل الـ GPS', 'error');
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    } else {
+      setIsLocating(false);
+    }
+  };
 
   // إرسال تنبيه الهورن للراكب (بيب بيب 📢) عبر الباك إند مع تغذية حسية فورية للسائق
   async function handleTriggerHorn() {
     if (!activeRide) return;
 
-    // 1. تشغيل اهتزاز فوري في هاتف السائق كتغذية راجعة حسية فورية (نبضتان سريعتان)
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
         navigator.vibrate([120, 60, 120]);
@@ -988,16 +1116,46 @@ export default function DriverHomePage() {
     }
   }
 
-  function handleOpenGoogleMaps(lat: number, lng: number) {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-    window.open(url, '_blank');
+  // تفعيل الملاحة الخارجية وفتح التطبيق المختار
+  async function handleStartExternalNav(app: 'Google Maps' | 'Waze', lat: number, lng: number) {
+    if (!activeRide) return;
+    try {
+      localStorage.setItem('tawseela_preferred_nav_app', app);
+    } catch (_) {}
+
+    const currentId = driverId || rawPhone;
+    try {
+      await http.post('/ride/external-nav/start', {
+        requestId: activeRide.id,
+        driverId: currentId,
+        app: app === 'Waze' ? 'Waze' : 'Google Maps',
+      }, {
+        headers: { 'Idempotency-Key': `extnav-start-${activeRide.id}-${Date.now()}` }
+      });
+      isExternalNavActiveRef.current = true;
+    } catch (err) {
+      console.warn('[ExternalNav] start error:', err);
+    }
+
+    if (app === 'Google Maps') {
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      const url = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
     setIsNavModalOpen(false);
   }
 
-  function handleOpenWaze(lat: number, lng: number) {
-    const url = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
-    window.open(url, '_blank');
-    setIsNavModalOpen(false);
+  // نسخ الإحداثيات احتياطياً للحافظة
+  function handleCopyCoordinates(lat: number, lng: number) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`).then(() => {
+        show('تم نسخ إحداثيات الموقع بنجاح 📋', 'success', 3000);
+      }).catch(() => {
+        show('تعذر نسخ الإحداثيات', 'error');
+      });
+    }
   }
 
   function handleOpenNavModal(target?: 'pickup' | 'dropoff') {
@@ -1033,12 +1191,15 @@ export default function DriverHomePage() {
   // انطلاق الرحلة
   async function handleDriverStartRide() {
     const currentId = driverId || rawPhone;
-    if (!activeRide || !currentId) return;
+    if (!activeRide || !currentId || isActionInFlight) return;
+    setIsActionInFlight(true);
     try {
       const { data } = await http.post<{ success: boolean; message?: string; status?: string }>('/ride/start', {
         requestId: activeRide.id,
         driverId: currentId,
         driverPhone: rawPhone,
+      }, {
+        headers: { 'Idempotency-Key': `start-${activeRide.id}-${Date.now()}` }
       });
       if (data?.success) {
         show('تم بدء الرحلة والانطلاق إلى الوجهة 🚗💨', 'success', 3000);
@@ -1055,31 +1216,224 @@ export default function DriverHomePage() {
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ في بدء الرحلة', 'error');
+    } finally {
+      setIsActionInFlight(false);
     }
   }
+
+  // الوصول إلى الوجهة (المحطة الأولى أو الوجهة النهائية)
+  async function handleDriverArrivedDestination() {
+    const currentId = driverId || rawPhone;
+    if (!activeRide || !currentId || isActionInFlight) return;
+    setIsActionInFlight(true);
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string; status?: string; waitStartedAt?: string; finalFare?: number }>('/ride/arrive-destination', {
+        requestId: activeRide.id,
+        driverId: currentId,
+        driverPhone: rawPhone,
+      }, {
+        headers: { 'Idempotency-Key': `arrive-dest-${activeRide.id}-${Date.now()}` }
+      });
+
+      if (data?.success) {
+        if (data.status === 'WAITING_AT_DESTINATION' || activeRide.isRoundTrip) {
+          show('وصلتم إلى المحطة الأولى وبدأ وقت الانتظار ⏳', 'success', 4000);
+          setActiveRide((prev: any) => ({
+            ...prev,
+            status: 'WAITING_AT_DESTINATION',
+            waitStartedAt: data.waitStartedAt || new Date().toISOString()
+          }));
+        } else {
+          show('وصلتم إلى الوجهة بنجاح 🏁', 'success', 3000);
+          setActiveRide((prev: any) => ({ ...prev, status: 'ARRIVED_DESTINATION', finalFare: data.finalFare || prev?.fare }));
+          handleInitiateCompleteRide();
+        }
+      } else {
+        show(data?.message || 'تعذر تأكيد الوصول للوجهة', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ في تأكيد الوصول للوجهة', 'error');
+    } finally {
+      setIsActionInFlight(false);
+    }
+  }
+
+  // بدء رحلة العودة في الرحلات الذهاب والإياب
+  async function handleStartReturnTrip() {
+    const currentId = driverId || rawPhone;
+    if (!activeRide || !currentId || isActionInFlight) return;
+    setIsActionInFlight(true);
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string; status?: string; actualWaitMinutes?: number; waitFee?: number }>('/ride/return/start', {
+        requestId: activeRide.id,
+        driverId: currentId,
+      }, {
+        headers: { 'Idempotency-Key': `return-start-${activeRide.id}-${Date.now()}` }
+      });
+
+      if (data?.success) {
+        show('تم بدء رحلة العودة بنجاح 🔄 والانطلاق إلى نقطة الانطلاق', 'success', 3000);
+        setActiveRide((prev: any) => ({
+          ...prev,
+          status: 'IN_TRIP_RETURN',
+          actualWaitMinutes: data.actualWaitMinutes || prev?.actualWaitMinutes,
+          waitFee: data.waitFee || prev?.waitFee
+        }));
+
+        // توجيه الملاحة إلى نقطة العودة (موقع الانطلاق الأصلي)
+        const retLat = activeRide.pickupLat ?? activeRide.pickup_lat ?? activeRide.pickup?.lat;
+        const retLon = activeRide.pickupLon ?? activeRide.pickup_lon ?? activeRide.pickup?.lng;
+        if (retLat && retLon) {
+          setNavCoordinates({ lat: Number(retLat), lng: Number(retLon) });
+          setNavTargetName(activeRide.pickupName || 'نقطة العودة');
+          setIsNavModalOpen(true);
+        }
+      } else {
+        show(data?.message || 'تعذر بدء رحلة العودة', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ أثناء بدء رحلة العودة', 'error');
+    } finally {
+      setIsActionInFlight(false);
+    }
+  }
+
+  // الوصول إلى نقطة العودة
+  async function handleArrivedReturn() {
+    const currentId = driverId || rawPhone;
+    if (!activeRide || !currentId || isActionInFlight) return;
+    setIsActionInFlight(true);
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string; status?: string; finalFare?: number; breakdown?: any }>('/ride/return/arrived', {
+        requestId: activeRide.id,
+        driverId: currentId,
+      }, {
+        headers: { 'Idempotency-Key': `return-arrived-${activeRide.id}-${Date.now()}` }
+      });
+
+      if (data?.success) {
+        show('تم الوصول إلى نقطة العودة بسلام 🏁', 'success', 3000);
+        setActiveRide((prev: any) => ({
+          ...prev,
+          status: 'ARRIVED_RETURN',
+          finalFare: data.finalFare || prev?.finalFare,
+          pricingBreakdown: data.breakdown || prev?.pricingBreakdown
+        }));
+        handleInitiateCompleteRide();
+      } else {
+        show(data?.message || 'تعذر تأكيد الوصول لنقطة العودة', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ في تأكيد الوصول لنقطة العودة', 'error');
+    } finally {
+      setIsActionInFlight(false);
+    }
+  }
+
+  // حساب عداد الانتظار اللحظي عند التوقف في المحطة الأولى
+  useEffect(() => {
+    if (!activeRide?.waitStartedAt) return;
+    const updateWaitCounter = () => {
+      const start = new Date(activeRide.waitStartedAt).getTime();
+      const diffSec = Math.max(0, Math.floor((Date.now() - start) / 1000));
+      setWaitElapsedSeconds(diffSec);
+    };
+    updateWaitCounter();
+    const interval = setInterval(updateWaitCounter, 1000);
+    return () => clearInterval(interval);
+  }, [activeRide?.waitStartedAt]);
+
+  // العودة من تطبيق الملاحة الخارجي (visibilitychange & pageshow)
+  useEffect(() => {
+    const handleReturnFromExternalNav = async () => {
+      if (document.visibilityState === 'visible' && isExternalNavActiveRef.current) {
+        isExternalNavActiveRef.current = false;
+        const currentId = currentTargetId;
+        const activeRideId = activeRide?.id;
+
+        // 1. إعادة جلب المشوار النشط من الخادم
+        try {
+          const { data: actData } = await http.get<{ success?: boolean; activeRide?: any }>(
+            `/driver/${encodeURIComponent(currentId)}/active-ride`
+          );
+          if (actData?.success && actData.activeRide) {
+            setActiveRide(actData.activeRide);
+          }
+        } catch (_) {}
+
+        // 2. التقاط موقع GPS جديد وإرساله فورياً قبل أي إجراء
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const freshLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+              setDriverLoc(freshLoc);
+              driverLocRef.current = freshLoc;
+              http.post('/driver/location', {
+                driverId: currentId,
+                latitude: freshLoc.lat,
+                longitude: freshLoc.lng,
+                heading: 0,
+                tripStatus: 'Online',
+                workStatus: workStatus,
+              }).catch(() => {});
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 5000 }
+          );
+        }
+
+        // 3. إشعار الخادم بانتهاء وضع الملاحة الخارجية
+        if (activeRideId) {
+          try {
+            await http.post('/ride/external-nav/end', {
+              requestId: activeRideId,
+              driverId: currentId,
+            }, {
+              headers: { 'Idempotency-Key': `extnav-end-${activeRideId}-${Date.now()}` }
+            });
+          } catch (_) {}
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleReturnFromExternalNav);
+    window.addEventListener('pageshow', handleReturnFromExternalNav);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleReturnFromExternalNav);
+      window.removeEventListener('pageshow', handleReturnFromExternalNav);
+    };
+  }, [currentTargetId, activeRide?.id, workStatus]);
 
   // فتح نافذة تحصيل الأجرة الشفافة
   function handleInitiateCompleteRide() {
     if (!activeRide) return;
-    const rawFare = String(activeRide.fare || activeRide.price || '3500').replace(/[^0-9]/g, '');
-    const num = Math.max(3000, Number(rawFare) || 3500);
+    const rawFare = Number(activeRide.finalFare ?? activeRide.fare ?? activeRide.pricingBreakdown?.totalFare ?? 3500);
+    const num = Math.max(3000, rawFare);
     const rounded = Math.ceil(num / 250) * 250;
     setFinalFareAmount(rounded.toLocaleString('ar-IQ'));
+    setReceivedFareInput(String(rounded));
     setIsFareModalOpen(true);
   }
 
-  // إنهاء المشوار الفعلي بعد التحصيل
+  // إنهاء المشوار الفعلي بعد التحصيل (استلمت الكروة)
   async function handleDriverComplete() {
     const currentId = driverId || rawPhone;
-    if (!activeRide || !currentId) return;
+    if (!activeRide || !currentId || isActionInFlight) return;
+    setIsActionInFlight(true);
+    const numReceived = Number(receivedFareInput) || Number(String(finalFareAmount).replace(/[^0-9]/g, '')) || 3500;
     try {
       const { data } = await http.post<{ success: boolean; message?: string }>('/ride/complete', {
         requestId: activeRide.id,
         driverId: currentId,
         driverPhone: rawPhone,
+        receivedAmount: numReceived,
+      }, {
+        headers: { 'Idempotency-Key': `complete-${activeRide.id}-${Date.now()}` }
       });
+
       if (data?.success) {
-        show(`تم إنهاء المشوار بنجاح وتحصيل: ${finalFareAmount} د.ع 💵`, 'success', 4000);
+        show(`تم إنهاء المشوار بنجاح وتحصيل: ${numReceived.toLocaleString()} د.ع 💵`, 'success', 4000);
         setActiveRide(null);
         setIsFareModalOpen(false);
 
@@ -1097,6 +1451,8 @@ export default function DriverHomePage() {
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ في إنهاء الرحلة', 'error');
+    } finally {
+      setIsActionInFlight(false);
     }
   }
 
@@ -1426,45 +1782,156 @@ export default function DriverHomePage() {
             </div>
 
             {/* الزر الرئيسي العريض لمرحلة الرحلة (56px) */}
-            {activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? (
-              <button
-                type="button"
-                onClick={handleDriverArrived}
-                className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
-              >
-                <span>📍</span>
-                <span>أنا في موقع الراكب (وصلت)</span>
-              </button>
-            ) : activeRide.status === 'Arrived' ? (
-              <div className="flex flex-col gap-2.5 w-full">
+            {/* عرض خطأ القرب مع زر تحديث موقعي */}
+            {proximityError && (
+              <div className="p-3 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-300 text-xs space-y-2">
+                <p className="font-bold">{proximityError}</p>
                 <button
                   type="button"
-                  onClick={handleTriggerHorn}
-                  disabled={isTriggeringHorn}
-                  className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer border border-amber-300 disabled:opacity-60"
+                  onClick={handleRefreshLocationAndRetryProximity}
+                  disabled={isLocating}
+                  className="w-full min-h-[44px] rounded-xl bg-red-600/30 hover:bg-red-600/40 text-white font-bold flex items-center justify-center gap-2 border border-red-500/40 cursor-pointer"
                 >
-                  <span className="text-xl animate-bounce">📢</span>
-                  <span>{isTriggeringHorn ? 'جاري التنبيه...' : 'تنبيه الراكب (بيب بيب 🚖)'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDriverStartRide}
-                  className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
-                >
-                  <span className="text-xl">🚗💨</span>
-                  <span>بدء المشوار والانطلاق</span>
+                  <span>🔄</span>
+                  <span>{isLocating ? 'جاري تحديد موقعك بدقة...' : 'تحديث موقعي وإعادة المحاولة'}</span>
                 </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleInitiateCompleteRide}
-                className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer"
-              >
-                <span>🏁</span>
-                <span>إنهاء الرحلة واحتساب الأجرة</span>
-              </button>
             )}
+
+            {/* الأزرار الرئيسية لمراحل الرحلة بحجم 56px أو 52px مع منع الضغط المزدوج */}
+            {(() => {
+              const st = (activeRide.status || '').toLowerCase();
+              const isAccepted = st === 'accepted' || st === 'ontheway' || st === 'on_the_way';
+              const isArrived = st === 'arrived' || st === 'driver_arrived';
+              const isInTrip = st === 'inprogress' || st === 'in_progress' || st === 'in_trip' || st === 'started';
+              const isWaitingAtDest = st === 'waiting_at_destination' || st === 'captain_waiting_at_destination';
+              const isInTripReturn = st === 'in_trip_return';
+
+              if (isAccepted) {
+                return (
+                  <button
+                    type="button"
+                    disabled={isActionInFlight}
+                    onClick={handleDriverArrived}
+                    aria-label="أنا في موقع الراكب (وصلت)"
+                    className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer disabled:opacity-60"
+                  >
+                    <span>📍</span>
+                    <span>{isActionInFlight ? 'جاري تأكيد الوصول...' : 'أنا في موقع الراكب (وصلت)'}</span>
+                  </button>
+                );
+              }
+
+              if (isArrived) {
+                return (
+                  <div className="flex flex-col gap-2.5 w-full">
+                    <button
+                      type="button"
+                      onClick={handleTriggerHorn}
+                      disabled={isTriggeringHorn}
+                      aria-label="تنبيه الراكب بيب بيب"
+                      className="w-full min-h-[52px] h-[52px] rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer border border-amber-300 disabled:opacity-60"
+                    >
+                      <span className="text-xl animate-bounce">📢</span>
+                      <span>{isTriggeringHorn ? 'جاري التنبيه...' : 'تنبيه الراكب (بيب بيب 🚖)'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isActionInFlight}
+                      onClick={handleDriverStartRide}
+                      aria-label="بدء المشوار والانطلاق إلى الوجهة"
+                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer disabled:opacity-60"
+                    >
+                      <span className="text-xl">🚗💨</span>
+                      <span>{isActionInFlight ? 'جاري بدء المشوار...' : 'بدء المشوار والانطلاق'}</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              if (isInTrip) {
+                return (
+                  <button
+                    type="button"
+                    disabled={isActionInFlight}
+                    onClick={handleDriverArrivedDestination}
+                    aria-label="وصلنا إلى الوجهة"
+                    className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer disabled:opacity-60"
+                  >
+                    <span>🏁</span>
+                    <span>{isActionInFlight ? 'جاري تأكيد الوصول...' : (activeRide.isRoundTrip ? 'وصلنا إلى المحطة الأولى (بدء الانتظار ⏳)' : 'وصلنا إلى الوجهة 🏁')}</span>
+                  </button>
+                );
+              }
+
+              if (isWaitingAtDest) {
+                const waitMins = Math.floor(waitElapsedSeconds / 60);
+                const waitSecs = waitElapsedSeconds % 60;
+                return (
+                  <div className="flex flex-col gap-2.5 w-full">
+                    <div className="p-3 rounded-2xl bg-amber-500/20 border border-amber-400/50 text-center space-y-1">
+                      <span className="text-xs text-amber-300 font-bold block">
+                        الكابتن في انتظار الراكب في المحطة الأولى ⏳
+                      </span>
+                      <span className="text-2xl font-black text-white font-mono tracking-wider">
+                        {String(waitMins).padStart(2, '0')}:{String(waitSecs).padStart(2, '0')}
+                      </span>
+                      <span className="text-[11px] text-slate-300 block">
+                        (أول 5 دقائق مجانية، ثم 100 د.ع لكل دقيقة)
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isActionInFlight}
+                      onClick={handleStartReturnTrip}
+                      aria-label="بدء رحلة العودة"
+                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer disabled:opacity-60"
+                    >
+                      <span className="text-xl">🔄</span>
+                      <span>{isActionInFlight ? 'جاري البدء...' : 'بدء رحلة العودة 🔄'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleInitiateCompleteRide}
+                      aria-label="إنهاء الرحلة هنا واحتساب الأجرة"
+                      className="w-full min-h-[48px] h-12 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/15 cursor-pointer"
+                    >
+                      <span>🏁</span>
+                      <span>إنهاء الرحلة هنا واحتساب الأجرة المستحقة</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              if (isInTripReturn) {
+                return (
+                  <button
+                    type="button"
+                    disabled={isActionInFlight}
+                    onClick={handleArrivedReturn}
+                    aria-label="وصلنا للعودة"
+                    className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer disabled:opacity-60"
+                  >
+                    <span>🏁</span>
+                    <span>{isActionInFlight ? 'جاري التأكيد...' : 'وصلنا للعودة 🏁'}</span>
+                  </button>
+                );
+              }
+
+              return (
+                <button
+                  type="button"
+                  onClick={handleInitiateCompleteRide}
+                  aria-label="استلمت الكروة"
+                  className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo"
+                >
+                  <span className="text-xl">💵</span>
+                  <span>استلمت الكروة</span>
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -1822,7 +2289,7 @@ export default function DriverHomePage() {
       )}
 
       {/* بطاقة ملخص الأجرة وتحصيل المبلغ (Fare Summary & Cash Collection) */}
-      {isFareModalOpen && (
+      {isFareModalOpen && activeRide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in" dir="rtl">
           <div className="w-full max-w-sm rounded-3xl bg-[#161C28] border-2 border-amber-400/80 p-5 shadow-2xl text-center space-y-4">
             <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-400 text-3xl mx-auto flex items-center justify-center">
@@ -1834,46 +2301,100 @@ export default function DriverHomePage() {
               <p className="text-xs text-slate-400 mt-0.5">محسوبة وفق تسعيرة بلي المعتمدة لمنظومة توصيلة</p>
             </div>
 
-            {/* تفاصيل العداد الشفافة */}
+            {/* تفاصيل العداد والرحلة الشفافة */}
             <div className="rounded-2xl bg-white/5 border border-white/10 p-3.5 space-y-2 text-xs text-right">
-              <div className="flex items-center justify-between text-slate-300">
-                <span>فتح العداد القياسي:</span>
-                <span className="font-bold text-white">١,٠٠٠ د.ع</span>
-              </div>
-              <div className="flex items-center justify-between text-slate-300">
-                <span>المسافة والوقت:</span>
-                <span className="font-bold text-white">٥٠٠ د.ع/كم • ١٠٠ د.ع/د</span>
-              </div>
-              <div className="flex items-center justify-between text-slate-300">
-                <span>الحد الأدنى للأجرة:</span>
-                <span className="font-bold text-white">٣,٠٠٠ د.ع</span>
-              </div>
+              {activeRide.isRoundTrip ? (
+                <>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>أجرة الذهاب (المحطة الأولى):</span>
+                    <span className="font-bold text-white">
+                      {Number(activeRide.leg1Fare || activeRide.pricingBreakdown?.leg1Fare || 0).toLocaleString()} د.ع
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>رسوم الانتظار ({activeRide.actualWaitMinutes || 0} دقيقة):</span>
+                    <span className="font-bold text-amber-300">
+                      {Number(activeRide.waitFee || activeRide.pricingBreakdown?.waitFee || 0).toLocaleString()} د.ع
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>أجرة العودة (خصم 15%):</span>
+                    <span className="font-bold text-white">
+                      {Number(activeRide.leg2Fare || activeRide.pricingBreakdown?.leg2Fare || 0).toLocaleString()} د.ع
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>فتح العداد القياسي:</span>
+                    <span className="font-bold text-white">١,٠٠٠ د.ع</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-300">
+                    <span>المسافة والوقت:</span>
+                    <span className="font-bold text-white">٥٠٠ د.ع/كم • ١٠٠ د.ع/د</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* المبلغ النهائي المطلوب تحصيله كاش */}
-            <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-400/60 text-center">
-              <span className="text-xs font-bold text-amber-400 block mb-1">المبلغ المطلوب تحصيله نقداً (كاش):</span>
-              <span className="text-3xl font-black text-white font-mono tracking-tight text-amber-300">
-                {finalFareAmount} د.ع
-              </span>
-            </div>
+            {(() => {
+              const reqFare = Number(activeRide.finalFare ?? activeRide.fare ?? activeRide.pricingBreakdown?.totalFare ?? 3500);
+              const recNum = Number(receivedFareInput) || reqFare;
+              const diff = recNum - reqFare;
+
+              return (
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-400/60 text-center">
+                    <span className="text-xs font-bold text-amber-400 block mb-1">المبلغ المطلوب تحصيله نقداً:</span>
+                    <span className="text-3xl font-black text-amber-300 font-mono tracking-tight">
+                      {reqFare.toLocaleString()} د.ع
+                    </span>
+                  </div>
+
+                  {/* إدخال المبلغ المستلم الفعلي مع مؤشر الفرق */}
+                  <div className="space-y-1.5 text-right">
+                    <label className="text-xs font-bold text-slate-300 block" htmlFor="driver-received-cash">
+                      المبلغ المستلم فعلياً من الراكب (د.ع):
+                    </label>
+                    <input
+                      id="driver-received-cash"
+                      type="number"
+                      inputMode="numeric"
+                      value={receivedFareInput}
+                      onChange={(e) => setReceivedFareInput(e.target.value)}
+                      className="w-full rounded-2xl bg-[#1A202C] border border-slate-700 p-3 text-center text-lg font-black text-white font-mono focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    />
+                    {diff === 0 ? (
+                      <p className="text-[11px] font-bold text-emerald-400 text-center">المبلغ مطابق تماماً للأجرة المطلوبة ✅</p>
+                    ) : diff > 0 ? (
+                      <p className="text-[11px] font-bold text-sky-400 text-center">إكرامية إضافية للكابتن: +{diff.toLocaleString()} د.ع ⭐</p>
+                    ) : (
+                      <p className="text-[11px] font-bold text-amber-400 text-center">نقص في المبلغ: {diff.toLocaleString()} د.ع ⚠️</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             <button
               type="button"
+              disabled={isActionInFlight}
               onClick={handleDriverComplete}
-              className="w-full min-h-[54px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo"
+              className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo disabled:opacity-60"
             >
               <span>✅</span>
-              <span>تم التحصيل وجاهز لمشوار جديد</span>
+              <span>{isActionInFlight ? 'جاري التأكيد...' : 'تأكيد الاستلام وإنهاء المشوار'}</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* نافذة اختيار تطبيق الملاحة المنبثقة (Google Maps / Waze) */}
+      {/* نافذة اختيار تطبيق الملاحة المنبثقة (Google Maps / Waze / نسخ الإحداثيات) */}
       {isNavModalOpen && navCoordinates && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-[#161C28] border border-white/10 p-5 shadow-2xl text-center space-y-3.5" dir="rtl">
+          <div className="w-full max-w-sm rounded-3xl bg-[#161C28] border border-white/10 p-5 shadow-2xl text-center space-y-3.5" dir="rtl" role="dialog" aria-modal="true" aria-label="اختيار تطبيق الملاحة">
             <div className="w-12 h-12 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-400 text-2xl mx-auto flex items-center justify-center">
               🧭
             </div>
@@ -1887,24 +2408,37 @@ export default function DriverHomePage() {
             </div>
 
             <div className="space-y-2.5 pt-1">
-              {/* خرائط جوجل */}
+              {/* خرائط جوجل (Google Maps) بنمط الزر الثانوي */}
               <button
                 type="button"
-                onClick={() => handleOpenGoogleMaps(navCoordinates.lat, navCoordinates.lng)}
-                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer"
+                onClick={() => handleStartExternalNav('Google Maps', navCoordinates.lat, navCoordinates.lng)}
+                aria-label="افتح في خرائط جوجل"
+                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer"
               >
                 <span className="text-lg">🗺️</span>
-                <span>خرائط جوجل (Google Maps)</span>
+                <span>افتح في Google Maps</span>
               </button>
 
-              {/* تطبيق ويز */}
+              {/* تطبيق ويز (Waze) بنمط الزر الثانوي */}
               <button
                 type="button"
-                onClick={() => handleOpenWaze(navCoordinates.lat, navCoordinates.lng)}
+                onClick={() => handleStartExternalNav('Waze', navCoordinates.lat, navCoordinates.lng)}
+                aria-label="افتح في تطبيق ويز"
                 className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-300 font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer"
               >
                 <span className="text-lg">🚙</span>
-                <span>تطبيق ويز (Waze)</span>
+                <span>افتح في Waze</span>
+              </button>
+
+              {/* نسخ الإحداثيات الاحتياطي */}
+              <button
+                type="button"
+                onClick={() => handleCopyCoordinates(navCoordinates.lat, navCoordinates.lng)}
+                aria-label="نسخ الإحداثيات"
+                className="w-full min-h-[48px] py-2.5 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-[0.98] cursor-pointer"
+              >
+                <span>📋</span>
+                <span>نسخ الإحداثيات ({navCoordinates.lat.toFixed(4)}, {navCoordinates.lng.toFixed(4)})</span>
               </button>
 
               <button
@@ -1912,7 +2446,7 @@ export default function DriverHomePage() {
                 onClick={() => setIsNavModalOpen(false)}
                 className="w-full min-h-[44px] rounded-xl text-xs font-bold text-slate-400 hover:text-white transition cursor-pointer"
               >
-                إلغاء / المتابعة داخل التطبيق
+                المتابعة داخل التطبيق (Mapbox الافتراضي) ✕
               </button>
             </div>
           </div>
