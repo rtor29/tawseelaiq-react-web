@@ -1227,7 +1227,7 @@ export default function DriverHomePage() {
     if (!activeRide || !currentId || isActionInFlight) return;
     setIsActionInFlight(true);
     try {
-      const { data } = await http.post<{ success: boolean; message?: string; status?: string; waitStartedAt?: string; finalFare?: number }>('/ride/arrive-destination', {
+      const { data } = await http.post<{ success: boolean; message?: string; status?: string; waitStartedAt?: string; finalFare?: number }>('/ride/destination-arrived', {
         requestId: activeRide.id,
         driverId: currentId,
         driverPhone: rawPhone,
