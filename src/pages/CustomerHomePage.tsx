@@ -255,6 +255,16 @@ export default function CustomerHomePage() {
   const [isCitySelectorOpen, setIsCitySelectorOpen] = useState(false);
   const [isCancelTripOpen, setIsCancelTripOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<string | null>(null);
+  const [customCancelText, setCustomCancelText] = useState('');
+  const [cancelReasonsList, setCancelReasonsList] = useState<string[]>([
+    'تأخر الكابتن في الوصول',
+    'تغيير خطة المشوار',
+    'طلب بالخطأ',
+    'الكابتن طلب مني الإلغاء',
+    'الكابتن لا يتحرك باتجاهي',
+    'سبب آخر'
+  ]);
+  const [cancelFeeAmount, setCancelFeeAmount] = useState(1500);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   // المدينة المحددة
@@ -542,6 +552,18 @@ export default function CustomerHomePage() {
           .catch(() => {});
       }
     }
+
+    // جلب أسباب الإلغاء ورسوم الإلغاء المعتمدة من الخادم
+    http.get<{ success: boolean; riderReasons?: string[]; cancellationFeeIqd?: number }>('/ride/cancellation-reasons')
+      .then(({ data }) => {
+        if (data?.success && Array.isArray(data.riderReasons) && data.riderReasons.length > 0) {
+          setCancelReasonsList(data.riderReasons);
+        }
+        if (data?.cancellationFeeIqd) {
+          setCancelFeeAmount(data.cancellationFeeIqd);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // مزامنة حالة الطلب في التخزين المحلي لحمايته من اختفاء الطلب عند التحديث أو الخروج
@@ -1707,6 +1729,10 @@ export default function CustomerHomePage() {
   // إلغاء الرحلة حقيقياً
   async function handleConfirmCancelTrip() {
     if (!cancelReason) return;
+    if (cancelReason === 'سبب آخر' && (!customCancelText.trim() || customCancelText.trim().length < 3)) {
+      show('يرجى توضيح سبب الإلغاء الآخر (3 أحرف على الأقل)', 'warning');
+      return;
+    }
     hasNotifiedArrivalRef.current = false;
     localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
     if (rideRequestId) {
@@ -1715,12 +1741,18 @@ export default function CustomerHomePage() {
           requestId: rideRequestId,
           rideId: rideRequestId,
           reason: cancelReason,
+          customDetails: customCancelText.trim(),
         });
-        show('تم إلغاء الرحلة', 'info');
-      } catch (_) {}
+        show('تم إلغاء المشوار بنجاح', 'info');
+      } catch (err: any) {
+        show(err?.response?.data?.error || 'تعذر إلغاء الرحلة', 'error');
+        return;
+      }
     }
     setStage('ride_options');
     setIsCancelTripOpen(false);
+    setCancelReason(null);
+    setCustomCancelText('');
     setRideRequestId(null);
     setAssignedDriverInfo(null);
     setLiveDriverPosition(null);
@@ -2485,31 +2517,81 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* 7b. شاشة إلغاء الرحلة */}
-        {(stage === 'searching' || stage === 'driver_arriving') && isCancelTripOpen && (
+        {/* 7b. شاشة إلغاء الرحلة المعتمدة من الخادم مع عرض الرسوم */}
+        {(stage === 'searching' || stage === 'driver_arriving' || Boolean(rideRequestId)) && isCancelTripOpen && (
           <div className="absolute inset-0 z-40 bg-[#0D131F] text-white flex flex-col animate-fade-in" dir="rtl">
             <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-800">
               <h2 className="text-[19px] font-black text-white">إلغاء الرحلة</h2>
-              <button type="button" onClick={()=>setIsCancelTripOpen(false)} className="cursor-pointer text-slate-400 hover:text-white">
+              <button
+                type="button"
+                onClick={() => setIsCancelTripOpen(false)}
+                className="cursor-pointer text-slate-400 hover:text-white min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl"
+                aria-label="إغلاق نافذة الإلغاء"
+              >
                 <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
-            <p className="px-5 pt-5 pb-2 text-[16px] font-bold text-slate-200">اختر سبب لإلغاء الرحلة:</p>
+
+            {/* تنبيه رسوم الإلغاء */}
+            {stage === 'driver_arriving' && (
+              <div className="mx-5 mt-4 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-2">
+                <span className="text-base">⚠️</span>
+                <span>تنبيه: إذا مضت دقيقتان أو وصل الكابتن، تطبق رسوم إلغاء قدرها {cancelFeeAmount.toLocaleString()} د.ع لتعويض وقت الكابتن.</span>
+              </div>
+            )}
+
+            <p className="px-5 pt-4 pb-2 text-[15px] font-bold text-slate-200">اختر سبب الإلغاء (إلزامي):</p>
             <div className="overflow-y-auto flex-1 divide-y divide-slate-800 px-5">
-              {['أنا في عجلة من أمري والسائق بعيد','غيرت رأيي','السائق لا يتحرك باتجاه نقطة الانطلاق على الخريطة','طلب السائق أموالاً إضافية','السائق طلب إلغاء الرحلة','السائق لا يجيب أو غير متوفر','السائق طلب الدفع نقدي','اريد تعديل تفاصيل الرحلة','سوف أستخدم خدمة أخرى'].map(r=>(
-                <button key={r} type="button" onClick={()=>setCancelReason(r)} className="flex w-full items-center justify-between py-4 cursor-pointer hover:bg-slate-800/40">
-                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${cancelReason===r?'border-amber-400':'border-slate-600'}`}>{cancelReason===r&&<div className="h-2.5 w-2.5 rounded-full bg-amber-400"/>}</div>
+              {cancelReasonsList.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setCancelReason(r)}
+                  className="flex w-full items-center justify-between py-4 min-h-[48px] cursor-pointer hover:bg-slate-800/40 text-right transition"
+                >
+                  <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${cancelReason === r ? 'border-amber-400' : 'border-slate-600'}`}>
+                    {cancelReason === r && <div className="h-2.5 w-2.5 rounded-full bg-amber-400" />}
+                  </div>
                   <span className="text-[14px] font-bold text-slate-200 text-right flex-1 mr-3">{r}</span>
                 </button>
               ))}
+
+              {cancelReason === 'سبب آخر' && (
+                <div className="pt-3 pb-4">
+                  <label className="block text-xs font-bold text-slate-400 mb-1.5">اكتب توضيحاً لسبب الإلغاء (إلزامي):</label>
+                  <input
+                    type="text"
+                    maxLength={100}
+                    value={customCancelText}
+                    onChange={(e) => setCustomCancelText(e.target.value)}
+                    placeholder="مثال: حصل ظرف عائلي مفاجئ..."
+                    className="w-full rounded-xl bg-slate-900 border border-slate-700 p-3 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">{customCancelText.length}/100 حرف (3 كحد أدنى)</p>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-4 px-5 pt-4 pb-8 border-t border-slate-800">
-              <button type="button"
+
+            <div className="flex items-center gap-3 px-5 pt-4 pb-8 border-t border-slate-800">
+              <button
+                type="button"
                 onClick={handleConfirmCancelTrip}
-                className={`flex-1 rounded-xl border-2 py-3.5 text-[15px] font-bold transition ${cancelReason?'border-red-500 text-red-400 hover:bg-red-950/30 cursor-pointer':'border-slate-800 text-slate-600 cursor-not-allowed'}`}>
-                إلغاء الطلب
+                disabled={!cancelReason || (cancelReason === 'سبب آخر' && customCancelText.trim().length < 3)}
+                className={`flex-1 min-h-[56px] rounded-xl border-2 py-3.5 text-[15px] font-black transition ${
+                  cancelReason && (cancelReason !== 'سبب آخر' || customCancelText.trim().length >= 3)
+                    ? 'border-red-500 bg-red-600 text-white hover:bg-red-700 active:scale-98 cursor-pointer shadow-lg shadow-red-950/40'
+                    : 'border-slate-800 bg-slate-900 text-slate-600 cursor-not-allowed'
+                }`}
+              >
+                تأكيد إلغاء المشوار
               </button>
-              <button type="button" onClick={()=>setIsCancelTripOpen(false)} className="text-[15px] font-bold text-slate-400 cursor-pointer hover:text-white">تراجع</button>
+              <button
+                type="button"
+                onClick={() => setIsCancelTripOpen(false)}
+                className="min-h-[56px] px-6 text-[15px] font-bold text-slate-400 cursor-pointer hover:text-white"
+              >
+                تراجع
+              </button>
             </div>
           </div>
         )}

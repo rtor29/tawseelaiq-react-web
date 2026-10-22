@@ -235,10 +235,20 @@ export default function DriverHomePage() {
   const [navTargetName, setNavTargetName] = useState<string>('');
   const [navType, setNavType] = useState<'pickup' | 'dropoff'>('pickup');
 
-  // نافذة الإلغاء
+  // نافذة الإلغاء لمشتركي الخط الدائمي والرحلات الفورية
   const [cancellingSub, setCancellingSub] = useState<Subscriber | null>(null);
   const [driverApprovalReason, setDriverApprovalReason] = useState('تم التراضي مع الراكب');
   const [isSubmittingCancellation, setIsSubmittingCancellation] = useState(false);
+  const [isDriverCancelOpen, setIsDriverCancelOpen] = useState(false);
+  const [driverCancelReason, setDriverCancelReason] = useState<string | null>(null);
+  const [driverCustomCancelText, setDriverCustomCancelText] = useState('');
+  const driverReasonsList = [
+    'تعطل المركبة أو حادث مفاجئ',
+    'ازدحام مروري خانق / الطريق مغلق',
+    'تعذر التواصل مع الراكب / لم يحضر',
+    'نقطة الانطلاق في موقع يتعذر الوصول إليه',
+    'سبب آخر'
+  ];
 
   // نافذة الطوارئ SOS
   const [showSosAlert, setShowSosAlert] = useState(false);
@@ -977,6 +987,40 @@ export default function DriverHomePage() {
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ أثناء اعتماد الإلغاء', 'error');
+    } finally {
+      setIsSubmittingCancellation(false);
+    }
+  }
+
+  // إلغاء رحلة التكسي الفورية المعتمدة من طرف الكابتن
+  async function handleConfirmDriverCancel() {
+    if (!driverCancelReason || !activeRide) return;
+    if (driverCancelReason === 'سبب آخر' && (!driverCustomCancelText.trim() || driverCustomCancelText.trim().length < 3)) {
+      show('يرجى توضيح سبب الإلغاء الآخر (3 أحرف على الأقل)', 'warning');
+      return;
+    }
+    setIsSubmittingCancellation(true);
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string }>('/ride/cancel', {
+        requestId: activeRide.id,
+        rideId: activeRide.id,
+        driverId: currentTargetId,
+        cancelledBy: 'driver',
+        reason: driverCancelReason,
+        customDetails: driverCustomCancelText.trim(),
+      });
+      if (data?.success) {
+        show('تم إلغاء الرحلة بنجاح والبحث عن كابتن بديل للراكب', 'info');
+        setActiveRide(null);
+        setIsDriverCancelOpen(false);
+        setDriverCancelReason(null);
+        setDriverCustomCancelText('');
+        localStorage.removeItem('TAWSEELA_ACTIVE_DRIVER_RIDE');
+      } else {
+        show(data?.message || 'تعذر إلغاء الرحلة', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'حدث خطأ أثناء إلغاء الرحلة', 'error');
     } finally {
       setIsSubmittingCancellation(false);
     }
@@ -1851,16 +1895,29 @@ export default function DriverHomePage() {
 
               if (isAccepted) {
                 return (
-                  <button
-                    type="button"
-                    disabled={isActionInFlight}
-                    onClick={handleDriverArrived}
-                    aria-label="أنا في موقع الراكب (وصلت)"
-                    className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer disabled:opacity-60"
-                  >
-                    <span>📍</span>
-                    <span>{isActionInFlight ? 'جاري تأكيد الوصول...' : 'أنا في موقع الراكب (وصلت)'}</span>
-                  </button>
+                  <div className="flex flex-col gap-2 w-full">
+                    <button
+                      type="button"
+                      disabled={isActionInFlight}
+                      onClick={handleDriverArrived}
+                      aria-label="أنا في موقع الراكب (وصلت)"
+                      className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 text-slate-950 font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 active:scale-[0.98] transition hover:brightness-105 cursor-pointer disabled:opacity-60"
+                    >
+                      <span>📍</span>
+                      <span>{isActionInFlight ? 'جاري تأكيد الوصول...' : 'أنا في موقع الراكب (وصلت)'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDriverCancelOpen(true);
+                        setDriverCancelReason(null);
+                      }}
+                      className="w-full py-2 text-center text-xs font-bold text-red-400/80 hover:text-red-300 transition cursor-pointer min-h-[44px] flex items-center justify-center gap-1.5"
+                    >
+                      <span>⚠️</span>
+                      <span>إلغاء المشوار والاعتذار</span>
+                    </button>
+                  </div>
                 );
               }
 
@@ -1886,6 +1943,17 @@ export default function DriverHomePage() {
                     >
                       <span className="text-xl">🚗💨</span>
                       <span>{isActionInFlight ? 'جاري بدء المشوار...' : 'بدء المشوار والانطلاق'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDriverCancelOpen(true);
+                        setDriverCancelReason(null);
+                      }}
+                      className="w-full py-1.5 text-center text-xs font-bold text-red-400/80 hover:text-red-300 transition cursor-pointer min-h-[40px] flex items-center justify-center gap-1.5"
+                    >
+                      <span>⚠️</span>
+                      <span>إلغاء المشوار والاعتذار للراكب</span>
                     </button>
                   </div>
                 );
@@ -2543,6 +2611,100 @@ export default function DriverHomePage() {
                 className="flex-1 min-h-[48px] rounded-2xl bg-red-600 hover:bg-red-700 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-50"
               >
                 {isSubmittingCancellation ? 'جاري التأكيد...' : 'تأكيد الإلغاء ✅'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة إلغاء رحلة التكسي الفورية المعتمدة من الكابتن */}
+      {isDriverCancelOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in"
+          dir="rtl"
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl bg-[#161C28] border border-red-500/30 p-5 shadow-2xl text-white space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-700/60 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚠️</span>
+                <h3 className="text-base font-black text-red-400">إلغاء المشوار والاعتذار للراكب</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDriverCancelOpen(false)}
+                className="text-slate-400 hover:text-white min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 font-bold">
+              يرجى تحديد سبب الإلغاء (سيتم إشعار الراكب بالسبب وتحويل المشوار لكابتن بديل فوراً):
+            </p>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {driverReasonsList.map((reason) => (
+                <button
+                  key={reason}
+                  type="button"
+                  onClick={() => setDriverCancelReason(reason)}
+                  className={`w-full min-h-[48px] p-3 rounded-xl border text-right text-xs font-bold transition flex items-center justify-between ${
+                    driverCancelReason === reason
+                      ? 'border-amber-400 bg-amber-500/15 text-amber-300'
+                      : 'border-slate-800 bg-[#0B101B] text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  <span>{reason}</span>
+                  <div
+                    className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+                      driverCancelReason === reason ? 'border-amber-400' : 'border-slate-600'
+                    }`}
+                  >
+                    {driverCancelReason === reason && <div className="h-2 w-2 rounded-full bg-amber-400" />}
+                  </div>
+                </button>
+              ))}
+
+              {driverCancelReason === 'سبب آخر' && (
+                <div className="pt-2">
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                    توضيح السبب الآخر (3 أحرف على الأقل):
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={100}
+                    value={driverCustomCancelText}
+                    onChange={(e) => setDriverCustomCancelText(e.target.value)}
+                    placeholder="اكتب سبب الاعتذار..."
+                    className="w-full rounded-xl bg-[#0B101B] border border-slate-700 p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-0.5">{driverCustomCancelText.length}/100 حرف</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsDriverCancelOpen(false)}
+                className="flex-1 min-h-[48px] rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition active:scale-95 cursor-pointer"
+              >
+                تراجع
+              </button>
+              <button
+                type="button"
+                disabled={
+                  isSubmittingCancellation ||
+                  !driverCancelReason ||
+                  (driverCancelReason === 'سبب آخر' && driverCustomCancelText.trim().length < 3)
+                }
+                onClick={handleConfirmDriverCancel}
+                className="flex-1 min-h-[48px] rounded-xl bg-red-600 hover:bg-red-700 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isSubmittingCancellation ? 'جاري الإلغاء...' : 'تأكيد الإلغاء والاعتذار ✕'}
               </button>
             </div>
           </div>
