@@ -694,6 +694,9 @@ export default function DriverHomePage() {
 
     // اتصال SSE اللحظي الفوري عبر المسار الرسمي المعياري
     try {
+      if (!currentTargetId || currentTargetId === 'undefined' || currentTargetId === 'null') {
+        return;
+      }
       const token = storage.getToken() || localStorage.getItem('token') || '';
       const lastIdQuery = lastEventIdRef.current ? `&lastEventId=${encodeURIComponent(lastEventIdRef.current)}` : '';
       const streamUrl = `${config.apiBaseUrl}/events/driver/${encodeURIComponent(currentTargetId)}?token=${encodeURIComponent(token)}${lastIdQuery}`;
@@ -762,6 +765,20 @@ export default function DriverHomePage() {
           const data = JSON.parse(e.data);
           if (!handleIncomingEventId(e, data)) return;
 
+          // معالجة عرض المشوار المباشر الموجه للكابتن
+          const innerEv = data?.event || data;
+          const evType = innerEv?.event || innerEv?.type || data?.type;
+          if (evType === 'new_ride') {
+            const req = innerEv?.request || innerEv?.ride || data?.request || data?.ride;
+            if (req) {
+              updatePendingRequestsSafely([req]);
+            }
+          }
+
+          if (data?.pendingRequests && Array.isArray(data.pendingRequests)) {
+            updatePendingRequestsSafely(data.pendingRequests);
+          }
+
           if (data?.activeRide !== undefined) {
             if (data.activeRide) {
               setActiveRide(data.activeRide);
@@ -772,7 +789,9 @@ export default function DriverHomePage() {
               });
             }
           }
-        } catch (_) {}
+        } catch (err) {
+          console.error('[SSE:driver_event] Error:', err);
+        }
       });
 
       es.onerror = () => {
