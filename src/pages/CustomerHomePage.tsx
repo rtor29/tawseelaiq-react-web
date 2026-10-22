@@ -2665,8 +2665,8 @@ export default function CustomerHomePage() {
                 </div>
               </div>
 
-              {/* مراسلة + اتصال */}
-              <div className="flex items-center gap-3">
+              {/* وسائل التواصل الثلاث: اتصال + واتساب + مراسلة داخلية */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -2674,8 +2674,8 @@ export default function CustomerHomePage() {
                     if (assignedDriverInfo?.driverPhone) window.open(`tel:${assignedDriverInfo.driverPhone}`);
                     else show('رقم الكابتن غير متوفر حالياً', 'info');
                   }}
-                  className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-500/40 text-amber-400 shrink-0 hover:bg-amber-500/10 cursor-pointer"
-                  title="اتصال بالكابتن"
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-500/40 bg-emerald-950/40 text-emerald-400 shrink-0 hover:bg-emerald-500/20 active:scale-95 cursor-pointer"
+                  title="اتصال هاتفي بالكابتن"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -2685,9 +2685,27 @@ export default function CustomerHomePage() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    const raw = assignedDriverInfo?.driverPhone;
+                    if (!raw) {
+                      show('رقم الكابتن غير متوفر لمحادثة الواتساب', 'info');
+                      return;
+                    }
+                    const clean = String(raw).replace(/[^0-9]/g, '').replace(/^0+/, '');
+                    const intlPhone = clean.startsWith('964') ? clean : `964${clean}`;
+                    window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent('السلام عليكم كابتن، أنا بخصوص رحلتنا في توصيلة')}`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-500/40 bg-emerald-950/40 text-emerald-400 shrink-0 hover:bg-emerald-500/20 active:scale-95 cursor-pointer"
+                  title="محادثة واتساب"
+                >
+                  <span className="text-xl">💬</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setIsChatOpen(true);
                   }}
-                  className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-[#0B101B] border border-amber-500/30 px-4 py-3 text-[14px] font-bold text-amber-300 hover:border-amber-500 transition active:scale-95 cursor-pointer"
+                  className="flex flex-1 items-center justify-end gap-2 rounded-2xl bg-[#0B101B] border border-amber-500/30 px-4 py-3 text-[14px] font-bold text-amber-300 hover:border-amber-500 transition active:scale-95 cursor-pointer min-h-[48px]"
                 >
                   <span>مراسلة السائق...</span>
                   <svg className="h-5 w-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">

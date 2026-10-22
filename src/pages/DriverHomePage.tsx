@@ -1765,32 +1765,55 @@ export default function DriverHomePage() {
               </div>
             </div>
 
-            {/* أزرار الاتصال والمراسلة والملاحة السريعة */}
-            <div className="grid grid-cols-3 gap-2">
-              {activeRide.customerPhone && (
-                <button
-                  type="button"
-                  onClick={() => window.open(`tel:${activeRide.customerPhone}`)}
-                  className="min-h-[48px] py-2 px-2 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-emerald-600/30 transition cursor-pointer active:scale-95"
-                >
-                  <span>📞</span>
-                  <span>اتصال</span>
-                </button>
-              )}
+            {/* أزرار الاتصال والواتساب والمراسلة والملاحة السريعة (4 أزرار متوازنة بحد أدنى 48px) */}
+            <div className="grid grid-cols-4 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const phone = activeRide.customerPhone || activeRide.phone;
+                  if (phone) window.open(`tel:${phone}`);
+                  else show('رقم هاتف الراكب غير متوفر', 'info');
+                }}
+                className="min-h-[48px] py-2 px-1 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex flex-col items-center justify-center gap-0.5 font-bold text-[11px] hover:bg-emerald-600/30 transition cursor-pointer active:scale-95"
+                title="اتصال هاتفي"
+              >
+                <span className="text-sm">📞</span>
+                <span>اتصال</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const raw = activeRide.customerPhone || activeRide.phone;
+                  if (!raw) {
+                    show('رقم الراكب غير متوفر لمحادثة الواتساب', 'info');
+                    return;
+                  }
+                  const clean = String(raw).replace(/[^0-9]/g, '').replace(/^0+/, '');
+                  const intlPhone = clean.startsWith('964') ? clean : `964${clean}`;
+                  window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent('السلام عليكم، أنا كابتن توصيلة بخصوص رحلتك')}`, '_blank', 'noopener,noreferrer');
+                }}
+                className="min-h-[48px] py-2 px-1 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex flex-col items-center justify-center gap-0.5 font-bold text-[11px] hover:bg-emerald-500/25 transition cursor-pointer active:scale-95"
+                title="واتساب"
+              >
+                <span className="text-sm">💬</span>
+                <span>واتساب</span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
-                className="min-h-[48px] py-2 px-2 rounded-xl bg-sky-600/20 text-sky-400 border border-sky-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
+                className="min-h-[48px] py-2 px-1 rounded-xl bg-sky-600/20 text-sky-400 border border-sky-500/30 flex flex-col items-center justify-center gap-0.5 font-bold text-[11px] hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
+                title="الملاحة الخارجية والداخلية"
               >
-                <span>🧭</span>
+                <span className="text-sm">🧭</span>
                 <span>ملاحة</span>
               </button>
               <button
                 type="button"
                 onClick={() => setIsChatOpen(true)}
-                className="min-h-[48px] py-2 px-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1.5 font-bold text-xs hover:bg-amber-500/30 transition cursor-pointer active:scale-95 relative"
+                className="min-h-[48px] py-2 px-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex flex-col items-center justify-center gap-0.5 font-bold text-[11px] hover:bg-amber-500/30 transition cursor-pointer active:scale-95 relative"
+                title="دردشة فورية داخل التطبيق"
               >
-                <span>💬</span>
+                <span className="text-sm">✉️</span>
                 <span>محادثة</span>
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -start-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white animate-pulse">
