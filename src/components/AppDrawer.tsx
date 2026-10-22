@@ -395,24 +395,27 @@ export function AppDrawer({ open, onClose }: DrawerProps) {
                 <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 shrink-0">فوري</span>
               </div>
 
-              <div
-                onClick={() => go('/driver/documents')}
-                className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-amber-50/50 transition active:bg-amber-100 min-h-[52px]"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="text-amber-600 shrink-0">
-                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              {/* TODO: driver_documents_enabled (معطلة افتراضياً حتى تفعيلها رسمياً من لوحة التحكم) */}
+              {false && (
+                <div
+                  onClick={() => go('/driver/documents')}
+                  className="flex items-center justify-between px-6 py-3.5 cursor-pointer hover:bg-amber-50/50 transition active:bg-amber-100 min-h-[52px]"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="text-amber-600 shrink-0">
+                      <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
+                    </div>
+                    <p className="text-[16px] font-black text-amber-900 text-right">رفع المستمسكات والوثائق</p>
+                  </div>
+                  <div className="text-gray-400 shrink-0">
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
                     </svg>
                   </div>
-                  <p className="text-[16px] font-black text-amber-900 text-right">رفع المستمسكات والوثائق</p>
                 </div>
-                <div className="text-gray-400 shrink-0">
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </div>
-              </div>
+              )}
             </>
           )}
 
