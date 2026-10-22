@@ -627,6 +627,62 @@ export default function DriverHomePage() {
     [show]
   );
 
+  // معالجة الرابط العميق من إشعار تيليجرام (?ride=<id>)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const deepRideId = urlParams.get('ride') || urlParams.get('rideId');
+    if (!deepRideId || !currentTargetId) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const { data: res } = await http.get<any>(`/ride/${encodeURIComponent(deepRideId)}`);
+        if (!isMounted) return;
+
+        if (res?.notFound || !res?.ride) {
+          show('الطلب لم يعد متاحاً أو تم قبوله من كابتن آخر ⚠️', 'info', 5000);
+          window.history.replaceState({}, '', window.location.pathname);
+          return;
+        }
+
+        const r = res.ride;
+        const rStatus = String(r.status || '').toLowerCase();
+        
+        // إذا كان المشوار مقبولاً بالفعل للكابتن الحالي
+        if (r.assignedDriverId === currentTargetId || r.acceptedDriverId === currentTargetId) {
+          setActiveRide(r);
+          window.history.replaceState({}, '', window.location.pathname);
+          return;
+        }
+
+        // إذا كان المشوار ما زال قيد الانتظار والكابتن مرشح له
+        if (rStatus === 'pending' || rStatus === 'requested' || rStatus === 'offered') {
+          updatePendingRequestsSafely([r]);
+          try {
+            playIncomingTripAlert();
+          } catch (_) {}
+          show('تم فتح تفاصيل الطلب الوارد 🚖', 'success', 3000);
+        } else {
+          show('الطلب لم يعد متاحاً أو تم قبوله مسبقاً ⚠️', 'info', 5000);
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err?.response?.status === 403) {
+          show('غير مصرح: هذا الطلب غير موجه لك أو انتهت مهلته ⚠️', 'warning', 5000);
+        } else {
+          show('الطلب لم يعد متاحاً ⚠️', 'info', 4000);
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentTargetId, updatePendingRequestsSafely, show]);
+
   // 1. كتم الاقتراع الاحتياطي طالما أن قناة الـ SSE متصلة (Mute Polling on Active SSE)
   useEffect(() => {
     if (!currentTargetId) {

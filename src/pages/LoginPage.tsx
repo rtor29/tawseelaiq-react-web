@@ -136,6 +136,12 @@ export default function LoginPage() {
   }, [phone]);
 
   const navigateAfterLogin = (userRole: string) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirect = urlParams.get('redirect');
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      navigate(redirect, { replace: true });
+      return;
+    }
     navigate(userRole?.toLowerCase() === 'driver' ? '/drive' : '/hub', { replace: true });
   };
 
@@ -222,11 +228,7 @@ export default function LoginPage() {
           'success'
         );
 
-        if (finalRole === 'Driver') {
-          navigate('/drive', { replace: true });
-        } else {
-          navigate('/hub', { replace: true });
-        }
+        navigateAfterLogin(finalRole);
         return;
       }
 

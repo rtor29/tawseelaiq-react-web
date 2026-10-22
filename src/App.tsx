@@ -48,9 +48,11 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const rawRole = (storage.getUserRole() || localStorage.getItem('role') || localStorage.getItem('user_role') || 'customer').toLowerCase();
   const currentRole = rawRole === 'driver' ? 'driver' : rawRole === 'admin' ? 'admin' : 'customer';
 
-  // إذا لم يكن المستخدم مسجلاً، يتم تحويله لشاشة تسجيل الدخول
+  // إذا لم يكن المستخدم مسجلاً، يتم تحويله لشاشة تسجيل الدخول مع حفظ الرابط الحالي
   if (!token) {
-    return <Navigate to="/login" replace />;
+    const fullPath = typeof window !== 'undefined' ? (window.location.pathname + window.location.search) : '';
+    const redirectParam = fullPath && fullPath !== '/' ? `?redirect=${encodeURIComponent(fullPath)}` : '';
+    return <Navigate to={`/login${redirectParam}`} replace />;
   }
 
   // إذا كانت الصلاحيات محددة والمستخدم لا يملك الصلاحية المناسبة، يتم توجيهه لمساره الصحيح
