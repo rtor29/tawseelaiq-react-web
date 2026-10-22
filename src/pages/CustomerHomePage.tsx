@@ -342,6 +342,62 @@ export default function CustomerHomePage() {
   const sheetPointerCurrentYRef = useRef<number | null>(null);
   const isSheetDraggingRef = useRef<boolean>(false);
 
+  // حالة الورقة السفلية ثلاثية الحالات لفئات الرحلة (minimized, middle, expanded)
+  const [tierSheetState, setTierSheetState] = useState<'minimized' | 'middle' | 'expanded'>('middle');
+  const tierPointerStartYRef = useRef<number | null>(null);
+  const tierPointerCurrentYRef = useRef<number | null>(null);
+  const isTierDraggingRef = useRef<boolean>(false);
+
+  const handleTierPointerDown = useCallback((e: React.PointerEvent) => {
+    try {
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch (_) {}
+    tierPointerStartYRef.current = e.clientY;
+    tierPointerCurrentYRef.current = e.clientY;
+    isTierDraggingRef.current = true;
+  }, []);
+
+  const handleTierPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isTierDraggingRef.current || tierPointerStartYRef.current === null) return;
+    tierPointerCurrentYRef.current = e.clientY;
+  }, []);
+
+  const handleTierPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!isTierDraggingRef.current || tierPointerStartYRef.current === null || tierPointerCurrentYRef.current === null) {
+      isTierDraggingRef.current = false;
+      tierPointerStartYRef.current = null;
+      tierPointerCurrentYRef.current = null;
+      return;
+    }
+    const deltaY = tierPointerCurrentYRef.current - tierPointerStartYRef.current;
+    if (deltaY > 40) {
+      // سحب لأسفل يصغّر الورقة
+      setTierSheetState((prev) => (prev === 'expanded' ? 'middle' : 'minimized'));
+    } else if (deltaY < -40) {
+      // سحب لأعلى يرفع الورقة
+      setTierSheetState((prev) => (prev === 'minimized' ? 'middle' : 'expanded'));
+    }
+    isTierDraggingRef.current = false;
+    tierPointerStartYRef.current = null;
+    tierPointerCurrentYRef.current = null;
+    try {
+      (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch (_) {}
+  }, []);
+
+  const handleTierKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setTierSheetState((prev) => (prev === 'minimized' ? 'middle' : 'expanded'));
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setTierSheetState((prev) => (prev === 'expanded' ? 'middle' : 'minimized'));
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setTierSheetState((prev) => (prev === 'middle' ? 'expanded' : prev === 'expanded' ? 'minimized' : 'middle'));
+    }
+  }, []);
+
   // مرجع لتتبع مرحلة الرحلة بدقة ومنع ارتداد الوجهة
   const stageRef = useRef(stage);
   useEffect(() => {
@@ -1792,8 +1848,9 @@ export default function CustomerHomePage() {
     >
       {/* ====================================================================
           الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
+          ثابتة وظاهرة دائماً فوق كل شيء بـ z-50 ولا تُغطى بأي تنبيه أو بطاقة
           ==================================================================== */}
-      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-30 shadow-lg transition-colors ${
+      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-50 shrink-0 w-full shadow-lg transition-colors ${
         isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
       }`}>
         {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
@@ -1884,7 +1941,7 @@ export default function CustomerHomePage() {
 
       {/* 3. الخريطة الرئيسية Mapbox */}
       <div
-        className="relative flex-1 w-full h-full"
+        className="relative flex-1 min-h-0 w-full h-full overflow-hidden"
         onClick={() => {
           if (stage === 'driver_arriving' && rideSheetState === 'expanded') {
             setRideSheetState('middle');
@@ -2282,15 +2339,85 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* 7. بطاقة خيارات فئات الرحلة الفاخرة */}
+        {/* 7. بطاقة خيارات فئات الرحلة كنافذة سفلية قابلة للسحب ثلاثية الحالات (minimized, middle, expanded) */}
         {stage === 'ride_options' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl bg-[#161C28]/95 backdrop-blur-md pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in" dir="rtl">
+          <div
+            role="region"
+            aria-label="قائمة فئات الرحلة والتسعير"
+            tabIndex={0}
+            onKeyDown={handleTierKeyDown}
+            style={{
+              transform:
+                tierSheetState === 'expanded'
+                  ? 'translateY(0)'
+                  : tierSheetState === 'middle'
+                  ? 'translateY(calc(100% - 335px))'
+                  : 'translateY(calc(100% - 108px))',
+              transition: 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            }}
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md pt-1 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in will-change-transform motion-reduce:transition-none select-none"
+            dir="rtl"
+          >
+            {/* مقبض السحب القابل للمس مع مساحة 48px وتحريك ناعم */}
+            <div
+              onPointerDown={handleTierPointerDown}
+              onPointerMove={handleTierPointerMove}
+              onPointerUp={handleTierPointerUp}
+              style={{ touchAction: 'none' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setTierSheetState((prev) => (prev === 'middle' ? 'expanded' : prev === 'expanded' ? 'minimized' : 'middle'));
+              }}
+              className="cursor-pointer select-none touch-none pt-2 pb-1.5 px-4 flex flex-col items-center"
+              aria-label="مقبض سحب وتغيير حجم قائمة الفئات"
+            >
+              <div className="py-2 px-10 flex justify-center items-center min-h-[48px]">
+                <div className="h-1.5 w-12 rounded-full bg-slate-400 hover:bg-slate-300 active:bg-amber-400 transition-colors" />
+              </div>
+
+              {/* حالة مصغّرة (minimized): مقبض + الفئة المحددة + زر الطلب فتظهر الخريطة كاملة */}
+              {tierSheetState === 'minimized' && (
+                <div className="w-full flex items-center justify-between gap-3 pt-1 pb-1 px-1 animate-fade-in">
+                  <div 
+                    className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 transition active:scale-98"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTierSheetState('middle');
+                    }}
+                    title="اضغط لعرض كافة الفئات"
+                  >
+                    <TawseelaTierLogo badge={currentTier.badge} size="sm" />
+                    <div className="text-right">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[15px] font-black text-white">{currentTier.name}</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                          محدد ↕️
+                        </span>
+                      </div>
+                      <span className="text-[14px] font-black text-amber-400">{calculatedPrice.toLocaleString()} د.ع</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOrderTrip();
+                    }}
+                    className="h-12 min-h-[48px] px-6 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-center text-[15px] font-black text-[#090D16] shadow-[0_4px_16px_rgba(245,158,11,0.3)] transition active:scale-98 hover:brightness-110 cursor-pointer flex items-center justify-center shrink-0"
+                  >
+                    طلب الآن 🚖
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* التبويبات العلوية: تكسي و بوكس (RTL: تكسي يمين، بوكس يسار) */}
             <div className="flex border-b border-slate-800 px-4" dir="rtl">
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('taxi')}
-                className={`flex-1 min-h-[48px] py-3 text-center text-[15px] font-bold transition relative cursor-pointer ${
+                className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
                   selectedServiceTab === 'taxi'
                     ? 'text-amber-400 border-b-2 border-amber-500'
                     : 'text-slate-400 hover:text-slate-200'
@@ -2301,7 +2428,7 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={() => setSelectedServiceTab('box')}
-                className={`flex-1 min-h-[48px] py-3 text-center text-[15px] font-bold transition relative cursor-pointer ${
+                className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
                   selectedServiceTab === 'box'
                     ? 'text-amber-400 border-b-2 border-amber-500'
                     : 'text-slate-400 hover:text-slate-200'
@@ -2313,30 +2440,30 @@ export default function CustomerHomePage() {
 
             {/* شارة الذروة أو الخصم الذكي المفعّل */}
             {dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs" dir="rtl">
+              <div className="mx-4 mt-2 mb-1 p-2 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs" dir="rtl">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
-                  <span className="text-[12.5px] font-bold text-amber-200">{dynamicPricingData.surgeBadge.text}</span>
+                  <span className="w-5 h-5 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
+                  <span className="text-[12px] font-bold text-amber-200">{dynamicPricingData.surgeBadge.text}</span>
                 </div>
-                <span className="text-[10.5px] font-bold text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded-md border border-amber-500/40">
+                <span className="text-[10px] font-bold text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded-md border border-amber-500/40">
                   تحديث حي
                 </span>
               </div>
             )}
             {dynamicPricingData.discountBadge && !dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2.5 mb-1 p-2.5 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs" dir="rtl">
+              <div className="mx-4 mt-2 mb-1 p-2 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs" dir="rtl">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
-                  <span className="text-[12.5px] font-bold text-emerald-200">{dynamicPricingData.discountBadge.text}</span>
+                  <span className="w-5 h-5 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
+                  <span className="text-[12px] font-bold text-emerald-200">{dynamicPricingData.discountBadge.text}</span>
                 </div>
-                <span className="text-[10.5px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/40">
+                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/40">
                   عرض خاص
                 </span>
               </div>
             )}
 
             {/* قائمة فئات الرحلة (سوبر، توفير، بلس) بأسلوب RTL صارم */}
-            <div className="px-4 py-2 space-y-1.5" dir="rtl">
+            <div className="px-4 py-1.5 space-y-1.5" dir="rtl">
               {RIDE_TIERS.map((tier) => {
                 const isSelected = selectedTierId === tier.id;
                 const tierPrice = getTierPrice(tier);
@@ -2345,7 +2472,7 @@ export default function CustomerHomePage() {
                   <div
                     key={tier.id}
                     onClick={() => setSelectedTierId(tier.id)}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border transition cursor-pointer min-h-[58px] ${
+                    className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer min-h-[54px] ${
                       isSelected
                         ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/50'
                         : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/30'
@@ -2353,23 +2480,23 @@ export default function CustomerHomePage() {
                     dir="rtl"
                   >
                     {/* الطرف الأيمن: شعار توصيلة المعتمد + الشارة، وبجانبه الاسم والوصف */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                       <TawseelaTierLogo badge={tier.badge} size="sm" />
                       <div className="text-right">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[15px] font-bold text-white">{tier.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[14.5px] font-bold text-white">{tier.name}</p>
                           {isSelected && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
                               محدد
                             </span>
                           )}
                         </div>
-                        <p className="text-[12px] font-medium text-slate-400">{tier.subtitle}</p>
+                        <p className="text-[11.5px] font-medium text-slate-400">{tier.subtitle}</p>
                       </div>
                     </div>
 
                     {/* الطرف الأيسر: السعر بالدينار العراقي */}
-                    <div className="text-left font-black text-[16px] text-amber-400 whitespace-nowrap">
+                    <div className="text-left font-black text-[15px] text-amber-400 whitespace-nowrap">
                       {tierPrice.toLocaleString()} د.ع
                     </div>
                   </div>
@@ -2377,62 +2504,70 @@ export default function CustomerHomePage() {
               })}
             </div>
 
-            {/* شريط الإجراءات: خيارات الرحلة وقسيمة */}
-            <div className="my-1 flex items-center justify-around border-t border-b border-slate-800 py-2 px-6" dir="rtl">
-              {/* خيارات الرحلة */}
-              <button
-                type="button"
-                onClick={() => setIsTripOptionsOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 min-h-[48px] py-2 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
-              >
-                <span className="text-[14px] font-bold">خيارات الرحلة</span>
-                <svg
-                  className="h-5 w-5 text-amber-400/80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
+            {/* محتوى الحالة المرتفعة (expanded): خيارات الرحلة وقسيمة الخصم */}
+            <div
+              className={`transition-all duration-300 overflow-hidden px-4 ${
+                tierSheetState === 'expanded'
+                  ? 'opacity-100 max-h-[100px] pointer-events-auto my-1'
+                  : 'opacity-0 max-h-0 pointer-events-none'
+              }`}
+            >
+              <div className="flex items-center justify-around border-t border-b border-slate-800 py-2" dir="rtl">
+                {/* خيارات الرحلة */}
+                <button
+                  type="button"
+                  onClick={() => setIsTripOptionsOpen(true)}
+                  className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
                 >
-                  <line x1="4" y1="6" x2="20" y2="6" />
-                  <line x1="7" y1="12" x2="17" y2="12" />
-                  <line x1="10" y1="18" x2="14" y2="18" />
-                </svg>
-              </button>
+                  <span className="text-[13.5px] font-bold">خيارات الرحلة</span>
+                  <svg
+                    className="h-4.5 w-4.5 text-amber-400/80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                  >
+                    <line x1="4" y1="6" x2="20" y2="6" />
+                    <line x1="7" y1="12" x2="17" y2="12" />
+                    <line x1="10" y1="18" x2="14" y2="18" />
+                  </svg>
+                </button>
 
-              {/* فاصل */}
-              <div className="h-5 w-[1px] bg-slate-800" />
+                {/* فاصل */}
+                <div className="h-5 w-[1px] bg-slate-800" />
 
-              {/* قسيمة الخصم */}
-              <button
-                type="button"
-                onClick={() => setIsPromoModalOpen(true)}
-                className="flex flex-1 items-center justify-center gap-2 min-h-[48px] py-2 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
-              >
-                <span className="text-[14px] font-bold">
-                  {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
-                </span>
-                <svg
-                  className="h-5 w-5 text-amber-400/80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                {/* قسيمة الخصم */}
+                <button
+                  type="button"
+                  onClick={() => setIsPromoModalOpen(true)}
+                  className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
                 >
-                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-                  <line x1="7" y1="7" x2="7.01" y2="7" />
-                </svg>
-              </button>
+                  <span className="text-[13.5px] font-bold">
+                    {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
+                  </span>
+                  <svg
+                    className="h-4.5 w-4.5 text-amber-400/80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                    <line x1="7" y1="7" x2="7.01" y2="7" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
-            {/* الزر الرئيسي: طلب الفئة المحددة (بارتفاع 56px = h-14) */}
-            <div className="px-6 pt-2 pb-2">
+            {/* الزر الرئيسي: طلب الفئة المحددة (بارتفاع 56px = h-14) متاح في middle و expanded */}
+            <div className="px-6 pt-2 pb-1">
               <button
                 type="button"
                 onClick={handleOrderTrip}
-                className="w-full h-14 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer flex items-center justify-center"
+                className="w-full h-14 min-h-[56px] rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-center text-[16px] font-black text-[#090D16] shadow-[0_4px_20px_rgba(245,158,11,0.3)] transition-all duration-200 ease-in-out active:scale-[0.98] hover:brightness-110 cursor-pointer flex items-center justify-center"
               >
                 طلب {currentTier.name}
               </button>

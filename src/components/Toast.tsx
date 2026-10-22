@@ -82,8 +82,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ show, dismiss, dismissAll }}>
       {children}
-      {/* موضع الإشعارات ثابت في أعلى الشاشة دون حجب أزرار الواجهة السفلية */}
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-[9999] flex flex-col items-center gap-2 px-4 pt-safe transition-all duration-200">
+      {/* موضع الإشعارات أسفل الترويسة العلوية مباشرة لمنع حجب أزرار التنقل (الرئيسية، الحساب، الرجوع) */}
+      <div className="pointer-events-none fixed inset-x-0 top-[calc(4.75rem+env(safe-area-inset-top,1rem))] z-[9999] flex flex-col items-center gap-2 px-4 transition-all duration-200">
         {toasts.map((t) => (
           <div
             key={t.id}
