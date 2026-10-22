@@ -456,6 +456,38 @@ export default function CustomerHomePage() {
     }
   }, []);
 
+  // فحص الكباتن الفعليين القريبين من الخادم لتوحيد المصدر ومنع تناقض الرسائل
+  const [nearbyDriversCount, setNearbyDriversCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    async function checkNearbyDrivers() {
+      try {
+        const { data } = await http.get<any>('/drivers/nearby', {
+          params: {
+            lat: pickup.lat,
+            lon: pickup.lng,
+            tripType: 'taxi',
+            vehicleType: selectedTierId,
+            rangeKm: 25,
+          },
+        });
+        if (!isCancelled) {
+          const list = Array.isArray(data) ? data : (data?.drivers || data?.data || []);
+          setNearbyDriversCount(list.length);
+        }
+      } catch (_) {
+        if (!isCancelled) setNearbyDriversCount(0);
+      }
+    }
+    checkNearbyDrivers();
+    const interval = setInterval(checkNearbyDrivers, 15000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [pickup.lat, pickup.lng, selectedTierId]);
+
   // حالة الـ GPS والتنبيهات المخصصة لـ iOS Safari
   const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -1193,8 +1225,16 @@ export default function CustomerHomePage() {
         show(data.error || 'تعذر إرسال الطلب، يرجى المحاولة لاحقاً', 'error');
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error || 'حدث خطأ في الاتصال بالخادم';
-      show(msg, 'error');
+      const errData = err?.response?.data;
+      if (errData?.noDriversInTier) {
+        show(errData.error || `لا يوجد كابتن ${errData.tierName || ''} متاح قريباً، جرّب فئة أخرى`, 'warning');
+      } else if (errData?.noDriversInRadius) {
+        show(errData.error || 'لا يوجد كابتن متاح بالقرب منك حالياً ضمن نطاق البحث', 'warning');
+      } else if (errData?.error) {
+        show(errData.error, err?.response?.status === 400 && errData.activeRideExists ? 'warning' : 'error');
+      } else {
+        show('تعذر الاتصال بالخادم، يرجى التحقق من اتصال الإنترنت وإعادة المحاولة', 'error');
+      }
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -2179,30 +2219,30 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* شارة: «٤ كباتن متوفرين قربك الآن ⚡» في أعلى اليمين وأدوات الطوارئ في أعلى اليسار */}
-        {stage !== 'searching' && stage !== 'driver_arriving' && (
-          <>
-            <div className="pointer-events-auto absolute top-3.5 right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-2 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-              </span>
-              <span>٤ كباتن متوفرين قربك الآن</span>
-              <span className="text-amber-400 text-sm">⚡</span>
-            </div>
+        {/* شارة الكباتن المتوفرين قربك الآن (مشروطة بوجود كباتن فعليين > 0 فقط لمنع التناقض) */}
+        {stage !== 'searching' && stage !== 'driver_arriving' && nearbyDriversCount !== null && nearbyDriversCount > 0 && (
+          <div className="pointer-events-auto absolute top-3.5 right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-2 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            </span>
+            <span>{nearbyDriversCount} {nearbyDriversCount === 1 ? 'كابتن متوفر' : nearbyDriversCount === 2 ? 'كابتنان متوفران' : 'كباتن متوفرين'} قربك الآن</span>
+            <span className="text-amber-400 text-sm">⚡</span>
+          </div>
+        )}
 
-            <div className="pointer-events-auto absolute top-3.5 left-4 z-20 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => show('خدمة الطوارئ والأمان 🛡️', 'info')}
-                className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/10 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
-                title="طوارئ وأمان"
-                aria-label="طوارئ"
-              >
-                <span className="text-base">🛡️</span>
-              </button>
-            </div>
-          </>
+        {stage !== 'searching' && stage !== 'driver_arriving' && (
+          <div className="pointer-events-auto absolute top-3.5 left-4 z-20 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => show('خدمة الطوارئ والأمان 🛡️', 'info')}
+              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/10 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+              title="طوارئ وأمان"
+              aria-label="طوارئ"
+            >
+              <span className="text-base">🛡️</span>
+            </button>
+          </div>
         )}
 
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}

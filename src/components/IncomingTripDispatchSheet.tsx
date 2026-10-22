@@ -26,6 +26,7 @@ export interface IncomingRideRequest {
   stepTimeoutAt?: number;
   serverTimestamp?: number;
   tier?: string;
+  tierBadge?: string;
   price?: number;
   routeCoordinates?: [number, number][];
   pickupLocation?: any;
@@ -42,6 +43,13 @@ interface IncomingTripDispatchSheetProps {
 export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps> = React.memo(
   ({ incomingRequest, isDark, onAccept, onReject }) => {
     const currentRideId = incomingRequest ? String(incomingRequest.id || incomingRequest.rideId || '') : null;
+
+    const onRejectRef = useRef(onReject);
+    const onAcceptRef = useRef(onAccept);
+    useEffect(() => {
+      onRejectRef.current = onReject;
+      onAcceptRef.current = onAccept;
+    }, [onReject, onAccept]);
 
     // احتساب الثواني المتبقية استناداً إلى stepTimeoutAt من الخادم وفرق الساعة
     const computeInitialRemaining = () => {
@@ -69,6 +77,11 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
       setCountdown(initial);
       setIsSubmitting(false);
 
+      if (initial <= 0) {
+        onRejectRef.current();
+        return;
+      }
+
       // تشغيل نغمة التنبيه والاهتزاز مرة واحدة فقط لكل طلب فريد
       if (lastAlertRideIdRef.current !== currentRideId) {
         lastAlertRideIdRef.current = currentRideId;
@@ -83,28 +96,33 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
       }
 
       const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (incomingRequest?.stepTimeoutAt) {
-            const skew = incomingRequest.serverTimestamp ? (Date.now() - incomingRequest.serverTimestamp) : 0;
-            const remaining = Math.round((incomingRequest.stepTimeoutAt - (Date.now() - skew)) / 1000);
-            if (remaining <= 0) {
-              clearInterval(timer);
-              onReject();
-              return 0;
-            }
-            return Math.min(20, remaining);
-          }
-          if (prev <= 1) {
+        let remaining = 0;
+        if (incomingRequest?.stepTimeoutAt) {
+          const skew = incomingRequest.serverTimestamp ? (Date.now() - incomingRequest.serverTimestamp) : 0;
+          remaining = Math.round((incomingRequest.stepTimeoutAt - (Date.now() - skew)) / 1000);
+        } else {
+          setCountdown((prev) => {
+            remaining = prev - 1;
+            return Math.max(0, remaining);
+          });
+          if (remaining <= 0) {
             clearInterval(timer);
-            onReject();
-            return 0;
+            onRejectRef.current();
           }
-          return prev - 1;
-        });
+          return;
+        }
+
+        if (remaining <= 0) {
+          setCountdown(0);
+          clearInterval(timer);
+          onRejectRef.current();
+        } else {
+          setCountdown(Math.min(20, remaining));
+        }
       }, 1000);
 
       return () => clearInterval(timer);
-    }, [currentRideId, incomingRequest?.stepTimeoutAt, onReject]);
+    }, [currentRideId, incomingRequest?.stepTimeoutAt]);
 
     if (!incomingRequest || !currentRideId) {
       return null;
@@ -117,16 +135,19 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
     const isRoundTripRide = Boolean(incomingRequest.isRoundTrip || incomingRequest.tripType === 'ROUND_TRIP');
     const expectedWaitMins = incomingRequest.expectedWaitMinutes || incomingRequest.waitDuration || incomingRequest.stopDuration || 15;
 
+    const reqTierNorm = (incomingRequest.tier || '').toLowerCase();
+    const tierBadge = (incomingRequest as any).tierBadge || (reqTierNorm === 'plus' ? '💎 بلس' : reqTierNorm === 'super' ? '⚡ سوبر' : '🚕 توفير');
+
     const handleAcceptClick = () => {
-      if (isSubmitting) return;
+      if (isSubmitting || countdown <= 0) return;
       setIsSubmitting(true);
-      onAccept();
+      onAcceptRef.current();
     };
 
     const handleRejectClick = () => {
       if (isSubmitting) return;
       setIsSubmitting(true);
-      onReject();
+      onRejectRef.current();
     };
 
     return (
@@ -152,9 +173,12 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
           </div>
 
           <div className={`flex items-center justify-between pb-2 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-500 dark:text-amber-300 px-3 py-1 text-xs font-black animate-pulse" aria-live="polite">
                 طلب مشوار جديد ({countdown} ثانية) 🚖
+              </span>
+              <span className="rounded-full bg-slate-800/90 border border-amber-500/40 text-amber-300 px-2.5 py-0.5 text-xs font-bold shadow-xs">
+                {tierBadge}
               </span>
               {(incomingRequest.surgeBadge || (incomingRequest.surgeMultiplier && incomingRequest.surgeMultiplier > 1.05)) && (
                 <span className="rounded-full bg-amber-500 text-slate-950 font-black px-2 py-0.5 text-[11px] shadow-xs">
@@ -220,13 +244,19 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
             {/* زر القبول العريض الفاخر (56px) */}
             <button
               type="button"
-              disabled={isSubmitting}
+              disabled={isSubmitting || countdown <= 0}
               onClick={handleAcceptClick}
               aria-label={`قبول المشوار، الأجرة ${totalFareDisplay} دينار عراقي`}
-              className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full min-h-[56px] h-14 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-slate-950 font-black text-lg flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 active:scale-[0.98] transition hover:brightness-105 cursor-pointer font-cairo disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>🚖</span>
-              <span>{isSubmitting ? 'جاري القبول...' : `قبول المشوار 🚖 (${totalFareDisplay} د.ع)`}</span>
+              <span>
+                {isSubmitting
+                  ? 'جاري القبول...'
+                  : countdown <= 0
+                  ? 'انتهت مهلة الطلب (0 ث)'
+                  : `قبول المشوار 🚖 (${totalFareDisplay} د.ع)`}
+              </span>
             </button>
 
             {/* زر الرفض والتجاهل (48px) */}

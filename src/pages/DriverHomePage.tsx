@@ -816,18 +816,19 @@ export default function DriverHomePage() {
           if (!handleIncomingEventId(e, data)) return;
 
           const evType = data.event || data.type;
-          if (evType === 'ride_cancelled' || evType === 'ride_taken') {
+          if (evType === 'ride_cancelled' || evType === 'ride_taken' || evType === 'ride_expired' || evType === 'ride_offer_expired') {
             const cancelledId = String(data.rideId || data.requestId || data.id || '');
             if (acceptedRideIdRef.current === cancelledId || (activeRide && String(activeRide.id || activeRide.rideId) === cancelledId)) {
               return; // المشوار المقبول للكابتن الحالي لا يُلغى أو يومض
             }
-            if (evType === 'ride_taken') {
-              // تم قبول المشوار من كابتن آخر: إزالة هادئة من البطاقات المعلقة دون رسالة إلغاء مربكة
+            if (evType === 'ride_taken' || evType === 'ride_expired' || evType === 'ride_offer_expired') {
+              // تم قبول المشوار أو انتهاء مهلته: إزالة هادئة من البطاقات المعلقة دون رسالة إلغاء مربكة
               setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== cancelledId));
               if (pendingMarkersRef.current.has(cancelledId)) {
                 pendingMarkersRef.current.get(cancelledId)?.remove();
                 pendingMarkersRef.current.delete(cancelledId);
               }
+              lastIncomingIdRef.current = null;
               return;
             }
             handleRideCancelled(cancelledId);
@@ -844,9 +845,22 @@ export default function DriverHomePage() {
           const data = JSON.parse(e.data);
           if (!handleIncomingEventId(e, data)) return;
 
-          // معالجة عرض المشوار المباشر الموجه للكابتن
+          // معالجة عرض وسحب المشوار المباشر الموجه للكابتن
           const innerEv = data?.event || data;
           const evType = innerEv?.event || innerEv?.type || data?.type;
+          if (evType === 'ride_offer_expired' || evType === 'ride_taken' || evType === 'ride_cancelled') {
+            const expId = String(innerEv?.rideId || innerEv?.requestId || data?.rideId || data?.requestId || '');
+            if (expId) {
+              setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== expId));
+              if (pendingMarkersRef.current.has(expId)) {
+                pendingMarkersRef.current.get(expId)?.remove();
+                pendingMarkersRef.current.delete(expId);
+              }
+              lastIncomingIdRef.current = null;
+            }
+            return;
+          }
+
           if (evType === 'new_ride') {
             const req = innerEv?.request || innerEv?.ride || data?.request || data?.ride;
             if (req) {
@@ -938,18 +952,23 @@ export default function DriverHomePage() {
         show('تعذر قبول الطلب في الوقت الحالي', 'info');
       }
     } catch (err: any) {
-      const errMsg = err?.response?.data?.error || '';
-      if (errMsg && !errMsg.includes('غير موجود')) {
+      const errData = err?.response?.data;
+      const errMsg = errData?.error || '';
+      const isConflictOrExpired = err?.response?.status === 409 || errData?.conflict || errData?.alreadyAccepted || errData?.expired || errMsg.includes('تعارض حالات') || errMsg.includes('انتهت مهلة') || errMsg.includes('تم قبوله');
+
+      if (isConflictOrExpired) {
+        show('عذراً، انتهت مهلة هذا المشوار أو تم قبوله من كابتن آخر', 'info');
+      } else if (errMsg && !errMsg.includes('غير موجود')) {
         show(errMsg, 'error');
-      } else {
-        const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
-        setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== accId));
-        if (pendingMarkersRef.current.has(accId)) {
-          pendingMarkersRef.current.get(accId)?.remove();
-          pendingMarkersRef.current.delete(accId);
-        }
-        lastIncomingIdRef.current = null;
       }
+
+      const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
+      setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== accId));
+      if (pendingMarkersRef.current.has(accId)) {
+        pendingMarkersRef.current.get(accId)?.remove();
+        pendingMarkersRef.current.delete(accId);
+      }
+      lastIncomingIdRef.current = null;
     }
   }
 
