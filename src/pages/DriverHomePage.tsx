@@ -164,6 +164,7 @@ export default function DriverHomePage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [pendingSeatRequests, setPendingSeatRequests] = useState<PendingSeatBooking[]>([]);
   const lastNotifiedSeatBookingIdRef = useRef<string | null>(null);
+  const acceptedRideIdRef = useRef<string | null>(null);
 
   // قائمة الطلبات المعلقة الفورية وحالة المشوار النشط الحقيقي
   const [pendingRequests, setPendingRequests] = useState<IncomingRideRequest[]>([]);
@@ -817,6 +818,18 @@ export default function DriverHomePage() {
           const evType = data.event || data.type;
           if (evType === 'ride_cancelled' || evType === 'ride_taken') {
             const cancelledId = String(data.rideId || data.requestId || data.id || '');
+            if (acceptedRideIdRef.current === cancelledId || (activeRide && String(activeRide.id || activeRide.rideId) === cancelledId)) {
+              return; // المشوار المقبول للكابتن الحالي لا يُلغى أو يومض
+            }
+            if (evType === 'ride_taken') {
+              // تم قبول المشوار من كابتن آخر: إزالة هادئة من البطاقات المعلقة دون رسالة إلغاء مربكة
+              setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== cancelledId));
+              if (pendingMarkersRef.current.has(cancelledId)) {
+                pendingMarkersRef.current.get(cancelledId)?.remove();
+                pendingMarkersRef.current.delete(cancelledId);
+              }
+              return;
+            }
             handleRideCancelled(cancelledId);
           } else if (data?.pendingRequests) {
             updatePendingRequestsSafely(data.pendingRequests);
@@ -899,11 +912,13 @@ export default function DriverHomePage() {
       });
       if (data?.success) {
         show('تم قبول المشوار بنجاح! 🚖 توجه إلى موقع الراكب', 'success');
-        const reqObj = data.request || acceptedReq;
+        const reqObj = data.request || (data as any).ride || acceptedReq;
+        reqObj.status = 'accepted';
         reqObj.pickupName = reqObj.pickupName || reqObj.pickupAddress || reqObj.pickup_title || 'موقع الراكب';
         reqObj.dropoffName = reqObj.dropoffName || reqObj.dropoffAddress || reqObj.dropoff_title || reqObj.destination || reqObj.destinationAddress || 'وجهة الراكب';
+        const accId = String(acceptedReq.id || (acceptedReq as any).rideId || reqObj.id);
+        acceptedRideIdRef.current = accId;
         setActiveRide(reqObj);
-        const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
         setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== accId));
         if (pendingMarkersRef.current.has(accId)) {
           pendingMarkersRef.current.get(accId)?.remove();

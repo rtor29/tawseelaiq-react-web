@@ -284,6 +284,7 @@ export default function CustomerHomePage() {
     driverRating?: number;
     driverLat?: number;
     driverLon?: number;
+    driverTier?: string;
   } | null>(null);
   const [liveDriverPosition, setLiveDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [driverHeading, setDriverHeading] = useState<number>(0);
@@ -505,6 +506,7 @@ export default function CustomerHomePage() {
                     driverName: req.assignedDriverName || prev?.driverName,
                     driverPhone: req.assignedDriverPhone || prev?.driverPhone,
                     driverVehicle: req.assignedDriverVehicle || prev?.driverVehicle,
+                    driverTier: (req as any).assignedDriverTier || (req as any).driverTier || (req as any).vehicleType || prev?.driverTier,
                   }));
                 }
               }
@@ -543,6 +545,7 @@ export default function CustomerHomePage() {
                   driverName: r.assignedDriverName,
                   driverPhone: r.assignedDriverPhone,
                   driverVehicle: r.assignedDriverVehicle,
+                  driverTier: (r as any).assignedDriverTier || (r as any).driverTier || r.vehicleType,
                 });
               } else if (curStage === 'searching') {
                 setAssignedDriverInfo(null);
@@ -1020,23 +1023,17 @@ export default function CustomerHomePage() {
         if (isCancelled || !res.data || !res.data.success) return;
 
         const mainData = res.data;
-        const mainFare = mainData.fare || 3000;
-
-        // Calculate proportionate rates for other tiers (Strict upward ceil rounding to 250 IQD)
-        let superFare = mainFare;
-        if (selectedTierId === 'saving') {
-          superFare = Math.max(3000, Math.ceil((mainFare / 0.90) / 250) * 250);
-        } else if (selectedTierId === 'plus') {
-          superFare = Math.max(3000, Math.ceil((mainFare / 1.20) / 250) * 250);
-        }
-        const savingFare = Math.max(3000, Math.ceil((superFare * 0.90) / 250) * 250);
-        const plusFare = Math.max(3500, Math.ceil((superFare * 1.20) / 250) * 250);
+        // Authoritative tier fares computed exclusively by the backend (Strict 250 IQD multiples)
+        const savingFare = mainData.tierFares?.saving || mainData.tierFares?.economy || 3000;
+        const superFare = mainData.tierFares?.super || 3250;
+        const plusFare = mainData.tierFares?.plus || 3500;
+        const selectedFare = selectedTierId === 'saving' ? savingFare : (selectedTierId === 'plus' ? plusFare : (mainData.fare || superFare));
 
         setDynamicPricingData({
           superFare,
           savingFare,
           plusFare,
-          selectedFare: mainFare,
+          selectedFare,
           breakdown: mainData.breakdown || null,
           surgeBadge: mainData.surgeBadge || null,
           discountBadge: mainData.discountBadge || null
@@ -1098,7 +1095,7 @@ export default function CustomerHomePage() {
         promoCode: appliedPromo ? 'PROMO20' : '',
         distanceKm: Math.max(0.5, Math.round(dist * 10) / 10),
         durationMins: Math.max(5, Math.round(dist * 2.5)),
-        vehicleType: selectedTierId === 'plus' ? 'vip' : 'eco',
+        vehicleType: selectedTierId,
         isRoundTrip: Boolean(isRoundTrip),
         tripType: isRoundTrip ? 'ROUND_TRIP' : 'ONE_WAY',
         secondDestination: secondDestination.trim(),
@@ -1519,6 +1516,7 @@ export default function CustomerHomePage() {
           driverVehicle: req.assignedDriverVehicle || req.driverVehicle || prev?.driverVehicle,
           driverPlate: (req as any).driverPlate || (req as any).plateNumber || prev?.driverPlate || '١١٣٤٠ ة - النجف',
           driverRating: (req as any).driverRating || prev?.driverRating || 5.0,
+          driverTier: (req as any).assignedDriverTier || (req as any).driverTier || req.vehicleType || prev?.driverTier,
         }));
       }
     } else if (status === 'pending') {
@@ -2692,6 +2690,9 @@ export default function CustomerHomePage() {
                     <span className="text-xs font-mono font-bold bg-[#0B101B] px-2 py-0.5 rounded border border-amber-500/30 text-amber-400">
                       {assignedDriverInfo?.driverPlate || '١١٣٤٠ ة'}
                     </span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded border border-amber-500/30 text-amber-300 bg-amber-500/10">
+                      {assignedDriverInfo?.driverTier === 'super' || assignedDriverInfo?.driverTier === 'سوبر' ? '⚡ سوبر' : (assignedDriverInfo?.driverTier === 'plus' || assignedDriverInfo?.driverTier === 'بلس' || assignedDriverInfo?.driverTier === 'vip') ? '💎 بلس' : '🚕 توفير'}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-slate-400 text-xs font-bold">
                     <span>{rideSheetState === 'expanded' ? 'اسحب للأسفل' : 'اسحب للأعلى'}</span>
@@ -2853,9 +2854,14 @@ export default function CustomerHomePage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[16px] font-bold text-white">
-                    {assignedDriverInfo?.driverName || 'كابتن توصيله'}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-[16px] font-bold text-white block">
+                      {assignedDriverInfo?.driverName || 'كابتن توصيله'}
+                    </span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded border border-amber-500/30 text-amber-300 bg-amber-500/10 inline-block mt-0.5">
+                      {assignedDriverInfo?.driverTier === 'super' || assignedDriverInfo?.driverTier === 'سوبر' ? '⚡ سوبر' : (assignedDriverInfo?.driverTier === 'plus' || assignedDriverInfo?.driverTier === 'بلس' || assignedDriverInfo?.driverTier === 'vip') ? '💎 بلس' : '🚕 توفير'}
+                    </span>
+                  </div>
                   <div className="h-14 w-14 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 text-[26px] border-2 border-amber-500/40">
                     🧑‍✈️
                   </div>
@@ -2877,7 +2883,7 @@ export default function CustomerHomePage() {
                 <div className="text-right">
                   <p className="text-[13px] font-bold text-amber-400">الدفع نقداً للكابتن</p>
                   <p className="text-[12px] text-slate-400">
-                    مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار
+                    مبلغ الرحلة: {calculatedPrice.toLocaleString()} دينار ({selectedTierId === 'super' ? '⚡ سوبر' : selectedTierId === 'plus' ? '💎 بلس' : '🚕 توفير'})
                   </p>
                 </div>
                 <svg className="h-6 w-6 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

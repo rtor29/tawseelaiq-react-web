@@ -38,6 +38,7 @@ interface DriverItem {
   takenSeats: number;
   phone: string;
   routeId?: string;
+  vehicleType?: string;
 }
 
 function getDriverColor(distKm: number): { bg: string; text: string; label: string } {
@@ -362,6 +363,7 @@ export default function DailyRoutePage() {
             seats: 4,
             takenSeats: 1,
             phone: d.phoneNumber || d.phone || '',
+            vehicleType: d.vehicleType || d.vehicle_type || 'eco',
           };
         });
         setDrivers(mapped);
@@ -819,7 +821,12 @@ export default function DailyRoutePage() {
             {/* صف السائق */}
             <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-white/10">
               <div>
-                <p className="text-[19px] font-black">{selectedDriver.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[19px] font-black">{selectedDriver.name}</p>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded border border-amber-500/30 text-amber-300 bg-amber-500/10">
+                    {selectedDriver.vehicleType === 'super' || selectedDriver.vehicleType === 'سوبر' ? '⚡ سوبر' : (selectedDriver.vehicleType === 'plus' || selectedDriver.vehicleType === 'بلس' || selectedDriver.vehicleType === 'vip') ? '💎 بلس' : '🚕 توفير'}
+                  </span>
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: bg }} />
                   <span className="text-[12px] font-bold" style={{ color: bg }}>
