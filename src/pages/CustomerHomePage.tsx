@@ -1864,9 +1864,9 @@ export default function CustomerHomePage() {
     >
       {/* ====================================================================
           الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
-          ثابتة وظاهرة دائماً فوق كل شيء بـ z-50 ولا تُغطى بأي تنبيه أو بطاقة
+          ثابتة وظاهرة دائماً فوق كل شيء بـ z-[100] ولا تُغطى بأي نافذة سفلية أو تنبيه
           ==================================================================== */}
-      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-50 shrink-0 w-full shadow-lg transition-colors pointer-events-auto ${
+      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-[100] shrink-0 w-full shadow-lg transition-colors pointer-events-auto ${
         isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
       }`}>
         {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
@@ -1965,7 +1965,7 @@ export default function CustomerHomePage() {
 
       {/* 3. الخريطة الرئيسية Mapbox */}
       <div
-        className="relative flex-1 min-h-0 w-full h-full overflow-hidden touch-none"
+        className="relative flex-1 min-h-0 w-full overflow-hidden touch-none"
         style={{ touchAction: 'none' }}
         onClick={() => {
           if (stage === 'driver_arriving' && rideSheetState === 'expanded') {
@@ -2378,7 +2378,7 @@ export default function CustomerHomePage() {
             tabIndex={0}
             onKeyDown={handleTierKeyDown}
             style={{
-              maxHeight: 'calc(100% - 16px)',
+              maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))',
               transform:
                 tierSheetState === 'expanded'
                   ? 'translateY(0)'
@@ -2387,7 +2387,7 @@ export default function CustomerHomePage() {
                   : 'translateY(calc(100% - 108px))',
               transition: isTierDraggingRef.current ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md pt-1 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in will-change-transform motion-reduce:transition-none select-none max-h-[calc(100%-16px)] overflow-hidden"
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md pt-1 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in will-change-transform motion-reduce:transition-none select-none max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-hidden"
             dir="rtl"
           >
             {/* مقبض السحب القابل للمس مع مساحة 48px وتحريك ناعم */}
@@ -2542,20 +2542,19 @@ export default function CustomerHomePage() {
               <div
                 className={`transition-all duration-300 overflow-hidden px-4 ${
                   tierSheetState === 'expanded'
-                    ? 'opacity-100 max-h-[100px] pointer-events-auto my-1'
+                    ? 'opacity-100 max-h-[80px] pointer-events-auto my-1.5'
                     : 'opacity-0 max-h-0 pointer-events-none'
                 }`}
               >
-                <div className="flex items-center justify-around border-t border-b border-slate-800 py-2" dir="rtl">
+                <div className="flex items-center gap-2.5 pt-1 pb-1" dir="rtl">
                   {/* خيارات الرحلة */}
                   <button
                     type="button"
                     onClick={() => setIsTripOptionsOpen(true)}
-                    className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
+                    className="flex-1 h-11 min-h-[44px] px-3 rounded-xl border border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/40 text-slate-300 hover:text-amber-300 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] cursor-pointer shadow-xs"
                   >
-                    <span className="text-[13.5px] font-bold">خيارات الرحلة</span>
                     <svg
-                      className="h-4.5 w-4.5 text-amber-400/80"
+                      className="h-4 w-4 text-amber-400 shrink-0"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -2566,22 +2565,21 @@ export default function CustomerHomePage() {
                       <line x1="7" y1="12" x2="17" y2="12" />
                       <line x1="10" y1="18" x2="14" y2="18" />
                     </svg>
+                    <span className="text-[13px] font-bold">خيارات الرحلة</span>
                   </button>
-
-                  {/* فاصل */}
-                  <div className="h-5 w-[1px] bg-slate-800" />
 
                   {/* قسيمة الخصم */}
                   <button
                     type="button"
                     onClick={() => setIsPromoModalOpen(true)}
-                    className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
+                    className={`flex-1 h-11 min-h-[44px] px-3 rounded-xl border flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] cursor-pointer shadow-xs ${
+                      appliedPromo 
+                        ? 'border-emerald-500/60 bg-emerald-950/40 text-emerald-300' 
+                        : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/40 text-slate-300 hover:text-amber-300'
+                    }`}
                   >
-                    <span className="text-[13.5px] font-bold">
-                      {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
-                    </span>
                     <svg
-                      className="h-4.5 w-4.5 text-amber-400/80"
+                      className={`h-4 w-4 shrink-0 ${appliedPromo ? 'text-emerald-400' : 'text-amber-400'}`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -2592,6 +2590,9 @@ export default function CustomerHomePage() {
                       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
                       <line x1="7" y1="7" x2="7.01" y2="7" />
                     </svg>
+                    <span className="text-[13px] font-bold">
+                      {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة خصم'}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -2783,7 +2784,7 @@ export default function CustomerHomePage() {
             tabIndex={0}
             onKeyDown={handleSheetKeyDown}
             style={{
-              maxHeight: 'calc(100% - 16px)',
+              maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))',
               transform:
                 rideSheetState === 'expanded'
                   ? 'translateY(0)'
@@ -2792,7 +2793,7 @@ export default function CustomerHomePage() {
                   : 'translateY(calc(100% - 78px))',
               transition: 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col max-h-[calc(100%-16px)] overflow-hidden rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl will-change-transform animate-fade-in"
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-hidden rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl will-change-transform animate-fade-in"
           >
             {/* مقبض السحب وترويسة الورقة مع دعم Pointer Events وإمكانية الوصول */}
             <div

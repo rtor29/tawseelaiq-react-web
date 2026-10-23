@@ -348,20 +348,20 @@ export default function DailyRoutePage() {
           return true;
         });
         const mapped: DriverItem[] = commuteOnly.map((d: any, idx: number) => {
-          const dLat = Number(d.currentLat ?? d.latitude ?? (userLoc.lat + 0.003 * (idx + 1)));
-          const dLng = Number(d.currentLon ?? d.longitude ?? (userLoc.lng + 0.002 * (idx + 1)));
+          const dLat = Number(d.fixed_lat ?? d.currentLat ?? d.latitude ?? (userLoc.lat + 0.003 * (idx + 1)));
+          const dLng = Number(d.fixed_lng ?? d.currentLon ?? d.longitude ?? (userLoc.lng + 0.002 * (idx + 1)));
           return {
             id: d.driverId || idx + 1,
             driverId: d.driverId || `d-${idx}`,
-            name: d.driverName || d.fullName || 'كابتن توصيله',
+            name: d.firstName || d.driverName || d.fullName || 'كابتن توصيله',
             lat: dLat,
             lng: dLng,
-            from: d.routeStartName || (d.route && d.route.includes('➔') ? d.route.split('➔')[0].trim() : 'نقطة الانطلاق'),
-            to: d.routeEndName || (d.route && d.route.includes('➔') ? d.route.split('➔')[1].trim() : 'وجهة غير محددة'),
-            rating: Number(d.rating || 5.0),
+            from: d.fixed_label || d.routeStartName || (d.route && d.route.includes('➔') ? d.route.split('➔')[0].trim() : 'نقطة الانطلاق'),
+            to: d.fixed_dest_label || d.routeEndName || (d.route && d.route.includes('➔') ? d.route.split('➔')[1].trim() : 'وجهة غير محددة'),
+            rating: Number(d.rating || d.ratingAverage || 5.0),
             plate: d.plateNumber || 'العراق',
             seats: 4,
-            takenSeats: 1,
+            takenSeats: d.isFull ? 4 : 1,
             phone: d.phoneNumber || d.phone || '',
             vehicleType: d.vehicleType || d.vehicle_type || 'eco',
           };
