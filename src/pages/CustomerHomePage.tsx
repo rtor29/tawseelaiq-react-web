@@ -1885,7 +1885,7 @@ export default function CustomerHomePage() {
 
   return (
     <div 
-      className={`relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden select-none font-cairo flex flex-col transition-colors duration-200 ${
+      className={`relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden overscroll-none select-none font-cairo flex flex-col transition-colors duration-200 ${
         isDark ? 'bg-[#080E1A] text-slate-100' : 'bg-[#F8FAFC] text-slate-900'
       }`} 
       style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-app)' }} 
@@ -1895,7 +1895,7 @@ export default function CustomerHomePage() {
           الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
           ثابتة وظاهرة دائماً فوق كل شيء بـ z-50 ولا تُغطى بأي تنبيه أو بطاقة
           ==================================================================== */}
-      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-50 shrink-0 w-full shadow-lg transition-colors ${
+      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-50 shrink-0 w-full shadow-lg transition-colors pointer-events-auto ${
         isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
       }`}>
         {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
@@ -1929,7 +1929,11 @@ export default function CustomerHomePage() {
             <button
               type="button"
               onClick={handleBackNav}
-              className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#0F172A] border border-amber-500/30 shadow-sm flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
+              className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-sm flex items-center justify-center transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer ${
+                isDark 
+                  ? 'bg-[#0F172A] border-amber-500/30 text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B]' 
+                  : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'
+              }`}
               title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
               aria-label="رجوع"
             >
@@ -1956,15 +1960,19 @@ export default function CustomerHomePage() {
         {/* اليسار: ترحيب المستخدم وزر تبديل الوضع وزر الحساب الموحد الذي يفتح AppDrawer */}
         <div className="flex items-center gap-2">
           <div className="text-left hidden sm:block">
-            <div className="text-[12px] font-bold text-slate-400">مرحباً بك 👋</div>
-            <div className="text-[15px] font-black text-white truncate max-w-[140px] sm:max-w-[180px]">{customerFirstName}</div>
+            <div className={`text-[12px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>مرحباً بك 👋</div>
+            <div className={`text-[15px] font-black truncate max-w-[140px] sm:max-w-[180px] ${isDark ? 'text-white' : 'text-slate-900'}`}>{customerFirstName}</div>
           </div>
           {/* زر تبديل الوضع النهاري والليلي الشامل */}
           <ThemeToggleButton />
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
-            className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl bg-[#0F172A] border border-amber-500/30 shadow-sm flex items-center justify-center text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B] transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer"
+            className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-sm flex items-center justify-center transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer ${
+              isDark 
+                ? 'bg-[#0F172A] border-amber-500/30 text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B]' 
+                : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'
+            }`}
             aria-label="الحساب والإعدادات"
             title="الحساب والإعدادات"
           >
@@ -2399,15 +2407,16 @@ export default function CustomerHomePage() {
             tabIndex={0}
             onKeyDown={handleTierKeyDown}
             style={{
+              maxHeight: 'calc(100% - 16px)',
               transform:
                 tierSheetState === 'expanded'
                   ? 'translateY(0)'
                   : tierSheetState === 'middle'
                   ? 'translateY(calc(100% - 335px))'
                   : 'translateY(calc(100% - 108px))',
-              transition: 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
+              transition: isTierDraggingRef.current ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md pt-1 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in will-change-transform motion-reduce:transition-none select-none"
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md pt-1 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in will-change-transform motion-reduce:transition-none select-none max-h-[calc(100%-16px)] overflow-hidden"
             dir="rtl"
           >
             {/* مقبض السحب القابل للمس مع مساحة 48px وتحريك ناعم */}
@@ -2420,7 +2429,7 @@ export default function CustomerHomePage() {
                 e.stopPropagation();
                 setTierSheetState((prev) => (prev === 'middle' ? 'expanded' : prev === 'expanded' ? 'minimized' : 'middle'));
               }}
-              className="cursor-pointer select-none touch-none pt-2 pb-1.5 px-4 flex flex-col items-center"
+              className="cursor-pointer select-none touch-none pt-2 pb-1.5 px-4 flex flex-col items-center shrink-0"
               aria-label="مقبض سحب وتغيير حجم قائمة الفئات"
             >
               <div className="py-2 px-10 flex justify-center items-center min-h-[48px]">
@@ -2464,158 +2473,161 @@ export default function CustomerHomePage() {
               )}
             </div>
 
-            {/* التبويبات العلوية: تكسي و بوكس (RTL: تكسي يمين، بوكس يسار) */}
-            <div className="flex border-b border-slate-800 px-4" dir="rtl">
-              <button
-                type="button"
-                onClick={() => setSelectedServiceTab('taxi')}
-                className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
-                  selectedServiceTab === 'taxi'
-                    ? 'text-amber-400 border-b-2 border-amber-500'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                تكسي
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedServiceTab('box')}
-                className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
-                  selectedServiceTab === 'box'
-                    ? 'text-amber-400 border-b-2 border-amber-500'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                بوكس
-              </button>
-            </div>
-
-            {/* شارة الذروة أو الخصم الذكي المفعّل */}
-            {dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2 mb-1 p-2 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs" dir="rtl">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
-                  <span className="text-[12px] font-bold text-amber-200">{dynamicPricingData.surgeBadge.text}</span>
-                </div>
-                <span className="text-[10px] font-bold text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded-md border border-amber-500/40">
-                  تحديث حي
-                </span>
+            {/* الحاوية القابلة للتمرير الداخلي عند ضيق الشاشة (Scrollable Body) */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1.5 touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {/* التبويبات العلوية: تكسي و بوكس (RTL: تكسي يمين، بوكس يسار) */}
+              <div className="flex border-b border-slate-800 px-4" dir="rtl">
+                <button
+                  type="button"
+                  onClick={() => setSelectedServiceTab('taxi')}
+                  className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
+                    selectedServiceTab === 'taxi'
+                      ? 'text-amber-400 border-b-2 border-amber-500'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  تكسي
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedServiceTab('box')}
+                  className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
+                    selectedServiceTab === 'box'
+                      ? 'text-amber-400 border-b-2 border-amber-500'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  بوكس
+                </button>
               </div>
-            )}
-            {dynamicPricingData.discountBadge && !dynamicPricingData.surgeBadge && (
-              <div className="mx-4 mt-2 mb-1 p-2 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs" dir="rtl">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
-                  <span className="text-[12px] font-bold text-emerald-200">{dynamicPricingData.discountBadge.text}</span>
+
+              {/* شارة الذروة أو الخصم الذكي المفعّل */}
+              {dynamicPricingData.surgeBadge && (
+                <div className="mx-4 mt-2 mb-1 p-2 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs" dir="rtl">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
+                    <span className="text-[12px] font-bold text-amber-200">{dynamicPricingData.surgeBadge.text}</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded-md border border-amber-500/40">
+                    تحديث حي
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/40">
-                  عرض خاص
-                </span>
-              </div>
-            )}
+              )}
+              {dynamicPricingData.discountBadge && !dynamicPricingData.surgeBadge && (
+                <div className="mx-4 mt-2 mb-1 p-2 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs" dir="rtl">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
+                    <span className="text-[12px] font-bold text-emerald-200">{dynamicPricingData.discountBadge.text}</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/40">
+                    عرض خاص
+                  </span>
+                </div>
+              )}
 
-            {/* قائمة فئات الرحلة (سوبر، توفير، بلس) بأسلوب RTL صارم */}
-            <div className="px-4 py-1.5 space-y-1.5" dir="rtl">
-              {RIDE_TIERS.map((tier) => {
-                const isSelected = selectedTierId === tier.id;
-                const tierPrice = getTierPrice(tier);
+              {/* قائمة فئات الرحلة (سوبر، توفير، بلس) بأسلوب RTL صارم */}
+              <div className="px-4 py-1.5 space-y-1.5" dir="rtl">
+                {RIDE_TIERS.map((tier) => {
+                  const isSelected = selectedTierId === tier.id;
+                  const tierPrice = getTierPrice(tier);
 
-                return (
-                  <div
-                    key={tier.id}
-                    onClick={() => setSelectedTierId(tier.id)}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer min-h-[54px] ${
-                      isSelected
-                        ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/50'
-                        : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/30'
-                    }`}
-                    dir="rtl"
-                  >
-                    {/* الطرف الأيمن: شعار توصيلة المعتمد + الشارة، وبجانبه الاسم والوصف */}
-                    <div className="flex items-center gap-2.5">
-                      <TawseelaTierLogo badge={tier.badge} size="sm" />
-                      <div className="text-right">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[14.5px] font-bold text-white">{tier.name}</p>
-                          {isSelected && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                              محدد
-                            </span>
-                          )}
+                  return (
+                    <div
+                      key={tier.id}
+                      onClick={() => setSelectedTierId(tier.id)}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer min-h-[54px] ${
+                        isSelected
+                          ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/50'
+                          : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/30'
+                      }`}
+                      dir="rtl"
+                    >
+                      {/* الطرف الأيمن: شعار توصيلة المعتمد + الشارة، وبجانبه الاسم والوصف */}
+                      <div className="flex items-center gap-2.5">
+                        <TawseelaTierLogo badge={tier.badge} size="sm" />
+                        <div className="text-right">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-[14.5px] font-bold text-white">{tier.name}</p>
+                            {isSelected && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                محدد
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11.5px] font-medium text-slate-400">{tier.subtitle}</p>
                         </div>
-                        <p className="text-[11.5px] font-medium text-slate-400">{tier.subtitle}</p>
+                      </div>
+
+                      {/* الطرف الأيسر: السعر بالدينار العراقي */}
+                      <div className="text-left font-black text-[15px] text-amber-400 whitespace-nowrap">
+                        {tierPrice.toLocaleString()} د.ع
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* الطرف الأيسر: السعر بالدينار العراقي */}
-                    <div className="text-left font-black text-[15px] text-amber-400 whitespace-nowrap">
-                      {tierPrice.toLocaleString()} د.ع
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* محتوى الحالة المرتفعة (expanded): خيارات الرحلة وقسيمة الخصم */}
-            <div
-              className={`transition-all duration-300 overflow-hidden px-4 ${
-                tierSheetState === 'expanded'
-                  ? 'opacity-100 max-h-[100px] pointer-events-auto my-1'
-                  : 'opacity-0 max-h-0 pointer-events-none'
-              }`}
-            >
-              <div className="flex items-center justify-around border-t border-b border-slate-800 py-2" dir="rtl">
-                {/* خيارات الرحلة */}
-                <button
-                  type="button"
-                  onClick={() => setIsTripOptionsOpen(true)}
-                  className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
-                >
-                  <span className="text-[13.5px] font-bold">خيارات الرحلة</span>
-                  <svg
-                    className="h-4.5 w-4.5 text-amber-400/80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
+              {/* محتوى الحالة المرتفعة (expanded): خيارات الرحلة وقسيمة الخصم */}
+              <div
+                className={`transition-all duration-300 overflow-hidden px-4 ${
+                  tierSheetState === 'expanded'
+                    ? 'opacity-100 max-h-[100px] pointer-events-auto my-1'
+                    : 'opacity-0 max-h-0 pointer-events-none'
+                }`}
+              >
+                <div className="flex items-center justify-around border-t border-b border-slate-800 py-2" dir="rtl">
+                  {/* خيارات الرحلة */}
+                  <button
+                    type="button"
+                    onClick={() => setIsTripOptionsOpen(true)}
+                    className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
                   >
-                    <line x1="4" y1="6" x2="20" y2="6" />
-                    <line x1="7" y1="12" x2="17" y2="12" />
-                    <line x1="10" y1="18" x2="14" y2="18" />
-                  </svg>
-                </button>
+                    <span className="text-[13.5px] font-bold">خيارات الرحلة</span>
+                    <svg
+                      className="h-4.5 w-4.5 text-amber-400/80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                    >
+                      <line x1="4" y1="6" x2="20" y2="6" />
+                      <line x1="7" y1="12" x2="17" y2="12" />
+                      <line x1="10" y1="18" x2="14" y2="18" />
+                    </svg>
+                  </button>
 
-                {/* فاصل */}
-                <div className="h-5 w-[1px] bg-slate-800" />
+                  {/* فاصل */}
+                  <div className="h-5 w-[1px] bg-slate-800" />
 
-                {/* قسيمة الخصم */}
-                <button
-                  type="button"
-                  onClick={() => setIsPromoModalOpen(true)}
-                  className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
-                >
-                  <span className="text-[13.5px] font-bold">
-                    {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
-                  </span>
-                  <svg
-                    className="h-4.5 w-4.5 text-amber-400/80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  {/* قسيمة الخصم */}
+                  <button
+                    type="button"
+                    onClick={() => setIsPromoModalOpen(true)}
+                    className="flex flex-1 items-center justify-center gap-2 min-h-[44px] py-1 text-slate-300 hover:text-amber-400 transition cursor-pointer active:scale-95"
                   >
-                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-                    <line x1="7" y1="7" x2="7.01" y2="7" />
-                  </svg>
-                </button>
+                    <span className="text-[13.5px] font-bold">
+                      {appliedPromo ? 'خصم 20% مفعّل' : 'قسيمة'}
+                    </span>
+                    <svg
+                      className="h-4.5 w-4.5 text-amber-400/80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                      <line x1="7" y1="7" x2="7.01" y2="7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* الزر الرئيسي: طلب الفئة المحددة (بارتفاع 56px = h-14) متاح في middle و expanded */}
-            <div className="px-6 pt-2 pb-1">
+            {/* الزر الرئيسي: طلب الفئة المحددة (بارتفاع 56px = h-14) مثبت في أسفل الورقة (shrink-0) */}
+            <div className="px-6 pt-2 pb-1 shrink-0">
               <button
                 type="button"
                 onClick={handleOrderTrip}
@@ -2800,6 +2812,7 @@ export default function CustomerHomePage() {
             tabIndex={0}
             onKeyDown={handleSheetKeyDown}
             style={{
+              maxHeight: 'calc(100% - 16px)',
               transform:
                 rideSheetState === 'expanded'
                   ? 'translateY(0)'
@@ -2808,7 +2821,7 @@ export default function CustomerHomePage() {
                   : 'translateY(calc(100% - 78px))',
               transition: 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl will-change-transform animate-fade-in"
+            className="absolute inset-x-0 bottom-0 z-30 flex flex-col max-h-[calc(100%-16px)] overflow-hidden rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl will-change-transform animate-fade-in"
           >
             {/* مقبض السحب وترويسة الورقة مع دعم Pointer Events وإمكانية الوصول */}
             <div
@@ -3023,7 +3036,7 @@ export default function CustomerHomePage() {
 
             {/* محتوى تفاصيل الكابتن الإضافية والدفع والإلغاء (يظهر في حالة expanded) */}
             <div
-              className={`flex flex-col transition-all duration-300 px-5 pt-2 space-y-3.5 ${
+              className={`flex flex-col transition-all duration-300 px-5 pt-2 space-y-3.5 overflow-y-auto overscroll-contain touch-pan-y ${
                 rideSheetState === 'expanded'
                   ? 'opacity-100 pointer-events-auto max-h-[500px]'
                   : 'opacity-0 pointer-events-none max-h-0 overflow-hidden'
