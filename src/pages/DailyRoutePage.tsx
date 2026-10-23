@@ -544,75 +544,77 @@ export default function DailyRoutePage() {
       dir="rtl"
     >
 
-      {/* الترويسة العلوية العائمة مع حماية كاملة لهوامش الأمان على iOS */}
-      <div className="fixed top-0 inset-x-0 max-w-md mx-auto z-[100] px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 flex items-center justify-between pointer-events-none">
-        {/* زر الرئيسية / الرجوع */}
-        <div className="pointer-events-auto">
-          <button
-            type="button"
-            onClick={() => navigate('/hub')}
-            className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
-              isDark 
-                ? 'bg-[#161C28]/95 border-white/15 text-amber-400 hover:text-amber-300 hover:border-amber-400/50' 
-                : 'bg-white/95 border-slate-200 text-amber-600 hover:border-amber-400 shadow-sm'
-            }`}
-            title="الرئيسية"
-            aria-label="الرئيسية"
-          >
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+      {/* الترويسة العلوية العائمة مع حماية كاملة لهوامش الأمان على iOS — مطابقة لواجهة السائق DriverHomePage */}
+      <header className="fixed top-0 inset-x-0 z-[100] pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 px-4 flex items-center justify-between pointer-events-none w-full" dir="rtl">
+        <div className="flex justify-between items-center max-w-lg mx-auto w-full">
+          {/* زر الرئيسية / الرجوع */}
+          <div className="pointer-events-auto">
+            <button
+              type="button"
+              onClick={() => navigate('/hub')}
+              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                isDark 
+                  ? 'bg-[#161C28]/95 border-white/15 text-amber-400 hover:text-amber-300 hover:border-amber-400/50' 
+                  : 'bg-white/95 border-slate-200 text-amber-600 hover:border-amber-400 shadow-sm'
+              }`}
+              title="الرئيسية"
+              aria-label="الرئيسية"
             >
-              <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </button>
-        </div>
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </button>
+          </div>
 
-        {/* عنوان التبويب */}
-        <div className="pointer-events-auto">
-          <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full backdrop-blur-md border shadow-lg text-[13px] font-bold ${
-            isDark ? 'bg-[#161C28]/95 border-white/15 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
-          }`}>
-            <span>حجز خط دائمي</span>
-            <span>🚌</span>
+          {/* عنوان التبويب */}
+          <div className="pointer-events-auto">
+            <div className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full backdrop-blur-md border shadow-lg text-[13px] font-bold ${
+              isDark ? 'bg-[#161C28]/95 border-white/15 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
+            }`}>
+              <span>حجز خط دائمي</span>
+              <span>🚌</span>
+            </div>
+          </div>
+
+          {/* أزرار التحكم: تبديل الوضع والحساب */}
+          <div className="pointer-events-auto flex items-center gap-2">
+            <ThemeToggleButton />
+            <button
+              type="button"
+              onClick={() => setIsDrawerOpen(true)}
+              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                isDark 
+                  ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-amber-400/50' 
+                  : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-amber-400 shadow-sm'
+              }`}
+              title="الحساب والإعدادات"
+              aria-label="الحساب"
+            >
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
           </div>
         </div>
-
-        {/* أزرار التحكم: تبديل الوضع والحساب */}
-        <div className="pointer-events-auto flex items-center gap-2">
-          <ThemeToggleButton />
-          <button
-            type="button"
-            onClick={() => setIsDrawerOpen(true)}
-            className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
-              isDark 
-                ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-amber-400/50' 
-                : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-amber-400 shadow-sm'
-            }`}
-            title="الحساب والإعدادات"
-            aria-label="الحساب"
-          >
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      </header>
 
       {/* شريط البحث الجغرافي السريع عن الأحياء والمعالم بالنجف */}
       <div className="absolute top-[calc(4.5rem+env(safe-area-inset-top,0.75rem))] inset-x-4 z-20 pointer-events-auto max-w-md mx-auto font-map-search">
@@ -692,63 +694,65 @@ export default function DailyRoutePage() {
         )}
       </div>
 
-      {/* الخريطة */}
-      <MapGL
-        ref={mapRef}
-        mapboxAccessToken={config.mapboxToken}
-        mapStyle={mapStyle}
-        initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
-        dragPan={true}
-        cooperativeGestures={false}
-        onClick={handleMapClick}
-        onLoad={(e) => {
-          applyMapEnhancements(e.target, isDark);
-          autoLocateDailyRouteOnMapReady(e.target);
-        }}
-        style={{ width: '100%', height: '100%' }}
-      >
-        {/* مسار الملاحة الانسيابي النحيف بين الراكب وسائق الخط الدائمي */}
-        {selectedDriverRoute && selectedDriverRoute.length > 0 && (
-          <RouteLines
-            lines={[
-              {
-                id: 'daily-route-line',
-                coordinates: selectedDriverRoute,
-                color: '#F59E0B',
-              },
-            ]}
-          />
-        )}
+      {/* الخريطة التفاعلية بخلفية ثابتة كاملة الشاشة مثل واجهة السائق */}
+      <div className="absolute inset-0 w-full h-full z-0 touch-none" style={{ touchAction: 'none' }}>
+        <MapGL
+          ref={mapRef}
+          mapboxAccessToken={config.mapboxToken}
+          mapStyle={mapStyle}
+          initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
+          dragPan={true}
+          cooperativeGestures={false}
+          onClick={handleMapClick}
+          onLoad={(e) => {
+            applyMapEnhancements(e.target, isDark);
+            autoLocateDailyRouteOnMapReady(e.target);
+          }}
+          style={{ width: '100%', height: '100%' }}
+        >
+          {/* مسار الملاحة الانسيابي النحيف بين الراكب وسائق الخط الدائمي */}
+          {selectedDriverRoute && selectedDriverRoute.length > 0 && (
+            <RouteLines
+              lines={[
+                {
+                  id: 'daily-route-line',
+                  coordinates: selectedDriverRoute,
+                  color: '#F59E0B',
+                },
+              ]}
+            />
+          )}
 
-        {/* موقع الراكب */}
-        <Marker longitude={userLoc.lng} latitude={userLoc.lat} anchor="center">
-          <div className="flex flex-col items-center">
-            <div className="h-5 w-5 rounded-full bg-[#f97316] border-3 border-white shadow-lg animate-pulse" />
-            <div className="mt-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-black text-white">موقعك</div>
-          </div>
-        </Marker>
+          {/* موقع الراكب */}
+          <Marker longitude={userLoc.lng} latitude={userLoc.lat} anchor="center">
+            <div className="flex flex-col items-center">
+              <div className="h-5 w-5 rounded-full bg-[#f97316] border-3 border-white shadow-lg animate-pulse" />
+              <div className="mt-1 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-black text-white">موقعك</div>
+            </div>
+          </Marker>
 
-        {/* السائقون مع الألوان والمسافات الدقيقة */}
-        {drivers.map(driver => {
-          const dist = distanceKm({ lat: userLoc.lat, lng: userLoc.lng }, { lat: driver.lat, lng: driver.lng });
-          const { bg } = getDriverColor(dist);
-          const isSelected = selectedDriver?.id === driver.id;
-          const distLabel = dist < 1 ? `${Math.round(dist * 1000)}م` : `${dist.toFixed(1)}كم`;
-          return (
-            <Marker key={driver.id} longitude={driver.lng} latitude={driver.lat} anchor="bottom">
-              <div className="flex flex-col items-center cursor-pointer transition-transform hover:scale-110 active:scale-95" onClick={(e) => { e.stopPropagation(); setSelectedDriver(driver); }}>
-                {/* اسم السائق + المسافة */}
-                <div className="mb-0.5 flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black text-white shadow-md"
-                  style={{ backgroundColor: bg, outline: isSelected ? '2px solid white' : 'none' }}>
-                  <span>{isSelected && '✓ '}{driver.name}</span>
-                  <span className="text-[10px] font-sans opacity-95">({distLabel})</span>
+          {/* السائقون مع الألوان والمسافات الدقيقة */}
+          {drivers.map(driver => {
+            const dist = distanceKm({ lat: userLoc.lat, lng: userLoc.lng }, { lat: driver.lat, lng: driver.lng });
+            const { bg } = getDriverColor(dist);
+            const isSelected = selectedDriver?.id === driver.id;
+            const distLabel = dist < 1 ? `${Math.round(dist * 1000)}م` : `${dist.toFixed(1)}كم`;
+            return (
+              <Marker key={driver.id} longitude={driver.lng} latitude={driver.lat} anchor="bottom">
+                <div className="flex flex-col items-center cursor-pointer transition-transform hover:scale-110 active:scale-95" onClick={(e) => { e.stopPropagation(); setSelectedDriver(driver); }}>
+                  {/* اسم السائق + المسافة */}
+                  <div className="mb-0.5 flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black text-white shadow-md"
+                    style={{ backgroundColor: bg, outline: isSelected ? '2px solid white' : 'none' }}>
+                    <span>{isSelected && '✓ '}{driver.name}</span>
+                    <span className="text-[10px] font-sans opacity-95">({distLabel})</span>
+                  </div>
+                  <CarSVG color={bg} />
                 </div>
-                <CarSVG color={bg} />
-              </div>
-            </Marker>
-          );
-        })}
-      </MapGL>
+              </Marker>
+            );
+          })}
+        </MapGL>
+      </div>
 
       {/* زر تحديد الموقع الحالي عبر الـ GPS */}
       <button
