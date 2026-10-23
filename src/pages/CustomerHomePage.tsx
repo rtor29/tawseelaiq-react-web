@@ -13,7 +13,7 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config } from '../lib/config';
 import { realtime } from '../lib/realtime';
-import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, type PlaceResult } from '../lib/mapbox';
 import {
   calculateBearing,
   distanceMeters,
@@ -21,7 +21,7 @@ import {
   getCurrentPositionWithFallback,
   isIosDevice,
   isStandalonePwa,
-  najafCenterLngLat,
+  iraqCenterLngLat,
 } from '../lib/geo';
 import {
   getFavoritePlaces,
@@ -33,6 +33,7 @@ import {
 } from '../lib/cache';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { storage } from '../lib/storage';
+import { IRAQ_GOVERNORATES, detectGovernorate, type Governorate } from '../lib/governorates';
 import { playCarHornBeep, initAudioUnlock } from '../lib/sound';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
@@ -46,46 +47,21 @@ import { AppDrawer } from '../components/AppDrawer';
 // التحميل الكسول لنافذة الدردشة لتقليل الحزمة الأولية
 const ChatModal = lazy(() => import('../components/ChatModal'));
 
-// نقطة الانطلاق والوصول الافتراضية في النجف
-const DEFAULT_PICKUP: LngLat = { lat: 32.0298, lng: 44.3285 };
-const DEFAULT_PICKUP_NAME = 'السلام، طريق النجف - كربلاء';
-const DEFAULT_DROPOFF: LngLat = { lat: 32.0355, lng: 44.3345 };
-const DEFAULT_DROPOFF_NAME = 'حي ميسان، الكوفة';
+// نقطة الانطلاق والوصول الافتراضية المحايدة (مركز العراق)
+const DEFAULT_PICKUP: LngLat = { lat: 33.3152, lng: 44.3661 };
+const DEFAULT_PICKUP_NAME = 'حدد نقطة الانطلاق على الخريطة';
+const DEFAULT_DROPOFF: LngLat = { lat: 33.3250, lng: 44.3750 };
+const DEFAULT_DROPOFF_NAME = 'حدد الوجهة على الخريطة';
 
-// الأماكن السريعة أسفل شريط البحث
+// الأماكن السريعة أسفل شريط البحث (محايدة)
 const QUICK_CHIPS = [
-  { name: 'كراج بغداد', address: 'النجف، كراج بغداد الموحد', lat: 32.028, lng: 44.3465 },
-  { name: 'ساحة مظفر', address: 'النجف، ساحة مظفر - مركز المدينة', lat: 32.021, lng: 44.338 },
+  { name: 'موقعي الحالي', address: 'موقعي الحالي عبر الـ GPS', lat: 33.3152, lng: 44.3661 },
+  { name: 'وسط المدينة', address: 'مركز المحافظة', lat: 33.3152, lng: 44.3661 },
 ];
 
-// قائمة المدن العراقية
-interface CityItem {
-  id: string;
-  name: string;
-  sub: string;
-  lat: number;
-  lng: number;
-}
-
-const IRAQI_CITIES: CityItem[] = [
-  { id: 'baghdad', name: 'بغداد', sub: 'بغداد', lat: 33.3152, lng: 44.3661 },
-  { id: 'babil', name: 'بابل', sub: 'بابل', lat: 32.4833, lng: 44.4333 },
-  { id: 'basra', name: 'البصرة', sub: 'البصرة', lat: 30.5081, lng: 47.7835 },
-  { id: 'diyala', name: 'ديالى', sub: 'ديالى', lat: 33.7464, lng: 44.6433 },
-  { id: 'kirkuk', name: 'كركوك', sub: 'كركوك', lat: 35.4681, lng: 44.3922 },
-  { id: 'karbala', name: 'كربلاء', sub: 'كربلاء', lat: 32.616, lng: 44.0249 },
-  { id: 'najaf', name: 'النجف', sub: 'النجف', lat: 32.0298, lng: 44.3285 },
-  { id: 'erbil', name: 'أربيل', sub: 'أربيل', lat: 36.1911, lng: 44.0092 },
-  { id: 'sulaymaniyah', name: 'السليمانية', sub: 'السليمانية', lat: 35.5669, lng: 45.4226 },
-  { id: 'duhok', name: 'دهوك', sub: 'دهوك', lat: 36.8679, lng: 42.9984 },
-  { id: 'anbar', name: 'الأنبار', sub: 'الأنبار', lat: 33.4244, lng: 43.3039 },
-  { id: 'wasit', name: 'واسط', sub: 'واسط', lat: 32.5089, lng: 45.8197 },
-  { id: 'maysan', name: 'ميسان', sub: 'ميسان', lat: 31.8447, lng: 47.1444 },
-  { id: 'muthanna', name: 'المثنى', sub: 'المثنى', lat: 31.3167, lng: 45.2833 },
-  { id: 'dhiqar', name: 'ذي قار', sub: 'ذي قار', lat: 31.0579, lng: 46.2573 },
-  { id: 'qadisiyah', name: 'القادسية', sub: 'القادسية', lat: 31.9922, lng: 44.925 },
-  { id: 'saladin', name: 'صلاح الدين', sub: 'صلاح الدين', lat: 34.6, lng: 43.6833 },
-];
+// قائمة محافظات ومدن العراق الـ 18
+type CityItem = Governorate;
+const IRAQI_CITIES: CityItem[] = IRAQ_GOVERNORATES;
 
 // فئات رحلات التكسي (الصورة 1)
 interface RideTier {
@@ -721,13 +697,17 @@ export default function CustomerHomePage() {
         // تحديث إحداثيات نقطة الانطلاق بموقع المستخدم الحقيقي
         setPickup(userPoint);
 
-        // تشغيل العكس الجغرافي (Reverse Geocoding) تلقائياً لتحديث اسم الشارع/الحي
+        // تشغيل العكس الجغرافي (Reverse Geocoding) تلقائياً لتحديث اسم الشارع/الحي وكشف المحافظة
         try {
           const addr = await reverseGeocode(userPoint);
+          const detected = detectGovernorate(latitude, longitude, addr || undefined);
+          setSelectedCity(detected.name);
           if (stageRef.current === 'pickup') {
             setPickupName(addr || 'موقعي الحالي عبر الـ GPS 📍');
           }
         } catch (_) {
+          const detected = detectGovernorate(latitude, longitude);
+          setSelectedCity(detected.name);
           if (stageRef.current === 'pickup') {
             setPickupName('موقعي الحالي عبر الـ GPS 📍');
           }
@@ -735,7 +715,7 @@ export default function CustomerHomePage() {
       },
       (err) => {
         // عند الفشل أو الرفض: البقاء بسلامة وهدوء على المركز الافتراضي الحالي دون رسائل خطأ مزعجة
-        console.warn('[AutoGeolocation] Location unavailable or denied, staying at default Najaf center:', err.message);
+        console.warn('[AutoGeolocation] Location unavailable or denied, using default center:', err.message);
       },
       {
         enableHighAccuracy: true,
@@ -823,6 +803,8 @@ export default function CustomerHomePage() {
         const point: LngLat = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         mapRef.current?.flyTo({ center: [point.lng, point.lat], zoom: 15.5, duration: 800 });
         const addr = await reverseGeocode(point);
+        const detectedGov = detectGovernorate(pos.coords.latitude, pos.coords.longitude, addr || undefined);
+        setSelectedCity(detectedGov.name);
 
         if (stage === 'pickup') {
           setPickup(point);
@@ -838,16 +820,16 @@ export default function CustomerHomePage() {
       (_err, isPermissionDenied) => {
         setIsLocatingCurrent(false);
 
-        // 4. التراجع عن استخدام الموقع التقديري إذا تعذر تماماً:
-        // تعيين الكاميرا افتراضياً على وسط محافظة النجف (مركز المدينة)
-        const najafCenter = najafCenterLngLat();
-        mapRef.current?.flyTo({ center: [najafCenter.lng, najafCenter.lat], zoom: 14.8, duration: 800 });
+        // التراجع عن استخدام الموقع إذا تعذر:
+        // تعيين الكاميرا افتراضياً على مركز العراق
+        const iraqCenter = iraqCenterLngLat();
+        mapRef.current?.flyTo({ center: [iraqCenter.lng, iraqCenter.lat], zoom: 12, duration: 800 });
 
         // تفعيل التلميح البصري فوق الخريطة: "يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍"
         triggerMapHint();
 
         if (isPermissionDenied) {
-          // 2. معالجة خطأ PERMISSION_DENIED لـ iOS Safari و PWA
+          // معالجة خطأ PERMISSION_DENIED لـ iOS Safari و PWA
           const isIOS = isIosDevice();
           const isPWA = isStandalonePwa();
           const permissionMessage = isIOS
@@ -859,7 +841,7 @@ export default function CustomerHomePage() {
           triggerLocationError(permissionMessage);
           show(permissionMessage, 'warning', 5000);
         } else {
-          // 1 & 3. تعذر تحديد الموقع بعد المحاولات أو Timeout
+          // تعذر تحديد الموقع بعد المحاولات أو Timeout
           const generalErrMsg = 'تعذر تحديد موقع GPS، يمكنك سحب الخريطة لتحديد مكانك';
           triggerLocationError(generalErrMsg);
           show(generalErrMsg, 'warning', 5000);
@@ -876,7 +858,7 @@ export default function CustomerHomePage() {
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
 
     if (!cleaned) {
-      setSearchResults(NAJAF_LOCAL_PLACES);
+      setSearchResults([]);
       setIsSearchingPlaces(false);
       return;
     }
@@ -971,7 +953,7 @@ export default function CustomerHomePage() {
     setSearchResults([]);
   }
 
-  // اختيار مدينة من نافذة اختيار المدينة
+  // اختيار محافظة من نافذة اختيار المحافظة
   function handleSelectCity(city: CityItem) {
     setSelectedCity(city.name);
     if (stage === 'pickup') {
@@ -984,24 +966,13 @@ export default function CustomerHomePage() {
     mapRef.current?.flyTo({ center: [city.lng, city.lat], zoom: 13, duration: 800 });
     setIsCitySelectorOpen(false);
     setCitySearchQuery('');
-    show(`تم اختيار مدينة: ${city.name} 🏙️`, 'success');
+    show(`تم التوسيط على محافظة: ${city.name} 📍`, 'success');
   }
 
-  // زر "مدينتك الحالية"
+  // زر "محافظتك الحالية" عبر الـ GPS
   function handleSelectCurrentCity() {
-    setSelectedCity('النجف');
-    if (stage === 'pickup') {
-      setPickup(DEFAULT_PICKUP);
-      setPickupName(DEFAULT_PICKUP_NAME);
-      mapRef.current?.flyTo({ center: [DEFAULT_PICKUP.lng, DEFAULT_PICKUP.lat], zoom: 15.2, duration: 800 });
-    } else {
-      setDropoff(DEFAULT_DROPOFF);
-      setDropoffName(DEFAULT_DROPOFF_NAME);
-      mapRef.current?.flyTo({ center: [DEFAULT_DROPOFF.lng, DEFAULT_DROPOFF.lat], zoom: 15.2, duration: 800 });
-    }
     setIsCitySelectorOpen(false);
-    setCitySearchQuery('');
-    show('تم تحديد مدينتك الحالية (النجف الأشرف) 📍', 'success');
+    handleUseCurrentLocation();
   }
 
   // البحث الصوتي
@@ -2130,11 +2101,11 @@ export default function CustomerHomePage() {
             </Marker>
           )}
 
-          {/* راية الوجهة «جامعة الكوفة» المثبتة على الخريطة */}
+          {/* راية الوجهة المثبتة على الخريطة */}
           {stage === 'ride_options' && (
             <DestinationFlagPin
               point={dropoff}
-              name={dropoffName || 'جامعة الكوفة'}
+              name={dropoffName || 'حدد الوجهة على الخريطة'}
               onClick={() => {
                 setStage('dropoff');
                 mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 15.2, duration: 600 });
@@ -2325,7 +2296,7 @@ export default function CustomerHomePage() {
             </div>
 
             <div
-              onClick={() => { setIsSearchOpen(true); setSearchResults(NAJAF_LOCAL_PLACES); }}
+              onClick={() => { setIsSearchOpen(true); setSearchResults([]); }}
               className="mb-4 flex items-center justify-between rounded-xl bg-[#0B101B] border border-amber-500/30 p-3.5 cursor-pointer transition active:scale-[0.99] hover:border-amber-500/60"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -3474,10 +3445,10 @@ export default function CustomerHomePage() {
               <button
                 type="button"
                 onClick={() => setIsCitySelectorOpen(true)}
-                className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg bg-[#161C28] border border-amber-500/30 text-[12.5px] font-bold text-amber-300 hover:border-amber-400 transition cursor-pointer"
-                title="تغيير المدينة"
+                className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg bg-[#161C28] border border-amber-500/30 text-[12px] font-bold text-amber-300 hover:border-amber-400 transition cursor-pointer"
+                title="تغيير المحافظة"
               >
-                <span>{selectedCity}</span>
+                <span>محافظتك: {selectedCity}</span>
                 <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
 
@@ -3778,7 +3749,7 @@ export default function CustomerHomePage() {
                   data-form-type="other"
                   value={citySearchQuery}
                   onChange={(e) => setCitySearchQuery(e.target.value)}
-                  placeholder="البحث في المدن..."
+                  placeholder="البحث في محافظات العراق الـ 18..."
                   className="w-full bg-transparent text-[14px] font-medium text-white outline-none placeholder-slate-500 text-right"
                 />
               </div>
@@ -3806,7 +3777,7 @@ export default function CustomerHomePage() {
                   <line x1="2" y1="12" x2="5" y2="12" />
                   <line x1="19" y1="12" x2="22" y2="12" />
                 </svg>
-                <span>مدينتك الحالية</span>
+                <span>محافظتك الحالية (GPS)</span>
               </button>
             </div>
 

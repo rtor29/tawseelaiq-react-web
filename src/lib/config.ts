@@ -1,10 +1,12 @@
 // إعدادات التطبيق المركزية — تُقرأ من متغيرات البيئة عبر Vite
 // (بديل AppConfig من نسخة Flutter)
 
-export const NAJAF_CENTER = { lat: 31.9961, lon: 44.3168 } as const;
+export const IRAQ_DEFAULT_CENTER = { lat: 33.3152, lon: 44.3661 } as const;
+export const NAJAF_CENTER = IRAQ_DEFAULT_CENTER; // للتوافق العكسي
 
-// حدود محافظة النجف الأشرف للبحث الجغرافي الصارم
-export const NAJAF_BBOX = { west: 44.05, south: 31.75, east: 44.65, north: 32.35 } as const;
+// حدود جمهورية العراق للبحث والتوسيط الجغرافي العام
+export const IRAQ_BBOX = { west: 38.5, south: 29.0, east: 48.8, north: 37.5 } as const;
+export const NAJAF_BBOX = IRAQ_BBOX; // للتوافق العكسي
 
 // أنماط Mapbox المعتمدة لمنصة توصيلة للوضعين النهاري والليلي
 export const MAPBOX_DAY_STYLE = 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';

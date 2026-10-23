@@ -2,7 +2,7 @@
 // التوكن يُقرأ من متغير البيئة VITE_MAPBOX_TOKEN فقط
 
 import { externalGet } from './api';
-import { config, NAJAF_BBOX } from './config';
+import { config } from './config';
 import type { LngLat } from '../types';
 
 export interface RouteResult {
@@ -84,52 +84,14 @@ export async function getDirections(
       coordinates: fallback,
       distanceKm: 5.2,
       durationMinutes: 10,
-      summary: 'مسار افتراضي مباشر - النجف الأشرف',
+      summary: 'مسار افتراضي مباشر',
       rawGeoJson: toGeoJsonLine(fallback),
     };
   }
 }
 
-// أحياء ومعالم وفنادق ومطاعم النجف للعرض المقترح والاحتياطي
-export const NAJAF_LOCAL_PLACES: PlaceResult[] = [
-  { name: 'مرقد الإمام علي (ع)', lat: 32.0025, lon: 44.3158, subName: 'المدينة القديمة، النجف الأشرف' },
-  { name: 'مركز مدينة النجف', lat: 31.9961, lon: 44.3168, subName: 'مركز المدينة، النجف الأشرف' },
-  { name: 'مطار النجف الدولي', lat: 31.9890, lon: 44.4040, subName: 'طريق المطار، النجف الأشرف' },
-  { name: 'جامعة الكوفة', lat: 32.0264, lon: 44.3862, subName: 'مجمع الكليات، الكوفة' },
-  { name: 'حي الكرامة', lat: 31.9900, lon: 44.3050, subName: 'حي الكرامة، النجف الأشرف' },
-  { name: 'حي السلام', lat: 31.9850, lon: 44.3200, subName: 'حي السلام، النجف الأشرف' },
-  { name: 'حي الحنانة', lat: 32.0100, lon: 44.3350, subName: 'حي الحنانة، النجف الأشرف' },
-  { name: 'حي النخيل', lat: 31.9750, lon: 44.3100, subName: 'حي النخيل، النجف الأشرف' },
-  { name: 'حي الضباط', lat: 32.0050, lon: 44.3400, subName: 'حي الضباط، النجف الأشرف' },
-  { name: 'حي الزهراء', lat: 31.9800, lon: 44.3300, subName: 'حي الزهراء، النجف الأشرف' },
-  { name: 'حي الأمين', lat: 31.9920, lon: 44.3450, subName: 'حي الأمين، النجف الأشرف' },
-  { name: 'حي الأنصار', lat: 31.9870, lon: 44.3600, subName: 'حي الأنصار، النجف الأشرف' },
-  { name: 'حي النصار', lat: 31.9880, lon: 44.3580, subName: 'حي النصار، النجف الأشرف' },
-  { name: 'حي الأمير', lat: 32.0120, lon: 44.3250, subName: 'حي الأمير، النجف الأشرف' },
-  { name: 'حي السعد', lat: 32.0080, lon: 44.3220, subName: 'حي السعد، النجف الأشرف' },
-  { name: 'حي العدالة', lat: 32.0150, lon: 44.3450, subName: 'حي العدالة، النجف الأشرف' },
-  { name: 'حي ميسان', lat: 32.0180, lon: 44.3800, subName: 'الكوفة، النجف الأشرف' },
-  { name: 'حي الاشتراكي', lat: 31.9830, lon: 44.3350, subName: 'حي الاشتراكي، النجف الأشرف' },
-  { name: 'السوق الكبير', lat: 32.0010, lon: 44.3200, subName: 'المدينة القديمة، النجف الأشرف' },
-  { name: 'ساحة ثورة العشرين', lat: 32.0030, lon: 44.3180, subName: 'ساحة ثورة العشرين، النجف الأشرف' },
-  { name: 'شارع الروان', lat: 32.0130, lon: 44.3400, subName: 'شارع الروان التجاري، النجف الأشرف' },
-  { name: 'شارع المدينة', lat: 32.0050, lon: 44.3250, subName: 'شارع المدينة، النجف الأشرف' },
-  { name: 'شارع كربلاء', lat: 32.0250, lon: 44.3100, subName: 'طريق يا حسين، النجف الأشرف' },
-  { name: 'شارع الكوفة', lat: 32.0150, lon: 44.3600, subName: 'طريق النجف - الكوفة' },
-  { name: 'كورنيش الكوفة', lat: 32.0300, lon: 44.4000, subName: 'كورنيش الكوفة، النجف الأشرف' },
-  { name: 'مسجد الكوفة المعظم', lat: 32.0290, lon: 44.4010, subName: 'الكوفة، النجف الأشرف' },
-  { name: 'مسجد السهلة المعظم', lat: 32.0380, lon: 44.3850, subName: 'الكوفة، النجف الأشرف' },
-  { name: 'فندق قصر الدر', lat: 32.0040, lon: 44.3140, subName: 'فندق قصر الدر، المدينة القديمة' },
-  { name: 'فندق قصر الشفاعة', lat: 32.0035, lon: 44.3145, subName: 'المدينة القديمة، النجف الأشرف' },
-  { name: 'فندق بلاس النجف', lat: 32.0060, lon: 44.3180, subName: 'فندق بلاس، النجف الأشرف' },
-  { name: 'فندق الطاووس', lat: 32.0020, lon: 44.3170, subName: 'فندق الطاووس، المدينة القديمة' },
-  { name: 'مستشفى الصدر التعليمي', lat: 32.0150, lon: 44.3350, subName: 'مستشفى الصدر، النجف الأشرف' },
-  { name: 'مستشفى الحكيم العام', lat: 32.0080, lon: 44.3280, subName: 'مستشفى الحكيم، النجف الأشرف' },
-  { name: 'مستشفى الفرات الأوسط', lat: 32.0200, lon: 44.3900, subName: 'الكوفة، النجف الأشرف' },
-  { name: 'سيتي مول النجف', lat: 32.0120, lon: 44.3420, subName: 'حي الأمير، النجف الأشرف' },
-  { name: 'مطعم ومشاوي الفردوس', lat: 32.0070, lon: 44.3320, subName: 'النجف الأشرف' },
-  { name: 'مطعم الطازج', lat: 32.0110, lon: 44.3380, subName: 'شارع الروان، النجف الأشرف' },
-];
+// قائمة فارغة للتوافق العكسي — تم اعتماد بحث Mapbox و OpenStreetMap الحي لكل العراق
+export const NAJAF_LOCAL_PLACES: PlaceResult[] = [];
 
 import {
   getCachedSearchResults,
@@ -139,11 +101,11 @@ import {
 } from './cache';
 import { sanitizeSearchQuery, normalizeArabicText } from './sanitize';
 
-// بحث الأماكن الذكي باللغة العربية داخل النجف الأشرف والعراق
+// بحث الأماكن الذكي باللغة العربية داخل كل محافظات العراق
 // يدمج بين Mapbox Geocoding و OpenStreetMap Nominatim للأماكن والمحلات المحلية (مثل السوبرماركت والمعالم)
 export async function searchPlaces(query: string, proximity?: LngLat): Promise<PlaceResult[]> {
   const q = sanitizeSearchQuery(query).trim();
-  if (!q) return NAJAF_LOCAL_PLACES;
+  if (!q) return [];
 
   // التحقق من كاش المتصفح أولاً لتقليل استهلاك الـ API وتسريع الاستجابة الفورية
   const cached = getCachedSearchResults(q, proximity);
@@ -152,10 +114,10 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
   }
 
   // تحديد ثقل البحث الجغرافي (Proximity Bias):
-  // توجيه البحث جغرافياً حول موقع المستخدم أو مركز النجف الأشرف [44.32, 32.02]
+  // توجيه البحث جغرافياً حول موقع المستخدم إذا توفر
   const proximityParam = proximity
     ? `${proximity.lng},${proximity.lat}`
-    : '44.32,32.02';
+    : undefined;
 
   // 1. محرك Mapbox Geocoding API الصارم
   const fetchMapbox = async (): Promise<PlaceResult[]> => {
@@ -179,7 +141,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
           country: 'iq',
           language: 'ar',
           types: 'poi,address,neighborhood,locality',
-          proximity: proximityParam,
+          ...(proximityParam ? { proximity: proximityParam } : {}),
           autocomplete: 'true',
           fuzzyMatch: 'true',
           limit: '8',
@@ -206,7 +168,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
         if (neighborhood && locality) {
           subName = `${neighborhood}، ${locality}`;
         } else if (neighborhood) {
-          subName = `${neighborhood}، النجف الأشرف`;
+          subName = `${neighborhood}، العراق`;
         } else if (locality) {
           subName = locality;
         } else if (f.place_name_ar) {
@@ -215,7 +177,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
             subName = parts.slice(1, 3).join('، ');
           }
         }
-        if (!subName) subName = 'النجف الأشرف، العراق';
+        if (!subName) subName = 'العراق';
 
         return {
           name,
@@ -230,13 +192,13 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
     }
   };
 
-  // 2. محرك OpenStreetMap Nominatim Fallback للأماكن والمحلات المحلية الدقيقة بالعراق
+  // 2. محرك OpenStreetMap Nominatim للأماكن والمحلات المحلية الدقيقة بالعراق
   const fetchNominatim = async (): Promise<PlaceResult[]> => {
     try {
-      // توجيه معلمات Nominatim مع حصر بالعراق ودعم اللغة العربية وثقل النجف (viewbox)
+      // توجيه معلمات Nominatim مع حصر بالعراق كاملاً عبر countrycodes=iq ودعم اللغة العربية
       const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
         q
-      )}&format=json&countrycodes=iq&accept-language=ar&limit=8&viewbox=44.05,32.35,44.65,31.75`;
+      )}&format=json&countrycodes=iq&accept-language=ar&limit=8`;
       const res = await externalGet<
         Array<{
           place_id: number;
@@ -267,7 +229,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
             subName = parts[1];
           }
         }
-        if (!subName) subName = 'النجف الأشرف، العراق';
+        if (!subName) subName = 'العراق';
 
         return {
           name: rawName,
@@ -283,21 +245,15 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
   };
 
   try {
-    // تشغيل محركي Mapbox و OpenStreetMap معاً بالتوازي لتحقيق أقصى سرعة ودقة
+    // تشغيل محركي Mapbox و OpenStreetMap معاً بالتوازي لتحقيق أقصى سرعة ودقة في كل العراق
     const [mapboxSettled, nominatimSettled] = await Promise.allSettled([fetchMapbox(), fetchNominatim()]);
     const mapboxResults = mapboxSettled.status === 'fulfilled' ? mapboxSettled.value : [];
     const nominatimResults = nominatimSettled.status === 'fulfilled' ? nominatimSettled.value : [];
 
-    // مطابقة محلية فورية في قائمة معالم النجف الأشرف
     const normQ = normalizeArabicText(q);
-    const localMatches = NAJAF_LOCAL_PLACES.filter((p) => {
-      const normName = normalizeArabicText(p.name);
-      const normSub = p.subName ? normalizeArabicText(p.subName) : '';
-      return normName.includes(normQ) || normSub.includes(normQ) || normQ.includes(normName);
-    });
 
-    // دمج نتائج المصادر مع إعطاء الأولوية لمعالم Nominatim والمحلات والمطابقة المحلية
-    const combined = [...localMatches, ...nominatimResults, ...mapboxResults];
+    // دمج نتائج المصادر
+    const combined = [...nominatimResults, ...mapboxResults];
 
     // إزالة التكرار مع الحفاظ على الأماكن المحددة داخل العراق
     const seen = new Set<string>();
@@ -305,7 +261,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
 
     for (const item of combined) {
       if (!item.name || isNaN(item.lat) || isNaN(item.lon)) continue;
-      // تصفية جغرافية تضمن أن النتائج داخل العراق (خطوط عرض 29 إلى 38، خطوط طول 38.5 إلى 49)
+      // تصفية جغرافية تضمن أن النتائج داخل جمهورية العراق (خطوط عرض 29 إلى 38، خطوط طول 38.5 إلى 49)
       if (item.lat < 29.0 || item.lat > 38.0 || item.lon < 38.5 || item.lon > 49.0) continue;
 
       const normName = normalizeArabicText(item.name).slice(0, 20);
@@ -316,11 +272,15 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
       }
     }
 
-    // فرز ذكي: الأماكن داخل النجف الأشرف والكوفة أولاً، ثم مطابقة الاسم
+    // فرز ذكي: الأقرب لموقع المستخدم أولاً (إن توفر proximity) ثم قوة مطابقة الاسم
     finalResults.sort((a, b) => {
-      const aInNajaf = isStrictlyNajaf(a.name, a.lat, a.lon) ? 1 : 0;
-      const bInNajaf = isStrictlyNajaf(b.name, b.lat, b.lon) ? 1 : 0;
-      if (aInNajaf !== bInNajaf) return bInNajaf - aInNajaf;
+      if (proximity) {
+        const distA = Math.hypot(a.lat - proximity.lat, a.lon - proximity.lng);
+        const distB = Math.hypot(b.lat - proximity.lat, b.lon - proximity.lng);
+        if (Math.abs(distA - distB) > 0.05) {
+          return distA - distB;
+        }
+      }
 
       const aExact = normalizeArabicText(a.name).includes(normQ) ? 1 : 0;
       const bExact = normalizeArabicText(b.name).includes(normQ) ? 1 : 0;
@@ -335,15 +295,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
     // إرجاع مصفوفة النتائج (أو مصفوفة فارغة إذا لم يعثر على شيء لإظهار رسالة عدم التطابق)
     return finalResults;
   } catch {
-    // السقوط الآمن على المطابقة المحلية الذكية في النجف الأشرف فقط إذا تطابقت، أو مصفوفة فارغة
-    const normQ = normalizeArabicText(q);
-    const localMatches = NAJAF_LOCAL_PLACES.filter((p) => {
-      const normName = normalizeArabicText(p.name);
-      const normSub = p.subName ? normalizeArabicText(p.subName) : '';
-      return normName.includes(normQ) || normSub.includes(normQ) || normQ.includes(normName);
-    });
-
-    return localMatches;
+    return [];
   }
 }
 
@@ -379,20 +331,22 @@ export async function reverseGeocode(point: LngLat): Promise<string | null> {
   }
 }
 
-const OTHER_GOVERNORATES = [
-  'بغداد', 'كربلاء', 'بابل', 'البصرة', 'أربيل', 'الموصل', 'السليمانية', 'الأنبار',
-  'ديالى', 'كركوك', 'واسط', 'ميسان', 'المثنى', 'ذي قار', 'القادسية', 'صلاح الدين',
-  'دهوك', 'الديوانية', 'الحلة', 'الناصرية', 'العمارة', 'الكوت', 'السماوة',
-];
+// حدود جمهورية العراق الجغرافية الصارمة (تغطي كافة المحافظات الـ 18)
+export const IRAQ_BOUNDS = {
+  minLat: 29.0,
+  maxLat: 37.5,
+  minLon: 38.5,
+  maxLon: 48.8,
+} as const;
 
-export function isStrictlyNajaf(name: string, lat: number, lon: number): boolean {
-  if (lon < NAJAF_BBOX.west || lon > NAJAF_BBOX.east || lat < NAJAF_BBOX.south || lat > NAJAF_BBOX.north) {
-    return false;
-  }
-  const lower = name.toLowerCase();
-  return !OTHER_GOVERNORATES.some(
-    (gov) => lower.includes(gov) && !lower.includes('النجف') && !lower.includes('الكوفة'),
-  );
+export function isInIraq(lat: number, lon: number): boolean {
+  return lat >= IRAQ_BOUNDS.minLat && lat <= IRAQ_BOUNDS.maxLat &&
+         lon >= IRAQ_BOUNDS.minLon && lon <= IRAQ_BOUNDS.maxLon;
+}
+
+// للتوافق العكسي
+export function isStrictlyNajaf(_name: string, lat: number, lon: number): boolean {
+  return isInIraq(lat, lon);
 }
 
 /**

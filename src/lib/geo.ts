@@ -1,6 +1,6 @@
 // أدوات جغرافية — بديل Geolocator.distanceBetween و latlong2 Distance
 
-import { NAJAF_CENTER } from './config';
+import { IRAQ_DEFAULT_CENTER } from './config';
 import type { LngLat } from '../types';
 
 const EARTH_RADIUS_M = 6371000;
@@ -52,8 +52,12 @@ export function formatDistanceAr(meters: number): string {
   return `${(meters / 1000).toFixed(1)} كم`;
 }
 
+export function iraqCenterLngLat(): LngLat {
+  return { lat: IRAQ_DEFAULT_CENTER.lat, lng: IRAQ_DEFAULT_CENTER.lon };
+}
+
 export function najafCenterLngLat(): LngLat {
-  return { lat: NAJAF_CENTER.lat, lng: NAJAF_CENTER.lon };
+  return iraqCenterLngLat();
 }
 
 export function isIosDevice(): boolean {

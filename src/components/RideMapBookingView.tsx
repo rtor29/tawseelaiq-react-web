@@ -22,22 +22,16 @@ export interface RideMapBookingProps {
   onManageSubscription?: () => void;
 }
 
-// قائمة المعالم والأحياء الرئيسية والشائعة في النجف الأشرف والكوفة
-const NAJAF_PLACES = [
-  { name: 'جامعة الكوفة', sub: 'مجمع الكليات، الكوفة', lat: 32.0355, lng: 44.3345, icon: '🎓' },
+// قائمة المعالم الرئيسية في العراق للعرض التوضيحي
+const IRAQ_PLACES = [
+  { name: 'مركز العاصمة بغداد', sub: 'بغداد، ساحة التحرير', lat: 33.3152, lng: 44.3661, icon: '📍' },
   { name: 'مرقد الإمام علي (ع)', sub: 'المدينة القديمة، النجف الأشرف', lat: 31.9959, lng: 44.3142, icon: '🕌' },
-  { name: 'مطار النجف الدولي', sub: 'طريق المطار الرئيسي، النجف', lat: 31.9897, lng: 44.4042, icon: '✈️' },
-  { name: 'حي الحنانة', sub: 'طريق الكوفة - النجف', lat: 32.0125, lng: 44.3380, icon: '🏡' },
-  { name: 'حي الأمير', sub: 'مركز مدينة النجف', lat: 32.0250, lng: 44.3320, icon: '🏙️' },
-  { name: 'كراج بغداد الموحد', sub: 'شمال النجف، طريق كربلاء', lat: 32.0280, lng: 44.3465, icon: '🚌' },
-  { name: 'ساحة الصدرين', sub: 'مركز مدينة النجف التجارية', lat: 32.0210, lng: 44.3380, icon: '📍' },
-  { name: 'مسجد الكوفة المعظم', sub: 'الكوفة، شارع السفير', lat: 32.0289, lng: 44.4008, icon: '🕌' },
-  { name: 'شارع الروان', sub: 'النجف الأشرف، حي الجامعة', lat: 32.0245, lng: 44.3210, icon: '🛍️' },
-  { name: 'حي الجامعة', sub: 'قرب مجمع النقابات', lat: 32.0270, lng: 44.3250, icon: '🏫' },
-  { name: 'حي السلام', sub: 'طريق النجف - كربلاء', lat: 32.0298, lng: 44.3285, icon: '🏘️' },
-  { name: 'حي ميسان', sub: 'قضاء الكوفة', lat: 32.0355, lng: 44.3345, icon: '🏡' },
-  { name: 'مستشفى الصدر التعليمي', sub: 'النجف، شارع الإسكان', lat: 32.0150, lng: 44.3300, icon: '🏥' },
+  { name: 'مطار بغداد الدولي', sub: 'طريق المطار، بغداد', lat: 33.2625, lng: 44.2344, icon: '✈️' },
+  { name: 'جامعة بغداد', sub: 'الجادرية، بغداد', lat: 33.2711, lng: 44.3789, icon: '🎓' },
+  { name: 'كورنيش شط العرب', sub: 'البصرة، العشار', lat: 30.5150, lng: 47.8420, icon: '🌊' },
+  { name: 'قلعة أربيل', sub: 'مركز مدينة أربيل', lat: 36.1911, lng: 44.0092, icon: '🏰' },
 ];
+const NAJAF_PLACES = IRAQ_PLACES;
 
 export const RideMapBookingView: React.FC<RideMapBookingProps> = ({
   mode,
@@ -47,8 +41,8 @@ export const RideMapBookingView: React.FC<RideMapBookingProps> = ({
   onRequestRide,
   onRequestCommute,
   onOpenDrawer,
-  initialPickupAddress = 'موقعك الحالي - شارع المدينة',
-  initialDropoffAddress = 'جامعة الكوفة - مجمع الكليات',
+  initialPickupAddress = 'حدد نقطة الانطلاق على الخريطة',
+  initialDropoffAddress = 'حدد الوجهة على الخريطة',
   isSubscribed = false,
   subscriptionInfo,
   onManageSubscription,
@@ -57,8 +51,8 @@ export const RideMapBookingView: React.FC<RideMapBookingProps> = ({
   const [pickupStep, setPickupStep] = useState<'select_pickup' | 'select_dropoff' | 'confirm'>('select_pickup');
   const [selectedTier, setSelectedTier] = useState<'saving' | 'vip' | 'super'>('saving');
   const [commuteShift, setCommuteShift] = useState<'morning_730' | 'morning_800' | 'afternoon_1400'>('morning_730');
-  const [pickupLoc, setPickupLoc] = useState({ lat: 32.0298, lng: 44.3285, address: initialPickupAddress });
-  const [dropoffLoc, setDropoffLoc] = useState({ lat: 32.0355, lng: 44.3345, address: initialDropoffAddress });
+  const [pickupLoc, setPickupLoc] = useState({ lat: 33.3152, lng: 44.3661, address: initialPickupAddress });
+  const [dropoffLoc, setDropoffLoc] = useState({ lat: 33.3250, lng: 44.3750, address: initialDropoffAddress });
   
   // الوضع النهاري والليلي
   const [isDayMode, setIsDayMode] = useState(false);
@@ -300,10 +294,10 @@ export const RideMapBookingView: React.FC<RideMapBookingProps> = ({
           </div>
           <div className="absolute top-[210px] left-[25%] text-[10px] font-bold tracking-wide select-none opacity-80"
                style={{ color: isDayMode ? '#0F172A' : '#F1F5F9' }}>
-            شارع الروان • حي الجامعة
+            ساحة التحرير • بغداد
           </div>
 
-          {/* دبوس الوجهة: جامعة الكوفة */}
+          {/* دبوس الوجهة المحددة */}
           <div 
             onClick={() => handleSelectPlace(NAJAF_PLACES[0])}
             className="absolute top-[140px] left-[70%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-20 cursor-pointer active:scale-95 transition-transform"
@@ -312,14 +306,14 @@ export const RideMapBookingView: React.FC<RideMapBookingProps> = ({
               isDayMode ? 'bg-white/95 border-slate-300 text-slate-900' : 'bg-[#161C28]/95 border-white/10 text-white'
             }`}>
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
-              <span>{mode === 'commute' ? 'جامعة الكوفة (الوجهة اليومية)' : 'جامعة الكوفة'}</span>
+              <span>{mode === 'commute' ? 'نقطة الوصول المحددة' : 'الوجهة المحددة'}</span>
             </div>
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 shadow-xl border-2 border-white/20 font-bold text-base">
-              🎓
+              📍
             </div>
           </div>
 
-          {/* دبوس المعلم: مطار النجف الدولي */}
+          {/* دبوس المعلم: مطار بغداد الدولي */}
           <div 
             onClick={() => handleSelectPlace(NAJAF_PLACES[2])}
             className="absolute top-[260px] left-[22%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-20 opacity-90 cursor-pointer hover:opacity-100 transition-opacity"
@@ -328,7 +322,7 @@ export const RideMapBookingView: React.FC<RideMapBookingProps> = ({
               isDayMode ? 'bg-white border-slate-300 text-slate-800' : 'bg-[#161C28]/90 border-white/10 text-slate-200'
             }`}>
               <span>✈️</span>
-              <span>مطار النجف الدولي</span>
+              <span>مطار بغداد الدولي</span>
             </div>
           </div>
 

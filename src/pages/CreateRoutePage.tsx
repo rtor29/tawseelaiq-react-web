@@ -7,7 +7,7 @@ import Map, { NavigationControl, Marker, type MapMouseEvent, type MapRef } from 
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { endpoints, http } from '../lib/api';
 import { authStore } from '../lib/auth';
-import { config, NAJAF_CENTER } from '../lib/config';
+import { config, IRAQ_DEFAULT_CENTER } from '../lib/config';
 import { getDirections, reverseGeocode, searchPlaces, applyArabicAndEnhancedLabels, type PlaceResult, type RouteResult } from '../lib/mapbox';
 import { RouteLines } from '../components/map/MapPins';
 import { sanitizeSearchQuery } from '../lib/sanitize';
@@ -19,22 +19,22 @@ import { getCurrentPositionWithFallback, isIosDevice, isStandalonePwa } from '..
 
 type MapMode = 'start' | 'end' | 'waypoint';
 
-const KUFA_UNIVERSITY: LngLat = { lat: 32.03, lng: 44.37 };
+const DEFAULT_END_POINT: LngLat = { lat: 33.3250, lng: 44.3750 };
 
 export default function CreateRoutePage() {
   const mapRef = useRef<MapRef>(null);
   const { show } = useToast();
   const driverId = authStore.getSession()?.userId ?? '';
 
-  const [routeName, setRouteName] = useState('خط النجف - الكوفة اليومي');
-  const [startName, setStartName] = useState('مرقد الإمام علي (ع) - مركز النجف');
-  const [endName, setEndName] = useState('جامعة الكوفة - مجمع الكليات');
+  const [routeName, setRouteName] = useState('خط يومي منتظم');
+  const [startName, setStartName] = useState('نقطة الانطلاق');
+  const [endName, setEndName] = useState('نقطة الوصول');
   const [seats, setSeats] = useState('4');
   const [price, setPrice] = useState('3000');
   const [departureTime, setDepartureTime] = useState('07:30');
 
-  const [startPoint, setStartPoint] = useState<LngLat>({ lat: NAJAF_CENTER.lat, lng: NAJAF_CENTER.lon });
-  const [endPoint, setEndPoint] = useState<LngLat>(KUFA_UNIVERSITY);
+  const [startPoint, setStartPoint] = useState<LngLat>({ lat: IRAQ_DEFAULT_CENTER.lat, lng: IRAQ_DEFAULT_CENTER.lon });
+  const [endPoint, setEndPoint] = useState<LngLat>(DEFAULT_END_POINT);
   const [waypoints, setWaypoints] = useState<LngLat[]>([]);
   const [mode, setMode] = useState<MapMode>('start');
 
@@ -340,7 +340,7 @@ export default function CreateRoutePage() {
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="اكتب اسم منطقة في النجف..."
+                placeholder="ابحث عن منطقة أو حي أو شارع..."
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-brand-amber font-map-search"
               />
               {searchResults.length > 0 && (

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Map, { NavigationControl, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { config, NAJAF_CENTER } from '../lib/config';
+import { config, IRAQ_DEFAULT_CENTER } from '../lib/config';
 import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
 import type { LngLat, RouteBroadcastEvent } from '../types';
@@ -22,7 +22,7 @@ export default function LiveTrackingPage() {
   const navigate = useNavigate();
   const mapRef = useRef<MapRef>(null);
 
-  const [driverPos, setDriverPos] = useState<LngLat>({ lat: NAJAF_CENTER.lat, lng: NAJAF_CENTER.lon });
+  const [driverPos, setDriverPos] = useState<LngLat>({ lat: IRAQ_DEFAULT_CENTER.lat, lng: IRAQ_DEFAULT_CENTER.lon });
   const [heading, setHeading] = useState(0);
   const [connected, setConnected] = useState(false);
   const [routePoints, setRoutePoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
@@ -105,10 +105,10 @@ export default function LiveTrackingPage() {
           <VehicleMarker targetLat={driverPos.lat} targetLng={driverPos.lng} targetHeading={heading} title={driverName} />
         </Map>
 
-        {/* شريط حالة النجف المباشر */}
+        {/* شريط الحالة المباشر */}
         <div className="absolute inset-x-4 top-3 z-10 flex items-center gap-2 rounded-2xl bg-white/95 px-4 py-2.5 shadow-card">
           <span className="text-red-500">📍</span>
-          <span className="flex-1 text-[13px] font-bold text-brand-slate">محافظة النجف الأشرف | خريطة حية</span>
+          <span className="flex-1 text-[13px] font-bold text-brand-slate">تتبع الكابتن المباشر | خريطة حية</span>
           <span
             className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-[10px] font-bold ${
               connected ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'

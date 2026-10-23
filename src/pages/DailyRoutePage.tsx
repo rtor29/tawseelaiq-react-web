@@ -16,13 +16,13 @@ import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { AppDrawer } from '../components/AppDrawer';
 import { RouteLines } from '../components/map/MapPins';
-import { applyMapEnhancements, getDirections, searchPlaces, NAJAF_LOCAL_PLACES, type PlaceResult } from '../lib/mapbox';
+import { applyMapEnhancements, getDirections, searchPlaces, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
 
-const USER_LOC = { lat: 32.0298, lng: 44.3285 };
+const USER_LOC = { lat: 33.3152, lng: 44.3661 };
 
 interface DriverItem {
   id: string | number;
@@ -108,7 +108,7 @@ export default function DailyRoutePage() {
 
     const cleaned = sanitizeSearchQuery(val);
     if (!cleaned) {
-      setSearchResults(NAJAF_LOCAL_PLACES);
+      setSearchResults([]);
       setIsSearching(false);
       return;
     }
@@ -356,10 +356,10 @@ export default function DailyRoutePage() {
             name: d.driverName || d.fullName || 'كابتن توصيله',
             lat: dLat,
             lng: dLng,
-            from: d.routeStartName || (d.route && d.route.includes('➔') ? d.route.split('➔')[0].trim() : 'المركز'),
-            to: d.routeEndName || (d.route && d.route.includes('➔') ? d.route.split('➔')[1].trim() : 'جامعة الكوفة'),
+            from: d.routeStartName || (d.route && d.route.includes('➔') ? d.route.split('➔')[0].trim() : 'نقطة الانطلاق'),
+            to: d.routeEndName || (d.route && d.route.includes('➔') ? d.route.split('➔')[1].trim() : 'وجهة غير محددة'),
             rating: Number(d.rating || 5.0),
-            plate: d.plateNumber || 'النجف',
+            plate: d.plateNumber || 'العراق',
             seats: 4,
             takenSeats: 1,
             phone: d.phoneNumber || d.phone || '',
@@ -622,13 +622,13 @@ export default function DailyRoutePage() {
         <div
           onClick={() => {
             setIsSearchOpen(true);
-            if (!searchQuery) setSearchResults(NAJAF_LOCAL_PLACES);
+            if (!searchQuery) setSearchResults([]);
           }}
           className="flex items-center gap-2.5 bg-[#161C28]/95 backdrop-blur-md px-4 py-2.5 rounded-2xl shadow-xl border border-white/15 cursor-pointer active:scale-[0.99] transition hover:border-amber-400"
         >
           <span className="text-amber-500">🔍</span>
           <span className="text-[13px] text-slate-300 font-medium truncate flex-1 font-map-search">
-            {searchQuery ? searchQuery : 'ابحث عن حي، معلم، فندق أو شارع بالنجف...'}
+            {searchQuery ? searchQuery : 'ابحث عن حي، معلم، أو شارع...'}
           </span>
           {isSearchOpen && (
             <button
