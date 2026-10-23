@@ -542,25 +542,42 @@ export default function CustomerHomePage() {
                 if (s === 'accepted' || s === 'arrived' || s === 'inprogress' || s === 'in_progress') {
                   setStage('driver_arriving');
                   setRideStatus(req.status);
-                  if (s === 'arrived' && !hasNotifiedArrivalRef.current) {
-                    hasNotifiedArrivalRef.current = true;
-                    show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
-                    playCarHornBeep();
+                  if (s === 'arrived') {
+                    setRouteCoordinates(null);
+                    if (!hasNotifiedArrivalRef.current) {
+                      hasNotifiedArrivalRef.current = true;
+                      show('الكابتن وصل إلى موقعك الآن! 🚖 بيب بيب', 'success', 7000);
+                      playCarHornBeep();
+                    }
                   }
                 } else if (s === 'pending') {
                   setStage('searching');
                   setRideStatus('Pending');
                   setAssignedDriverInfo(null);
                 } else if (
-                  req.status === 'Completed' ||
-                  req.status === 'Cancelled' ||
-                  req.status === 'NoDriversAvailable'
+                  [
+                    'completed',
+                    'ridecompleted',
+                    'arrived_destination',
+                    'cancelled',
+                    'canceled',
+                    'declined',
+                    'driver_declined',
+                    'driver_cancelled',
+                    'rejected',
+                    'expired',
+                    'nodriversavailable',
+                    'no_drivers'
+                  ].includes(s)
                 ) {
-                  // إزالة الطلب فقط عند الانتهاء أو الإلغاء
+                  // إزالة الطلب ومسح الخط عند الانتهاء أو الإلغاء
+                  hasNotifiedArrivalRef.current = false;
                   localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
                   setStage('pickup');
                   setRideRequestId(null);
                   setAssignedDriverInfo(null);
+                  setLiveDriverPosition(null);
+                  setRouteCoordinates(null);
                 }
 
                 if (s !== 'pending' && (req.assignedDriverName || req.assignedDriverPhone)) {
@@ -1524,6 +1541,7 @@ export default function CustomerHomePage() {
       }
     } else if (status === 'arrived' || status === 'driver_arrived') {
       setRideStatus('Arrived');
+      setRouteCoordinates(null);
       if (stage !== 'driver_arriving') {
         setStage('driver_arriving');
         setRideSheetState('expanded');
@@ -1559,10 +1577,26 @@ export default function CustomerHomePage() {
       status === 'arrived_return' ||
       (status === 'arrived_destination' && !req.isRoundTrip && req.tripType !== 'ROUND_TRIP')
     ) {
+      hasNotifiedArrivalRef.current = false;
+      localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+      setRouteCoordinates(null);
       setRideStatus(req.status || 'Completed');
       setCompletedRideBreakdown(req);
       triggerDriverRatingModal(req);
-    } else if (status === 'cancelled' || status === 'nodriversavailable' || status === 'no_drivers') {
+    } else if (
+      [
+        'cancelled',
+        'canceled',
+        'declined',
+        'driver_declined',
+        'driver_cancelled',
+        'rejected',
+        'expired',
+        'nodriversavailable',
+        'no_drivers',
+        'no_driver_found'
+      ].includes(status)
+    ) {
       hasNotifiedArrivalRef.current = false;
       localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
       show(status.includes('cancel') ? 'تم إلغاء الرحلة' : 'نعتذر منك، لم يتوفر كابتن متاح حالياً 🚖 يمكنك إعادة المحاولة', 'warning', 6000);
@@ -1730,8 +1764,9 @@ export default function CustomerHomePage() {
             setRideSheetState('expanded');
             show('تم قبول رحلتك من قبل الكابتن! 🚖', 'success');
           }
-        } else if (evStatus === 'arrived') {
+        } else if (evStatus === 'arrived' || evStatus === 'driver_arrived') {
           setRideStatus('Arrived');
+          setRouteCoordinates(null);
           if (stage !== 'driver_arriving') {
             setStage('driver_arriving');
             setRideSheetState('expanded');
@@ -1752,9 +1787,24 @@ export default function CustomerHomePage() {
               mapRef.current?.flyTo({ center: [dropoff.lng, dropoff.lat], zoom: 14.8, duration: 800 });
             }
           }
-        } else if (e.status === 'Completed' || e.status === 'completed' || e.status === 'RideCompleted') {
+        } else if (evStatus === 'completed' || evStatus === 'ridecompleted' || evStatus === 'arrived_destination') {
+          hasNotifiedArrivalRef.current = false;
+          localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+          setRouteCoordinates(null);
           triggerDriverRatingModal(assignedDriverInfo);
-        } else if (e.status === 'Cancelled') {
+        } else if (
+          [
+            'cancelled',
+            'canceled',
+            'declined',
+            'driver_declined',
+            'driver_cancelled',
+            'rejected',
+            'expired',
+            'nodriversavailable',
+            'no_drivers'
+          ].includes(evStatus)
+        ) {
           hasNotifiedArrivalRef.current = false;
           localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
           show('تم إلغاء الرحلة', 'warning');

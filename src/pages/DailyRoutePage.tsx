@@ -259,18 +259,15 @@ export default function DailyRoutePage() {
     return ['confirmed', 'active', 'pending', 'cancel_requested_by_passenger', 'cancel_requested_by_driver', 'cancellation_pending'].includes(status);
   });
 
+  const mbStatus = String(matchingBooking?.status || '').toLowerCase();
   const isBookingPending = Boolean(
     matchingBooking &&
-      (matchingBooking.status === 'Pending' ||
-        matchingBooking.status === 'pending_approval' ||
-        matchingBooking.status === 'pending')
+      (mbStatus === 'pending' || mbStatus === 'pending_approval')
   );
 
   const isAlreadySubscribed = Boolean(
     (matchingBooking &&
-      (matchingBooking.status === 'Confirmed' ||
-        matchingBooking.status === 'Active' ||
-        matchingBooking.status === 'active')) ||
+      (mbStatus === 'confirmed' || mbStatus === 'active')) ||
     (selectedDriver &&
       (subscribedDriverIds.has(String(selectedDriver.driverId)) ||
         subscribedDriverIds.has(String(selectedDriver.id)) ||
@@ -279,11 +276,11 @@ export default function DailyRoutePage() {
 
   const isCancellationPending = Boolean(
     matchingBooking &&
-      (matchingBooking.status === 'cancellation_pending' ||
+      !['cancelled', 'canceled', 'declined', 'rejected', 'expired'].includes(mbStatus) &&
+      (mbStatus === 'cancellation_pending' ||
         Boolean(matchingBooking.cancellationPending) ||
         Boolean(matchingBooking.cancellation_requested) ||
-        matchingBooking.cancellation_status === 'pending' ||
-        Boolean(matchingBooking.cancellationReason || matchingBooking.cancellation_reason))
+        matchingBooking.cancellation_status === 'pending')
   );
 
   // دالة التوسيط التلقائي السلس عند فتح شاشة حجز خط دائمي لمرة واحدة فقط
@@ -548,7 +545,7 @@ export default function DailyRoutePage() {
     >
 
       {/* الترويسة العلوية العائمة مع حماية كاملة لهوامش الأمان على iOS */}
-      <div className="fixed top-0 inset-x-0 max-w-md mx-auto z-40 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 flex items-center justify-between pointer-events-none">
+      <div className="fixed top-0 inset-x-0 max-w-md mx-auto z-[100] px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 flex items-center justify-between pointer-events-none">
         {/* زر الرئيسية / الرجوع */}
         <div className="pointer-events-auto">
           <button
@@ -814,7 +811,10 @@ export default function DailyRoutePage() {
         const remaining = selectedDriver.seats - selectedDriver.takenSeats;
         const distLabel = dist < 1 ? `${Math.round(dist * 1000)} متر` : `${dist.toFixed(1)} كم`;
         return (
-          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[24px] bg-[#1e1e2e] text-white pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in">
+          <div 
+            className="absolute inset-x-0 bottom-0 z-30 rounded-t-[24px] bg-[#1e1e2e] text-white pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-y-auto overscroll-contain"
+            style={{ maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))' }}
+          >
             <div className="flex justify-center pt-3 mb-1 cursor-pointer" onClick={() => setSelectedDriver(null)}>
               <div className="h-1 w-10 rounded-full bg-white/30" />
             </div>
