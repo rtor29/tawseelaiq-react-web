@@ -1277,46 +1277,26 @@ export default function DriverHomePage() {
     }
   }
 
-  // تفعيل الملاحة الخارجية وفتح التطبيق المختار
-  async function handleStartExternalNav(app: 'Google Maps' | 'Waze', lat: number, lng: number) {
+  // إرسال تنبيه تفعيل الملاحة الخارجية في الخلفية فوراً دون انتظار
+  function notifyExternalNavStart(app: 'Google Maps' | 'Waze') {
     if (!activeRide) return;
     try {
       localStorage.setItem('tawseela_preferred_nav_app', app);
     } catch (_) {}
 
     const currentId = driverId || rawPhone;
-    try {
-      await http.post('/ride/external-nav/start', {
-        requestId: activeRide.id,
-        driverId: currentId,
-        app: app === 'Waze' ? 'Waze' : 'Google Maps',
-      }, {
-        headers: { 'Idempotency-Key': `extnav-start-${activeRide.id}-${Date.now()}` }
-      });
-      isExternalNavActiveRef.current = true;
-    } catch (err) {
-      console.warn('[ExternalNav] start error:', err);
-    }
-
-    if (app === 'Google Maps') {
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } else {
-      const url = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
+    isExternalNavActiveRef.current = true;
     setIsNavModalOpen(false);
-  }
 
-  // نسخ الإحداثيات احتياطياً للحافظة
-  function handleCopyCoordinates(lat: number, lng: number) {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`).then(() => {
-        show('تم نسخ إحداثيات الموقع بنجاح 📋', 'success', 3000);
-      }).catch(() => {
-        show('تعذر نسخ الإحداثيات', 'error');
-      });
-    }
+    http.post('/ride/external-nav/start', {
+      requestId: activeRide.id,
+      driverId: currentId,
+      app: app === 'Waze' ? 'Waze' : 'Google Maps',
+    }, {
+      headers: { 'Idempotency-Key': `extnav-start-${activeRide.id}-${Date.now()}` }
+    }).catch((err) => {
+      console.warn('[ExternalNav] start background error:', err);
+    });
   }
 
   function handleOpenNavModal(target?: 'pickup' | 'dropoff') {
@@ -2616,38 +2596,35 @@ export default function DriverHomePage() {
             </div>
 
             <div className="space-y-2.5 pt-1">
-              {/* خرائط جوجل (Google Maps) بنمط الزر الثانوي */}
-              <button
-                type="button"
-                onClick={() => handleStartExternalNav('Google Maps', navCoordinates.lat, navCoordinates.lng)}
+              {/* خرائط جوجل (Google Maps) كرابط أصلي مباشر <a> يفتح فوراً دون اعتراض المتصفح */}
+              <a
+                href={(!isNaN(navCoordinates.lat) && !isNaN(navCoordinates.lng) && navCoordinates.lat !== 0)
+                  ? `https://www.google.com/maps/dir/?api=1&destination=${navCoordinates.lat},${navCoordinates.lng}&travelmode=driving`
+                  : '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => notifyExternalNavStart('Google Maps')}
                 aria-label="افتح في خرائط جوجل"
-                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer"
+                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer text-center"
               >
                 <span className="text-lg">🗺️</span>
                 <span>افتح في Google Maps</span>
-              </button>
+              </a>
 
-              {/* تطبيق ويز (Waze) بنمط الزر الثانوي */}
-              <button
-                type="button"
-                onClick={() => handleStartExternalNav('Waze', navCoordinates.lat, navCoordinates.lng)}
+              {/* تطبيق ويز (Waze) كرابط أصلي مباشر <a> يفتح فوراً دون اعتراض المتصفح */}
+              <a
+                href={(!isNaN(navCoordinates.lat) && !isNaN(navCoordinates.lng) && navCoordinates.lat !== 0)
+                  ? `https://waze.com/ul?ll=${navCoordinates.lat},${navCoordinates.lng}&navigate=yes`
+                  : '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => notifyExternalNavStart('Waze')}
                 aria-label="افتح في تطبيق ويز"
-                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-300 font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer"
+                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-300 font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer text-center"
               >
                 <span className="text-lg">🚙</span>
                 <span>افتح في Waze</span>
-              </button>
-
-              {/* نسخ الإحداثيات الاحتياطي */}
-              <button
-                type="button"
-                onClick={() => handleCopyCoordinates(navCoordinates.lat, navCoordinates.lng)}
-                aria-label="نسخ الإحداثيات"
-                className="w-full min-h-[48px] py-2.5 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-[0.98] cursor-pointer"
-              >
-                <span>📋</span>
-                <span>نسخ الإحداثيات ({navCoordinates.lat.toFixed(4)}, {navCoordinates.lng.toFixed(4)})</span>
-              </button>
+              </a>
 
               <button
                 type="button"

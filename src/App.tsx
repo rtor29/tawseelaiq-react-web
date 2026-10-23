@@ -9,6 +9,7 @@ import { consumeLoginTokenFromUrl } from './lib/googleAuth';
 import { fetchAndApplyTheme } from './lib/theme';
 import { initAudioUnlock } from './lib/sound';
 import { Spinner } from './components/ui';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Standard import for instant initial render of login screen
 import LoginPage from './pages/LoginPage';
@@ -167,7 +168,9 @@ export default function App() {
               path="/taxi"
               element={
                 <ProtectedRoute allowedRoles={['customer']}>
-                  <CustomerHomePage />
+                  <ErrorBoundary fallbackMessage="حدث خطأ مؤقت في شاشة مشوار الراكب">
+                    <CustomerHomePage />
+                  </ErrorBoundary>
                 </ProtectedRoute>
               }
             />

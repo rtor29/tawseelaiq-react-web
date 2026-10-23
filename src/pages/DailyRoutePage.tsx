@@ -497,7 +497,7 @@ export default function DailyRoutePage() {
       const bookingId = matchingBooking?.id || matchingBooking?.bookingId;
       const targetDriverId = String(selectedDriver.driverId || selectedDriver.id || selectedDriver.phone || '');
 
-      const { data } = await http.post<{ success: boolean; message?: string; request?: any }>('/customer/request-route-cancellation', {
+      const { data } = await http.post<{ success: boolean; message?: string; request?: any; bookingId?: string }>('/customer/request-route-cancellation', {
         bookingId: bookingId || undefined,
         customerId,
         customerPhone,
@@ -509,28 +509,27 @@ export default function DailyRoutePage() {
       });
 
       if (data?.success) {
-        show('تم إرسال طلب الإلغاء للسائق للمراجعة ✅', 'success', 5000);
+        show('تم إلغاء الحجز / الاشتراك بنجاح ✅', 'success', 5000);
         setIsCancelModalOpen(false);
-        const resolvedBookingId = bookingId || data?.request?.bookingId || 'bk-cancel-pending';
-        setCustomerBookings((prev) => [
-          ...prev.filter((b) => b.id !== resolvedBookingId && b.bookingId !== resolvedBookingId),
-          {
-            ...(matchingBooking || {}),
-            id: resolvedBookingId,
-            bookingId: resolvedBookingId,
-            driverId: targetDriverId,
-            status: 'cancellation_pending',
-            cancellationPending: true,
-            cancellation_requested: true,
-            cancellation_status: 'pending',
-            cancellationReason: cancelReason,
-            cancellation_reason: cancelReason,
-            cancellationDetails: cancelDetails.trim(),
-            cancellation_details: cancelDetails.trim(),
-          },
-        ]);
+        const resolvedBookingId = bookingId || data?.bookingId || data?.request?.bookingId;
+        setCustomerBookings((prev) =>
+          prev.map((b) => {
+            const bId = b.id || b.bookingId;
+            const bDriverId = String(b.driverId || b.driver_id || '');
+            if ((resolvedBookingId && bId === resolvedBookingId) || (targetDriverId && bDriverId === targetDriverId)) {
+              return { ...b, status: 'Cancelled', cancellationStatus: 'cancelled' };
+            }
+            return b;
+          })
+        );
+        setSubscribedDriverIds((prev) => {
+          const next = new Set(prev);
+          next.delete(targetDriverId);
+          if (selectedDriver.phone) next.delete(normalizePhoneLoose(selectedDriver.phone));
+          return next;
+        });
       } else {
-        show('تعذر إرسال طلب الإلغاء', 'error');
+        show(data?.message || 'تعذر إرسال طلب الإلغاء', 'error');
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ أثناء إرسال طلب الإلغاء', 'error');
@@ -899,6 +898,13 @@ export default function DailyRoutePage() {
                   <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-300">
                     تم إرسال طلب حجز المقعد للكابتن. بانتظار موافقة صاحب الخط لتأكيد مقعدك.
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsCancelModalOpen(true)}
+                    className="w-full rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 py-2.5 text-center text-[13px] font-bold text-red-300 transition active:scale-95 cursor-pointer"
+                  >
+                    إلغاء طلب الحجز المعلق ✕
+                  </button>
                 </div>
               ) : isAlreadySubscribed ? (
                 <div className="space-y-2">

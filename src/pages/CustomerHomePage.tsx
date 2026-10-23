@@ -1701,8 +1701,13 @@ export default function CustomerHomePage() {
           if (evType === 'external_nav_active') {
             setIsExternalNavActive(true);
             if (data?.lastKnownLocation) {
-              setLastKnownDriverLocation(data.lastKnownLocation);
-              handleDriverPositionUpdate({ lat: data.lastKnownLocation.lat, lng: data.lastKnownLocation.lon });
+              const rawLoc = data.lastKnownLocation;
+              const latNum = Number(rawLoc.lat);
+              const lngNum = Number(rawLoc.lng ?? rawLoc.lon);
+              if (!isNaN(latNum) && !isNaN(lngNum)) {
+                setLastKnownDriverLocation({ lat: latNum, lng: lngNum });
+                handleDriverPositionUpdate({ lat: latNum, lng: lngNum });
+              }
             }
           } else if (evType === 'external_nav_ended') {
             setIsExternalNavActive(false);
@@ -2025,9 +2030,13 @@ export default function CustomerHomePage() {
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-xl shrink-0 animate-pulse">🧭</span>
                 <div className="flex flex-col text-right min-w-0">
-                  <span className="text-[13px] font-bold text-white">الكابتن يستخدم تطبيق ملاحة خارجي</span>
+                  <span className="text-[13px] font-bold text-white">الكابتن في الطريق (يستخدم تطبيق ملاحة خارجي)</span>
                   <span className="text-[11px] text-blue-300">
-                    الموقع يُحدّث كل 10 ثوانٍ من آخر نقطة معروفة {lastKnownDriverLocation ? `(${lastKnownDriverLocation.lat.toFixed(4)}, ${lastKnownDriverLocation.lng.toFixed(4)})` : ''}
+                    الموقع يُحدّث كل 10 ثوانٍ من آخر نقطة معروفة {(() => {
+                      const lat = Number(lastKnownDriverLocation?.lat);
+                      const lng = Number(lastKnownDriverLocation?.lng ?? (lastKnownDriverLocation as any)?.lon);
+                      return (!isNaN(lat) && !isNaN(lng)) ? `(${lat.toFixed(4)}, ${lng.toFixed(4)})` : '';
+                    })()}
                   </span>
                 </div>
               </div>
@@ -3945,41 +3954,21 @@ export default function CustomerHomePage() {
                 </div>
               </div>
 
-              {/* زر تأكيد استلام ودفع الكروة نقداً (56px) أو الاعتراض */}
-              <div className="mt-3.5 pt-3 border-t border-slate-800/80">
+              {/* خيار الاعتراض على الأجرة إن وُجد */}
+              <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex flex-col items-center gap-1.5">
                 {!isFareConfirmedByCustomer ? (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      disabled={isSubmittingConfirmFare}
-                      onClick={() => handleCustomerConfirmFare(true)}
-                      className="w-full min-h-[56px] rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 hover:brightness-110 active:scale-[0.98] text-white font-black text-[15px] shadow-[0_4px_16px_rgba(16,185,129,0.3)] transition cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      {isSubmittingConfirmFare ? (
-                        <span>جاري التأكيد...</span>
-                      ) : (
-                        <>
-                          <span className="text-lg">💵</span>
-                          <span>تأكيد دفع الكروة نقداً للكابتن</span>
-                        </>
-                      )}
-                    </button>
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        disabled={isSubmittingConfirmFare}
-                        onClick={() => handleCustomerConfirmFare(false)}
-                        className="text-xs text-amber-400/90 hover:text-amber-300 underline cursor-pointer py-1"
-                      >
-                        لدي اعتراض على المبلغ المطلوب ⚠️
-                      </button>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={isSubmittingConfirmFare}
+                    onClick={() => handleCustomerConfirmFare(false)}
+                    className="text-xs text-amber-400/90 hover:text-amber-300 underline cursor-pointer py-1 transition"
+                  >
+                    لدي اعتراض على المبلغ المطلوب ⚠️
+                  </button>
                 ) : (
-                  <div className="text-center py-1 text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
-                    <span>✅</span>
-                    <span>تم تأكيد دفع الكروة نقداً للكابتن بنجاح</span>
-                  </div>
+                  <span className="text-[11.5px] font-semibold text-amber-300/80">
+                    تم تسجيل ملاحظتك وجاري مراجعتها من فريق المتابعة 🛡️
+                  </span>
                 )}
               </div>
             </div>
