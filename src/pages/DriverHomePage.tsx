@@ -1141,7 +1141,7 @@ export default function DriverHomePage() {
       });
       if (data?.success) {
         show(data.message || 'تم إلغاء اشتراك الراكب بنجاح وتحرير مقعده ✅', 'success');
-        setSubscribers((prev) => prev.filter((s) => s.id !== sub.id));
+        setSubscribers((prev) => prev.filter((s) => s.id !== sub.id && (!sub.customerId || s.customerId !== sub.customerId)));
         void fetchSubscribers();
       } else {
         show(data?.message || 'تعذر إلغاء الاشتراك', 'error');
