@@ -123,10 +123,10 @@ body {
   color: var(--text-app);
 }
 
-/* منع ابتلاع كانفاس خريطة Mapbox للسكرول على الهواتف */
+/* كانفاس خريطة Mapbox: تحريك الخريطة بحرية كاملة بإصبع واحد (360 درجة) */
 .mapboxgl-canvas-container,
 .mapboxgl-canvas {
-  touch-action: pan-y !important;
+  touch-action: none !important;
 }
 
 /* Dynamic Theme Variable Mapping for Tailwind Arbitrary Hex Classes */

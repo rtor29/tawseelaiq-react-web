@@ -1986,7 +1986,8 @@ export default function CustomerHomePage() {
 
       {/* 3. الخريطة الرئيسية Mapbox */}
       <div
-        className="relative flex-1 min-h-0 w-full h-full overflow-hidden"
+        className="relative flex-1 min-h-0 w-full h-full overflow-hidden touch-none"
+        style={{ touchAction: 'none' }}
         onClick={() => {
           if (stage === 'driver_arriving' && rideSheetState === 'expanded') {
             setRideSheetState('middle');
@@ -2085,6 +2086,8 @@ export default function CustomerHomePage() {
             latitude: DEFAULT_PICKUP.lat,
             zoom: 15.2,
           }}
+          dragPan={true}
+          cooperativeGestures={false}
           style={{ width: '100%', height: '100%' }}
           onMoveEnd={handleMapMoveEnd}
           onClick={handleMapClick}

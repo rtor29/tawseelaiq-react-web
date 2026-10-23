@@ -19,6 +19,7 @@ const ChatModal = lazy(() => import('../components/ChatModal'));
 
 interface Subscriber {
   id: string;
+  customerId?: string;
   name: string;
   from: string;
   to: string;
@@ -434,6 +435,7 @@ export default function DriverHomePage() {
 
         const mapped: Subscriber[] = rawSubs.map((s: any) => ({
           id: s.id || s.bookingId || s._id,
+          customerId: s.customerId || s.customer_id || (s.id && String(s.id).startsWith('bk-assign-') ? String(s.id).replace('bk-assign-', '') : undefined),
           name: s.customerName || s.fullName || 'راكب خط',
           from: s.pickupLocation || s.pickupName || 'النجف',
           to: s.dropoffLocation || s.dropoffName || 'الجامعة',
@@ -1125,24 +1127,31 @@ export default function DriverHomePage() {
   }
 
   // إلغاء اشتراك راكب من طرف الكابتن (force cancel)
-  async function handleDriverCancelSubscriber(bookingId: string, subName: string) {
-    if (!bookingId) return;
-    if (!window.confirm(`هل أنت متأكد من إلغاء اشتراك ${subName}؟ سيتم تحرير مقعده فوراً.`)) return;
+  async function handleDriverCancelSubscriber(sub: Subscriber) {
+    if (!sub || !sub.id) return;
+    if (!window.confirm(`هل أنت متأكد من إلغاء اشتراك ${sub.name}؟ سيتم تحرير مقعده فوراً.`)) return;
+    setIsSubmittingCancellation(true);
     try {
       const { data } = await http.post<{ success: boolean; message?: string }>('/driver/cancel-subscriber', {
-        bookingId,
+        bookingId: sub.id,
+        customerId: sub.customerId,
+        customerPhone: sub.phone,
         driverId: driverId || rawPhone,
         reason: 'إلغاء من الكابتن',
       });
       if (data?.success) {
         show(data.message || 'تم إلغاء اشتراك الراكب بنجاح وتحرير مقعده ✅', 'success');
-        setSubscribers((prev) => prev.filter((s) => s.id !== bookingId));
+        setSubscribers((prev) => prev.filter((s) => s.id !== sub.id));
         void fetchSubscribers();
       } else {
-        show('تعذر إلغاء الاشتراك', 'error');
+        show(data?.message || 'تعذر إلغاء الاشتراك', 'error');
+        void fetchSubscribers();
       }
     } catch (err: any) {
       show(err?.response?.data?.error || 'حدث خطأ أثناء إلغاء الاشتراك', 'error');
+      void fetchSubscribers();
+    } finally {
+      setIsSubmittingCancellation(false);
     }
   }
 
@@ -1659,17 +1668,18 @@ export default function DriverHomePage() {
       className={`relative w-full h-[100dvh] overflow-hidden font-cairo select-none ${
         isDark ? 'bg-[#080E1A] text-[#DDE2F4]' : 'bg-[#F8FAFC] text-[#0F172A]'
       }`} 
-      style={{ minHeight: '100dvh', touchAction: 'pan-y' }}
+      style={{ minHeight: '100dvh' }}
       dir="rtl"
     >
       {/* 1. خريطة تفاعلية تغطي كامل الشاشة (Midnight Executive Mapbox Canvas) */}
-      <div className="absolute inset-0 w-full h-full z-0">
+      <div className="absolute inset-0 w-full h-full z-0 touch-none" style={{ touchAction: 'none' }}>
         <MapGL
           ref={mapRef}
           mapboxAccessToken={config.mapboxToken}
           mapStyle={selectedMapStyle || mapStyle || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'}
           initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
-          cooperativeGestures={true}
+          dragPan={true}
+          cooperativeGestures={false}
           onLoad={(e) => {
             applyMapEnhancements(e.target, isDark);
           }}
@@ -2305,7 +2315,7 @@ export default function DriverHomePage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDriverCancelSubscriber(sub.id, sub.name)}
+                              onClick={() => handleDriverCancelSubscriber(sub)}
                               className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-500/30 text-xs font-bold cursor-pointer hover:bg-red-600/40"
                               title="إلغاء الاشتراك"
                             >

@@ -89,12 +89,14 @@ export default function LiveTrackingPage() {
         <span className="w-10" />
       </header>
 
-      <div className="relative flex-1">
+      <div className="relative flex-1 touch-none" style={{ touchAction: 'none' }}>
         <Map
           ref={mapRef}
           mapboxAccessToken={config.mapboxToken}
           mapStyle={config.navigationStyle}
           initialViewState={{ longitude: driverPos.lng, latitude: driverPos.lat, zoom: 15.5 }}
+          dragPan={true}
+          cooperativeGestures={false}
           style={{ width: '100%', height: '100%' }}
           onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
         >

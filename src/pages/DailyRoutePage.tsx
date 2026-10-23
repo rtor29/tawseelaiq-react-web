@@ -701,6 +701,8 @@ export default function DailyRoutePage() {
         mapboxAccessToken={config.mapboxToken}
         mapStyle={mapStyle}
         initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
+        dragPan={true}
+        cooperativeGestures={false}
         onClick={handleMapClick}
         onLoad={(e) => {
           applyMapEnhancements(e.target, isDark);
