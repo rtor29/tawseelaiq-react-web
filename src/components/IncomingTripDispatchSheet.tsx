@@ -25,6 +25,7 @@ export interface IncomingRideRequest {
   waitDuration?: number;
   stepTimeoutAt?: number;
   serverTimestamp?: number;
+  remainingSeconds?: number;
   tier?: string;
   tierBadge?: string;
   price?: number;
@@ -51,8 +52,11 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
       onAcceptRef.current = onAccept;
     }, [onReject, onAccept]);
 
-    // احتساب الثواني المتبقية استناداً إلى stepTimeoutAt من الخادم وفرق الساعة
+    // احتساب الثواني المتبقية استناداً إلى remainingSeconds النسبي من الخادم
     const computeInitialRemaining = () => {
+      if (typeof incomingRequest?.remainingSeconds === 'number') {
+        return Math.min(30, Math.max(0, incomingRequest.remainingSeconds));
+      }
       if (incomingRequest?.stepTimeoutAt) {
         const skew = incomingRequest.serverTimestamp ? (Date.now() - incomingRequest.serverTimestamp) : 0;
         const remaining = Math.max(0, Math.round((incomingRequest.stepTimeoutAt - (Date.now() - skew)) / 1000));
@@ -96,33 +100,19 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
       }
 
       const timer = setInterval(() => {
-        let remaining = 0;
-        if (incomingRequest?.stepTimeoutAt) {
-          const skew = incomingRequest.serverTimestamp ? (Date.now() - incomingRequest.serverTimestamp) : 0;
-          remaining = Math.round((incomingRequest.stepTimeoutAt - (Date.now() - skew)) / 1000);
-        } else {
-          setCountdown((prev) => {
-            remaining = prev - 1;
-            return Math.max(0, remaining);
-          });
-          if (remaining <= 0) {
+        setCountdown((prev) => {
+          const next = prev - 1;
+          if (next <= 0) {
             clearInterval(timer);
             onRejectRef.current();
+            return 0;
           }
-          return;
-        }
-
-        if (remaining <= 0) {
-          setCountdown(0);
-          clearInterval(timer);
-          onRejectRef.current();
-        } else {
-          setCountdown(Math.min(20, remaining));
-        }
+          return next;
+        });
       }, 1000);
 
       return () => clearInterval(timer);
-    }, [currentRideId, incomingRequest?.stepTimeoutAt]);
+    }, [currentRideId, incomingRequest?.stepTimeoutAt, incomingRequest?.remainingSeconds]);
 
     if (!incomingRequest || !currentRideId) {
       return null;

@@ -594,11 +594,19 @@ export default function DriverHomePage() {
 
   // 2. منع تحديث الـ State إذا كانت البيانات مطابقة (Deep ID Reconciliation)
   const updatePendingRequestsSafely = useCallback((incomingRides: IncomingRideRequest[]) => {
+    // تصفية أي طلب قديم انتهت مهلته فعلياً (remainingSeconds <= 0) بهدوء
+    const validRides = (incomingRides || []).filter((r) => {
+      if (typeof r.remainingSeconds === 'number' && r.remainingSeconds <= 0) {
+        return false;
+      }
+      return true;
+    });
+
     setPendingRequests((prev) => {
       // إذا كان عدد الرحلات متطابقاً والمعرفات والحالات متطابقة، لا نحدث المرجع
-      if (prev.length === incomingRides.length) {
+      if (prev.length === validRides.length) {
         const isSame = prev.every((p, idx) => {
-          const inc = incomingRides[idx];
+          const inc = validRides[idx];
           return (
             inc &&
             String(p.id || (p as any).rideId) === String(inc.id || (inc as any).rideId) &&
@@ -607,7 +615,7 @@ export default function DriverHomePage() {
         });
         if (isSame) return prev; // إرجاع نفس المرجع القديم لمنع Re-render
       }
-      return incomingRides;
+      return validRides;
     });
   }, []);
 
