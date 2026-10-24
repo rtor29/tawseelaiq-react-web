@@ -1,12 +1,13 @@
 // تخطيط وإنشاء خط السير — بديل create_route_screen.dart
 // خريطة Mapbox بثلاثة أنماط (انطلاق/وصول/نقاط وسيطة)، مسار تلقائي على الشوارع،
-// بحث جغرافي، وGPS مع عكس العنوان العربي
+// بحث جغرافي، وGPS مع عكس العنوان العربي، دعم الثيم (isDark) وقفل المسار
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Map, { NavigationControl, Marker, type MapMouseEvent, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { endpoints, http } from '../lib/api';
 import { authStore } from '../lib/auth';
+import { storage } from '../lib/storage';
 import { config, IRAQ_DEFAULT_CENTER } from '../lib/config';
 import { getDirections, reverseGeocode, searchPlaces, applyArabicAndEnhancedLabels, type PlaceResult, type RouteResult } from '../lib/mapbox';
 import { RouteLines } from '../components/map/MapPins';
@@ -15,6 +16,8 @@ import type { LngLat } from '../types';
 import { TopBar } from '../components/TopBar';
 import { Button, Field, SelectField, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import { getCurrentPositionWithFallback, isIosDevice, isStandalonePwa } from '../lib/geo';
 
 type MapMode = 'start' | 'end' | 'waypoint';
@@ -24,7 +27,8 @@ const DEFAULT_END_POINT: LngLat = { lat: 33.3250, lng: 44.3750 };
 export default function CreateRoutePage() {
   const mapRef = useRef<MapRef>(null);
   const { show } = useToast();
-  const driverId = authStore.getSession()?.userId ?? '';
+  const { isDark } = useTheme();
+  const driverId = authStore.getSession()?.userId || storage.getUserId() || '';
 
   const [routeName, setRouteName] = useState('خط يومي منتظم');
   const [startName, setStartName] = useState('نقطة الانطلاق');
@@ -42,6 +46,7 @@ export default function CreateRoutePage() {
   const [isFetchingRoute, setIsFetchingRoute] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isRouteLocked, setIsRouteLocked] = useState(false);
 
   // بحث الأماكن داخل نافذة مشتركة
   const [searchOpenFor, setSearchOpenFor] = useState<'start' | 'end' | null>(null);
@@ -69,12 +74,50 @@ export default function CreateRoutePage() {
     }
   }, []);
 
+  // جلب مسار الكابتن الحالي وحالة القفل من الخادم
   useEffect(() => {
-    void traceRoute(startPoint, endPoint, waypoints);
+    let isMounted = true;
+    async function loadDriverRoute() {
+      try {
+        const { data } = await http.get<any>('/driver/fixed-location');
+        if (isMounted && data?.success) {
+          setIsRouteLocked(Boolean(data.route_locked));
+          if (data.fixed_lat && data.fixed_lng) {
+            const sp: LngLat = { lat: Number(data.fixed_lat), lng: Number(data.fixed_lng) };
+            setStartPoint(sp);
+            if (data.fixed_label) setStartName(data.fixed_label);
+
+            let ep: LngLat = DEFAULT_END_POINT;
+            if (data.fixed_dest_lat && data.fixed_dest_lng) {
+              ep = { lat: Number(data.fixed_dest_lat), lng: Number(data.fixed_dest_lng) };
+              setEndPoint(ep);
+              if (data.fixed_dest_label) setEndName(data.fixed_dest_label);
+            }
+            if (data.route_name) setRouteName(data.route_name);
+            void traceRoute(sp, ep, []);
+          } else {
+            void traceRoute(startPoint, endPoint, waypoints);
+          }
+        } else if (isMounted) {
+          void traceRoute(startPoint, endPoint, waypoints);
+        }
+      } catch (_) {
+        if (isMounted) void traceRoute(startPoint, endPoint, waypoints);
+      }
+    }
+    void loadDriverRoute();
+    return () => {
+      isMounted = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleMapClick(e: MapMouseEvent) {
+    if (isRouteLocked) {
+      show('مسارك مثبّت ومقفل، للتعديل راجع الإدارة', 'warning');
+      return;
+    }
+
     const point: LngLat = { lat: e.lngLat.lat, lng: e.lngLat.lng };
     if (mode === 'waypoint') {
       const next = [...waypoints, point];
@@ -94,6 +137,7 @@ export default function CreateRoutePage() {
   }
 
   function useGpsAsStart() {
+    if (isRouteLocked) return;
     setIsLocating(true);
     getCurrentPositionWithFallback(
       async (pos) => {
@@ -129,6 +173,7 @@ export default function CreateRoutePage() {
   }
 
   function onSearchChange(q: string) {
+    if (isRouteLocked) return;
     const cleaned = sanitizeSearchQuery(q);
     setSearchQuery(q);
     if (searchTimer.current) window.clearTimeout(searchTimer.current);
@@ -143,6 +188,7 @@ export default function CreateRoutePage() {
   }
 
   function selectPlace(place: PlaceResult) {
+    if (isRouteLocked) return;
     if (searchOpenFor === 'start') {
       setStartPoint({ lat: place.lat, lng: place.lon });
       setStartName(place.name);
@@ -162,6 +208,11 @@ export default function CreateRoutePage() {
   }
 
   async function handleSaveRoute() {
+    if (isRouteLocked) {
+      show('مسارك مثبّت ومقفل. للتعديل راجع الإدارة.', 'error');
+      return;
+    }
+
     if (!routeName.trim() || !startName.trim() || !endName.trim()) {
       show('يرجى إدخال اسم الخط ونقاط الانطلاق والوصول', 'warning');
       return;
@@ -170,17 +221,24 @@ export default function CreateRoutePage() {
     setIsSaving(true);
     try {
       const [hh, mm] = departureTime.split(':');
-      const formattedTime = `${hh}:${mm}:00`;
+      const formattedTime = `${hh || '07'}:${mm || '30'}:00`;
 
       const coordinates = (route?.coordinates.length ? route.coordinates : [startPoint, ...waypoints, endPoint]).map((p) => ({
         latitude: p.lat,
         longitude: p.lng,
       }));
 
-      await http.post(endpoints.createRoute(driverId), {
+      const activeTargetId = driverId || authStore.getSession()?.userId || storage.getUserId() || '';
+
+      const { data } = await http.post<any>(endpoints.createRoute(activeTargetId), {
+        driverId: activeTargetId,
         routeName: routeName.trim(),
         startName: startName.trim(),
         endName: endName.trim(),
+        lat: startPoint.lat,
+        lng: startPoint.lng,
+        destLat: endPoint.lat,
+        destLng: endPoint.lng,
         coordinates,
         waypoints: waypoints.map((w) => ({ latitude: w.lat, longitude: w.lng })),
         geoJsonPolyline: route?.rawGeoJson ?? null,
@@ -194,10 +252,18 @@ export default function CreateRoutePage() {
         recurringDays: '1,2,3,4,5',
       });
 
-      show('تم إنشاء وتثبيت خط النقل بنجاح مع مسار Mapbox! 🛣️', 'success');
-      navigateBack();
-    } catch {
-      show('فشل حفظ المسار', 'error');
+      if (data?.success) {
+        show('تم إنشاء وتثبيت خط النقل بنجاح مع مسار Mapbox! 🛣️', 'success');
+        setIsRouteLocked(true);
+        setTimeout(() => {
+          navigateBack();
+        }, 1200);
+      } else {
+        show(data?.error || 'فشل حفظ المسار', 'error');
+      }
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error || 'فشل حفظ المسار';
+      show(errMsg, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -206,42 +272,100 @@ export default function CreateRoutePage() {
   const navigateBack = () => window.history.back();
 
   return (
-    <div className="flex h-dvh flex-col bg-white text-right font-cairo" dir="rtl">
+    <div className={`flex h-dvh flex-col text-right font-cairo transition-colors ${
+      isDark ? 'bg-[#080E1A] text-[#DDE2F4]' : 'bg-[#F8FAFC] text-[#0F172A]'
+    }`} dir="rtl">
       <TopBar
         title="تخطيط وإنشاء خط السير (Mapbox)"
         actions={
-          <button
-            type="button"
-            onClick={() => void traceRoute(startPoint, endPoint, waypoints)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10"
-            aria-label="تحديث المسار"
-          >
-            {isFetchingRoute ? <Spinner light className="h-4 w-4" /> : '🔄'}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <ThemeToggleButton />
+            <button
+              type="button"
+              onClick={() => void traceRoute(startPoint, endPoint, waypoints)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10"
+              aria-label="تحديث المسار"
+              title="تحديث المسار"
+            >
+              {isFetchingRoute ? <Spinner light className="h-4 w-4" /> : '🔄'}
+            </button>
+          </div>
         }
       />
 
       <div className="flex flex-1 flex-col-reverse overflow-hidden lg:flex-row">
-        {/* نموذج الإدخال */}
-        <aside className="w-full space-y-3.5 overflow-y-auto border-slate-200 p-5 lg:w-[420px] lg:border-s">
-          <Field label="اسم الخط *" value={routeName} onChange={(e) => setRouteName(e.target.value)} />
-          <Field label="نقطة الانطلاق *" value={startName} onChange={(e) => setStartName(e.target.value)} />
-          <Field label="نقطة الوصول *" value={endName} onChange={(e) => setEndName(e.target.value)} />
+        {/* نموذج الإدخال الجانبي المستجيب للثيم */}
+        <aside className={`w-full space-y-3.5 overflow-y-auto p-5 lg:w-[420px] transition-colors border-t lg:border-t-0 lg:border-s ${
+          isDark ? 'bg-[#161C28] border-slate-700/50 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+        }`}>
+          {/* إشعار القفل عند تثبيت المسار */}
+          {isRouteLocked && (
+            <div className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 ${
+              isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-900'
+            }`}>
+              <span className="text-base">🔒</span>
+              <span>مسارك مثبّت. للتعديل راجع الإدارة.</span>
+            </div>
+          )}
+
+          <Field
+            label="اسم الخط *"
+            value={routeName}
+            disabled={isRouteLocked}
+            onChange={(e) => setRouteName(e.target.value)}
+            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+          />
+          <Field
+            label="نقطة الانطلاق *"
+            value={startName}
+            disabled={isRouteLocked}
+            onChange={(e) => setStartName(e.target.value)}
+            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+          />
+          <Field
+            label="نقطة الوصول *"
+            value={endName}
+            disabled={isRouteLocked}
+            onChange={(e) => setEndName(e.target.value)}
+            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+          />
 
           <div className="grid grid-cols-2 gap-3">
-            <SelectField label="عدد المقاعد" value={seats} onChange={(e) => setSeats(e.target.value)}>
+            <SelectField
+              label="عدد المقاعد"
+              value={seats}
+              disabled={isRouteLocked}
+              onChange={(e) => setSeats(e.target.value)}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+            >
               {['1', '2', '3', '4', '5', '6'].map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </SelectField>
-            <Field label="الأجرة للمقعد (د.ع)" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} />
+            <Field
+              label="الأجرة للمقعد (د.ع)"
+              inputMode="numeric"
+              value={price}
+              disabled={isRouteLocked}
+              onChange={(e) => setPrice(e.target.value)}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+            />
           </div>
 
-          <Field label="وقت الانطلاق" type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} />
+          <Field
+            label="وقت الانطلاق"
+            type="time"
+            value={departureTime}
+            disabled={isRouteLocked}
+            onChange={(e) => setDepartureTime(e.target.value)}
+            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+          />
 
           {/* مبدّل نمط النقر */}
           <div>
-            <p className="mb-1.5 text-sm font-bold text-brand-slate">نمط النقر على الخريطة:</p>
+            <p className={`mb-1.5 text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+              نمط النقر على الخريطة:
+            </p>
             <div className="flex gap-2" dir="rtl">
               {(
                 [
@@ -253,9 +377,16 @@ export default function CreateRoutePage() {
                 <button
                   key={m}
                   type="button"
+                  disabled={isRouteLocked}
                   onClick={() => setMode(m)}
-                  className={`flex-1 rounded-xl border py-2 text-xs font-bold transition ${
-                    mode === m ? 'border-brand-amber bg-amber-50 text-amber-800' : 'border-slate-200 text-slate-500'
+                  className={`flex-1 rounded-xl border py-2 text-xs font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                    mode === m
+                      ? isDark
+                        ? 'border-amber-500 bg-amber-500/20 text-amber-300'
+                        : 'border-amber-500 bg-amber-50 text-amber-900'
+                      : isDark
+                        ? 'border-slate-700 text-slate-400 hover:text-white'
+                        : 'border-slate-200 text-slate-500 hover:text-slate-900'
                   }`}
                 >
                   {label}
@@ -265,25 +396,49 @@ export default function CreateRoutePage() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1 text-sm" onClick={useGpsAsStart} disabled={isLocating}>
+            <Button
+              variant="outline"
+              className={`flex-1 text-sm ${isDark ? 'border-slate-700 text-slate-200 hover:bg-white/5' : ''}`}
+              onClick={useGpsAsStart}
+              disabled={isLocating || isRouteLocked}
+            >
               {isLocating ? <Spinner className="h-4 w-4" /> : '📍'} موقعي كانطلاق
             </Button>
-            <Button variant="outline" className="flex-1 text-sm" onClick={() => setSearchOpenFor(mode === 'end' ? 'end' : 'start')}>
+            <Button
+              variant="outline"
+              className={`flex-1 text-sm ${isDark ? 'border-slate-700 text-slate-200 hover:bg-white/5' : ''}`}
+              onClick={() => setSearchOpenFor(mode === 'end' ? 'end' : 'start')}
+              disabled={isRouteLocked}
+            >
               🔍 بحث أماكن
             </Button>
           </div>
 
           {route && (
-            <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-              <p className="font-bold text-brand-slate">ملخص المسار المرسوم:</p>
+            <div className={`rounded-xl p-3 text-xs border ${
+              isDark ? 'bg-[#242A37]/80 border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              <p className={`font-bold ${isDark ? 'text-amber-400' : 'text-slate-900'}`}>ملخص المسار المرسوم:</p>
               <p className="mt-1">المسافة: {route.distanceKm.toFixed(1)} كم • المدة: ≈ {Math.round(route.durationMinutes)} دقيقة</p>
-              <p className="truncate">{route.summary}</p>
+              <p className="truncate mt-0.5">{route.summary}</p>
             </div>
           )}
 
-          <Button variant="primary" className="w-full" onClick={() => void handleSaveRoute()} disabled={isSaving}>
-            {isSaving ? <Spinner /> : '🛣️ حفظ ونشر الخط'}
-          </Button>
+          {isRouteLocked ? (
+            <div className="w-full py-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-bold text-center text-xs flex items-center justify-center gap-2 shadow-sm">
+              <span>🔒</span>
+              <span>مسارك مثبّت (للتعديل راجع الإدارة)</span>
+            </div>
+          ) : (
+            <Button
+              variant="primary"
+              className="w-full py-3.5 font-black text-sm shadow-md"
+              onClick={() => void handleSaveRoute()}
+              disabled={isSaving}
+            >
+              {isSaving ? <Spinner /> : '🛣️ حفظ ونشر الخط'}
+            </Button>
+          )}
         </aside>
 
         {/* الخريطة */}
@@ -291,7 +446,7 @@ export default function CreateRoutePage() {
           <Map
             ref={mapRef}
             mapboxAccessToken={config.mapboxToken}
-            mapStyle={config.navigationStyle}
+            mapStyle={isDark ? 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om' : config.navigationStyle}
             initialViewState={{ longitude: startPoint.lng, latitude: startPoint.lat, zoom: 13 }}
             style={{ width: '100%', height: '100%' }}
             onClick={handleMapClick}
@@ -313,26 +468,28 @@ export default function CreateRoutePage() {
             )}
 
             <Marker longitude={startPoint.lng} latitude={startPoint.lat} anchor="center">
-              <span className="text-3xl drop-shadow" title={`الانطلاق: ${startName}`}>🟢</span>
+              <span className="text-3xl drop-shadow select-none cursor-pointer" title={`الانطلاق: ${startName}`}>🟢</span>
             </Marker>
             {waypoints.map((w, i) => (
               <Marker key={i} longitude={w.lng} latitude={w.lat} anchor="center">
-                <span className="text-2xl">{`📍${i + 1}`}</span>
+                <span className="text-2xl select-none cursor-pointer">{`📍${i + 1}`}</span>
               </Marker>
             ))}
             <Marker longitude={endPoint.lng} latitude={endPoint.lat} anchor="center">
-              <span className="text-3xl drop-shadow" title={`الوصول: ${endName}`}>🔴</span>
+              <span className="text-3xl drop-shadow select-none cursor-pointer" title={`الوصول: ${endName}`}>🔴</span>
             </Marker>
           </Map>
 
-          {/* نافذة البحث */}
+          {/* نافذة البحث الموحدة المستجيبة للثيم */}
           {searchOpenFor && (
-            <div className="absolute inset-x-4 top-4 z-20 rounded-2xl bg-white p-4 shadow-float font-map-search">
+            <div className={`absolute inset-x-4 top-4 z-20 rounded-2xl p-4 border shadow-2xl font-map-search ${
+              isDark ? 'bg-[#161C28] text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'
+            }`}>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-extrabold text-brand-slate font-map-search">
+                <p className={`text-sm font-extrabold font-map-search ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   بحث عن {searchOpenFor === 'start' ? 'نقطة الانطلاق' : 'نقطة الوصول'}
                 </p>
-                <button type="button" onClick={() => setSearchOpenFor(null)} className="text-slate-400" aria-label="إغلاق">
+                <button type="button" onClick={() => setSearchOpenFor(null)} className="text-slate-400 hover:text-white" aria-label="إغلاق">
                   ✕
                 </button>
               </div>
@@ -340,13 +497,17 @@ export default function CreateRoutePage() {
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="ابحث عن منطقة أو حي أو شارع..."
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-brand-amber font-map-search"
+                placeholder="ابحث عن منطقة أو حي أو شارع في أي محافظة..."
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none font-map-search ${
+                  isDark ? 'bg-[#242A37] border-slate-700 text-white focus:border-amber-500' : 'bg-white border-slate-200 text-slate-900 focus:border-amber-500'
+                }`}
               />
               {searchResults.length > 0 && (
                 <div
                   onMouseDown={(e) => e.preventDefault()}
-                  className="mt-2 max-h-52 overflow-y-auto rounded-xl border border-slate-100 font-map-search"
+                  className={`mt-2 max-h-52 overflow-y-auto rounded-xl border font-map-search divide-y ${
+                    isDark ? 'bg-[#161C28] border-slate-700 divide-slate-700/50' : 'bg-white border-slate-100 divide-slate-100'
+                  }`}
                 >
                   {searchResults.map((p, i) => (
                     <button
@@ -357,12 +518,14 @@ export default function CreateRoutePage() {
                         e.stopPropagation();
                         selectPlace(p);
                       }}
-                      className="flex w-full items-center gap-2.5 border-b border-slate-50 px-3 py-2.5 text-right text-sm hover:bg-amber-50 cursor-pointer font-map-search"
+                      className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-right text-sm cursor-pointer font-map-search transition ${
+                        isDark ? 'hover:bg-amber-500/20 text-white' : 'hover:bg-amber-50 text-slate-800'
+                      }`}
                     >
-                      <span className="text-brand-amber shrink-0">📍</span>
+                      <span className="text-amber-500 shrink-0">📍</span>
                       <div className="flex flex-col text-right truncate font-map-search">
-                        <span className="truncate font-bold text-slate-800">{p.name}</span>
-                        <span className="truncate text-[11px] text-slate-500">{p.subName || 'النجف الأشرف'}</span>
+                        <span className="truncate font-bold">{p.name}</span>
+                        <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{p.subName || p.fullName || ''}</span>
                       </div>
                     </button>
                   ))}
@@ -375,5 +538,3 @@ export default function CreateRoutePage() {
     </div>
   );
 }
-
-

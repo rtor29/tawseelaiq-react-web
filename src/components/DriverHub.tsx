@@ -239,7 +239,7 @@ export const DriverHub: React.FC<DriverHubProps> = ({ onBackToMap }) => {
                   }`}
                 >
                   <span className="text-2xl">🎧</span>
-                  <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>غرفة عمليات النجف</span>
+                  <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>غرفة عمليات</span>
                   <span className={`text-[10.5px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>دعم الكباتن الميداني 24/7</span>
                 </a>
               </div>
