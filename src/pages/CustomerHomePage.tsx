@@ -2327,12 +2327,12 @@ export default function CustomerHomePage() {
                     <span className="text-[10px] opacity-90">({drv.distanceM != null ? (drv.distanceM < 1000 ? `${drv.distanceM}م` : `${(drv.distanceM / 1000).toFixed(1)}كم`) : 'خط'})</span>
                   </div>
 
-                  {/* أيقونة الباص المخصصة للخط الدائم */}
+                  {/* أيقونة الكابتن الموحدة = شعار توصيلة */}
                   <div
-                    className="relative flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-xl border-2 border-white"
+                    className="relative flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-xl border-2 border-white p-1"
                     style={{ backgroundColor: bandColor }}
                   >
-                    <span className="text-lg">🚌</span>
+                    <img src="/logo.png" alt="توصيلة" className="w-6 h-6 object-contain drop-shadow" />
                     {isFull && (
                       <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-700 border border-white text-[8px] font-bold">
                         ✕

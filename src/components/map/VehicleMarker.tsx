@@ -124,8 +124,9 @@ export function VehicleMarker({
             <path d="M 14.2 19 L 15.5 19 L 15.5 30 L 14.2 29.5 Z" fill="#BAE6FD" />
             <path d="M 32.5 19 L 33.8 19 L 33.8 29.5 L 32.5 30 Z" fill="#BAE6FD" />
 
-            {/* سقف السيارة الداخلي */}
+            {/* سقف السيارة الداخلي مع شعار توصيلة */}
             <rect x="16.5" y="18.5" width="15" height="12" rx="2.5" fill="#163A50" />
+            <image href="/logo.png" x="18" y="19" width="12" height="11" preserveAspectRatio="xMidYMid meet" />
 
             {/* لافتة تاكسي على السقف / شارة كهرمانية أنيقة #D97706 */}
             <rect x="20" y="23" width="8" height="3.2" rx="1.6" fill={isAvailable ? '#F59E0B' : '#D97706'} />

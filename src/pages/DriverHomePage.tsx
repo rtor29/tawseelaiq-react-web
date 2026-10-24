@@ -3,7 +3,7 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { useToast } from '../components/Toast';
-import { Map as MapGL, type MapRef } from 'react-map-gl';
+import { Map as MapGL, Marker, type MapRef, type MapMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import mapboxgl from 'mapbox-gl';
 import { config } from '../lib/config';
@@ -175,8 +175,17 @@ export default function DriverHomePage() {
   const [fixedDestPoint, setFixedDestPoint] = useState<{ lat: number; lng: number } | null>(null);
   const [fixedRouteName, setFixedRouteName] = useState<string>('');
   const [isFixedRouteActive, setIsFixedRouteActive] = useState<boolean>(false);
+  const [isRouteLocked, setIsRouteLocked] = useState<boolean>(false);
+  const [showLockConfirmModal, setShowLockConfirmModal] = useState<boolean>(false);
+  const [mapPickMode, setMapPickMode] = useState<'none' | 'start' | 'dest'>('none');
   const [isEditingRoute, setIsEditingRoute] = useState<boolean>(false);
   const [isSavingRoute, setIsSavingRoute] = useState<boolean>(false);
+
+  // البحث عن نقطة الانطلاق (من) لكل العراق
+  const [startSearchQuery, setStartSearchQuery] = useState<string>('');
+  const [startSearchResults, setStartSearchResults] = useState<any[]>([]);
+  const [isSearchingStart, setIsSearchingStart] = useState<boolean>(false);
+  const startSearchTimerRef = useRef<any>(null);
 
   // البحث عن الوجهة (إلى) لكل العراق
   const [destSearchQuery, setDestSearchQuery] = useState<string>('');
@@ -527,14 +536,18 @@ export default function DriverHomePage() {
       if (data?.success && data?.fixed_lat && data?.fixed_lng) {
         setFixedStartPoint({ lat: data.fixed_lat, lng: data.fixed_lng });
         setFixedStartName(data.fixed_label || 'نقطة الانطلاق');
+        setStartSearchQuery(data.fixed_label || '');
         if (data.fixed_dest_lat && data.fixed_dest_lng) {
           setFixedDestPoint({ lat: data.fixed_dest_lat, lng: data.fixed_dest_lng });
           setFixedDestName(data.fixed_dest_label || 'الوجهة');
+          setDestSearchQuery(data.fixed_dest_label || '');
         }
         setFixedRouteName(data.route_name || '');
         setIsFixedRouteActive(true);
+        setIsRouteLocked(Boolean(data.route_locked || (data.fixed_lat && data.fixed_dest_lat)));
       } else {
         setIsFixedRouteActive(false);
+        setIsRouteLocked(false);
       }
     } catch (_) {}
   }, [currentTargetId]);
@@ -576,6 +589,9 @@ export default function DriverHomePage() {
         show('تم تثبيت مسار خطك الدائم بنجاح! 🚖', 'success');
         setIsFixedRouteActive(true);
         setIsEditingRoute(false);
+        setIsRouteLocked(true);
+        setShowLockConfirmModal(false);
+        setMapPickMode('none');
         setFixedStartPoint({ lat: data.fixed_lat, lng: data.fixed_lng });
         setFixedStartName(data.fixed_label || cleanStartLabel);
         setFixedDestPoint({ lat: data.fixed_dest_lat, lng: data.fixed_dest_lng });
@@ -594,28 +610,28 @@ export default function DriverHomePage() {
     }
   };
 
-  // إيقاف الخط الدائم وإزالة التثبيت
-  const handleStopFixedRoute = async () => {
-    try {
-      const { data } = await http.post<any>('/driver/fixed-location/remove', {
-        driverId: currentTargetId,
-        remove: true
-      });
-      if (data?.success) {
-        show('تم إيقاف الخط وإزالة المسار الدائم من قائمة الركاب بنجاح 🛑', 'info');
-        setIsFixedRouteActive(false);
-        setIsEditingRoute(false);
-        setFixedStartPoint(null);
-        setFixedStartName('');
-        setFixedDestPoint(null);
-        setFixedDestName('');
-        setFixedRouteName('');
-      } else {
-        show(data?.error || 'تعذر إيقاف الخط', 'error');
-      }
-    } catch (err: any) {
-      show(err?.response?.data?.error || 'حدث خطأ أثناء إيقاف الخط', 'error');
+
+  // البحث عن نقطة الانطلاق (من) لكل العراق
+  const handleStartSearchInput = (q: string) => {
+    setStartSearchQuery(q);
+    setFixedStartName(q);
+    if (startSearchTimerRef.current) clearTimeout(startSearchTimerRef.current);
+    if (!q.trim() || q.trim().length < 2) {
+      setStartSearchResults([]);
+      setIsSearchingStart(false);
+      return;
     }
+    setIsSearchingStart(true);
+    startSearchTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await searchPlaces(q, driverLocRef.current ? { lat: driverLocRef.current.lat, lng: driverLocRef.current.lng } : undefined);
+        setStartSearchResults(results || []);
+      } catch (_) {
+        setStartSearchResults([]);
+      } finally {
+        setIsSearchingStart(false);
+      }
+    }, 350);
   };
 
   // البحث عن الوجهة (إلى) لكل العراق
@@ -1862,6 +1878,25 @@ export default function DriverHomePage() {
           initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
           dragPan={true}
           cooperativeGestures={false}
+          onClick={(e: MapMouseEvent) => {
+            if (mapPickMode === 'start') {
+              const lat = e.lngLat.lat;
+              const lng = e.lngLat.lng;
+              setFixedStartPoint({ lat, lng });
+              const label = `نقطة محددة (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+              setFixedStartName(label);
+              setStartSearchQuery(label);
+              show('تم تحديد نقطة الانطلاق على الخريطة 📍', 'info');
+            } else if (mapPickMode === 'dest') {
+              const lat = e.lngLat.lat;
+              const lng = e.lngLat.lng;
+              setFixedDestPoint({ lat, lng });
+              const label = `وجهة محددة (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+              setFixedDestName(label);
+              setDestSearchQuery(label);
+              show('تم تحديد الوجهة على الخريطة 🎯', 'info');
+            }
+          }}
           onLoad={(e) => {
             applyMapEnhancements(e.target, isDark);
           }}
@@ -1916,6 +1951,86 @@ export default function DriverHomePage() {
           {/* خطوط مرشدة منقطة بين الكابتن والركاب المعلقين (Memoized & Diffed) */}
           {pendingGuideLines.length > 0 && (
             <RouteLines lines={pendingGuideLines} />
+          )}
+
+          {/* خط معاينة مسار الكابتن الدائم بين نقطة الانطلاق والوجهة */}
+          {fixedStartPoint && fixedDestPoint && (
+            <RouteLines
+              lines={[
+                {
+                  id: 'driver-fixed-route-preview',
+                  coordinates: [
+                    [fixedStartPoint.lng, fixedStartPoint.lat],
+                    [fixedDestPoint.lng, fixedDestPoint.lat],
+                  ],
+                  color: '#F59E0B',
+                  casingColor: '#F59E0B',
+                  width: 3.0,
+                },
+              ]}
+            />
+          )}
+
+          {/* دبوس نقطة الانطلاق للخط الدائم (أخضر قابل للسحب عند عدم القفل) */}
+          {fixedStartPoint && (
+            <Marker
+              longitude={fixedStartPoint.lng}
+              latitude={fixedStartPoint.lat}
+              anchor="bottom"
+              draggable={!isRouteLocked}
+              onDragEnd={(e) => {
+                const lat = e.lngLat.lat;
+                const lng = e.lngLat.lng;
+                setFixedStartPoint({ lat, lng });
+                const label = `نقطة محددة (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+                setFixedStartName(label);
+                setStartSearchQuery(label);
+              }}
+            >
+              <div className="flex flex-col items-center cursor-grab active:cursor-grabbing select-none">
+                <div className="bg-emerald-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg border border-white/40 mb-1 flex items-center gap-1">
+                  <span>📍</span>
+                  <span className="truncate max-w-[120px]">{fixedStartName || 'الانطلاق'}</span>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 border-2 border-white">
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+                  </svg>
+                </div>
+                <div className="w-3 h-1.5 bg-black/40 rounded-full blur-[1px] mx-auto mt-0.5" />
+              </div>
+            </Marker>
+          )}
+
+          {/* دبوس وجهة الخط الدائم (كهرماني قابل للسحب عند عدم القفل) */}
+          {fixedDestPoint && (
+            <Marker
+              longitude={fixedDestPoint.lng}
+              latitude={fixedDestPoint.lat}
+              anchor="bottom"
+              draggable={!isRouteLocked}
+              onDragEnd={(e) => {
+                const lat = e.lngLat.lat;
+                const lng = e.lngLat.lng;
+                setFixedDestPoint({ lat, lng });
+                const label = `وجهة محددة (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+                setFixedDestName(label);
+                setDestSearchQuery(label);
+              }}
+            >
+              <div className="flex flex-col items-center cursor-grab active:cursor-grabbing select-none">
+                <div className="bg-amber-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg border border-white/40 mb-1 flex items-center gap-1">
+                  <span>🎯</span>
+                  <span className="truncate max-w-[120px]">{fixedDestName || 'الوجهة'}</span>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/40 border-2 border-white">
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+                  </svg>
+                </div>
+                <div className="w-3 h-1.5 bg-black/40 rounded-full blur-[1px] mx-auto mt-0.5" />
+              </div>
+            </Marker>
           )}
         </MapGL>
       </div>
@@ -2442,7 +2557,7 @@ export default function DriverHomePage() {
                 }`} dir="rtl">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      {isFixedRouteActive && !isEditingRoute ? 'مسار مثبت ومفعل 🟢' : 'إعداد المسار 📍'}
+                      {isRouteLocked || (isFixedRouteActive && !isEditingRoute) ? 'مسار مثبت ومقفل 🔒' : 'إعداد المسار 📍'}
                     </span>
                     <h4 className={`text-xs font-black flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       <span>🛣️</span>
@@ -2450,62 +2565,55 @@ export default function DriverHomePage() {
                     </h4>
                   </div>
 
-                  {isFixedRouteActive && !isEditingRoute ? (
-                    <div className={`p-3 rounded-xl border space-y-2 ${
+                  {isRouteLocked || (isFixedRouteActive && !isEditingRoute) ? (
+                    <div className={`p-3.5 rounded-xl border space-y-2.5 ${
                       isDark ? 'bg-[#161c28] border-white/10' : 'bg-white border-slate-200 shadow-sm'
                     }`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-amber-500">
+                        <span className="text-xs font-black text-amber-500">
                           {fixedRouteName || `${fixedStartName} ➔ ${fixedDestName}`}
                         </span>
-                        <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>خط دائمي</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                          <span>🔒</span>
+                          <span>خط دائمي مثبت</span>
+                        </span>
                       </div>
-                      <div className={`text-[11.5px] flex items-center gap-1.5 flex-wrap ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <span className="text-emerald-500 font-bold">من:</span>
-                        <span>{fixedStartName || 'نقطة الانطلاق'}</span>
-                        <span className="text-slate-400">➔</span>
-                        <span className="text-sky-500 font-bold">إلى:</span>
-                        <span>{fixedDestName || 'الوجهة'}</span>
+                      <div className={`text-xs space-y-1.5 p-2.5 rounded-lg border ${
+                        isDark ? 'bg-[#242a37]/60 border-white/5' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-emerald-500 font-bold shrink-0">من:</span>
+                          <span className={`truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{fixedStartName || 'نقطة الانطلاق'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sky-500 font-bold shrink-0">إلى:</span>
+                          <span className={`truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{fixedDestName || 'الوجهة'}</span>
+                        </div>
                       </div>
-                      <div className={`grid grid-cols-2 gap-2 pt-1.5 border-t ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditingRoute(true);
-                            setDestSearchQuery(fixedDestName);
-                          }}
-                          className={`py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
-                            isDark ? 'bg-white/10 text-slate-200 hover:bg-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          <span>تعديل المسار</span>
-                          <span>✏️</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleStopFixedRoute}
-                          className="py-1.5 rounded-lg bg-red-600/20 text-red-400 border border-red-500/30 text-xs font-bold hover:bg-red-600/30 transition cursor-pointer flex items-center justify-center gap-1"
-                        >
-                          <span>إيقاف الخط</span>
-                          <span>🛑</span>
-                        </button>
+
+                      {/* إشعار القفل - للعرض فقط دون أزرار تعديل أو إيقاف */}
+                      <div className={`text-center py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 ${
+                        isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-900'
+                      }`}>
+                        <span>🔒</span>
+                        <span>مسارك مثبّت. للتعديل راجع الإدارة.</span>
                       </div>
                     </div>
                   ) : (
                     <div className={`p-3 rounded-xl border space-y-2.5 ${
                       isDark ? 'bg-[#161c28] border-white/10' : 'bg-white border-slate-200 shadow-sm'
                     }`}>
-                      {/* حقل نقطة الانطلاق */}
-                      <div>
+                      {/* حقل نقطة الانطلاق (من) */}
+                      <div className="relative">
                         <label className={`text-[11px] font-bold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                           نقطة الانطلاق (من) 📍
                         </label>
                         <div className="flex gap-1.5">
                           <input
                             type="text"
-                            value={fixedStartName}
-                            onChange={(e) => setFixedStartName(e.target.value)}
-                            placeholder="حدد موقع انطلاق الخط (مثال: حي الجامعة)..."
+                            value={startSearchQuery || fixedStartName}
+                            onChange={(e) => handleStartSearchInput(e.target.value)}
+                            placeholder="ابحث عن مكان الانطلاق أو حدد من الخريطة..."
                             className={`flex-1 text-xs rounded-xl px-2.5 py-2 border focus:border-emerald-500 outline-none ${
                               isDark ? 'bg-[#242a37] text-white border-white/10' : 'bg-slate-50 text-slate-900 border-slate-300'
                             }`}
@@ -2516,6 +2624,7 @@ export default function DriverHomePage() {
                               if (driverLocRef.current) {
                                 setFixedStartPoint({ lat: driverLocRef.current.lat, lng: driverLocRef.current.lng });
                                 setFixedStartName('موقعي الحالي عبر الـ GPS 📍');
+                                setStartSearchQuery('موقعي الحالي عبر الـ GPS 📍');
                                 show('تم تحديد الانطلاق من موقعك الحالي عبر GPS ✅', 'success');
                               } else {
                                 show('تعذر قراءة GPS حالياً', 'error');
@@ -2526,7 +2635,57 @@ export default function DriverHomePage() {
                           >
                             GPS 🎯
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMapPickMode('start');
+                              setIsBottomDockExpanded(false);
+                            }}
+                            className={`px-2.5 py-2 rounded-xl border text-xs font-bold shrink-0 cursor-pointer transition ${
+                              mapPickMode === 'start'
+                                ? 'bg-amber-500 text-slate-950 border-amber-500'
+                                : isDark
+                                  ? 'bg-white/10 text-slate-300 border-white/10 hover:bg-white/20'
+                                  : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                            }`}
+                            title="تحديد على الخريطة"
+                          >
+                            🗺️ الخريطة
+                          </button>
                         </div>
+                        {isSearchingStart && (
+                          <div className="text-[10px] text-emerald-500 pt-1 animate-pulse">جارٍ البحث في خريطة العراق...</div>
+                        )}
+                        {startSearchResults.length > 0 && (
+                          <div className={`absolute z-50 inset-x-0 top-full mt-1 border border-emerald-500/30 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y ${
+                            isDark ? 'bg-[#1A2232] divide-white/5 text-white' : 'bg-white divide-slate-100 text-slate-900'
+                          }`}>
+                            {startSearchResults.map((p, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  setFixedStartPoint({ lat: p.lat, lng: p.lng });
+                                  setFixedStartName(p.name);
+                                  setStartSearchQuery(p.name);
+                                  setStartSearchResults([]);
+                                  if (mapRef.current) {
+                                    mapRef.current.flyTo({ center: [p.lng, p.lat], zoom: 15, duration: 1000 });
+                                  }
+                                }}
+                                className={`p-2.5 cursor-pointer text-right transition ${isDark ? 'hover:bg-emerald-500/20' : 'hover:bg-emerald-50'}`}
+                              >
+                                <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.name}</div>
+                                {p.address && <div className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{p.address}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {fixedStartPoint && (
+                          <div className="text-[10px] text-emerald-500 pt-1 flex items-center gap-1 font-bold">
+                            <span>✓ نقطة الانطلاق:</span>
+                            <span className={isDark ? "text-white" : "text-slate-900"}>{fixedStartName}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* حقل الوجهة لكل العراق */}
@@ -2534,15 +2693,34 @@ export default function DriverHomePage() {
                         <label className={`text-[11px] font-bold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                           الوجهة (إلى) — بحث حر لكل محافظات العراق 🎯
                         </label>
-                        <input
-                          type="text"
-                          value={destSearchQuery}
-                          onChange={(e) => handleDestSearchInput(e.target.value)}
-                          placeholder="ابحث عن الوجهة في أي محافظة (مثال: جامعة الكوفة، مطار النجف، بغداد)..."
-                          className={`w-full text-xs rounded-xl px-2.5 py-2 border focus:border-emerald-500 outline-none ${
-                            isDark ? 'bg-[#242a37] text-white border-white/10' : 'bg-slate-50 text-slate-900 border-slate-300'
-                          }`}
-                        />
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={destSearchQuery}
+                            onChange={(e) => handleDestSearchInput(e.target.value)}
+                            placeholder="ابحث عن الوجهة في أي محافظة (مثال: جامعة الكوفة، مطار النجف، بغداد)..."
+                            className={`flex-1 text-xs rounded-xl px-2.5 py-2 border focus:border-emerald-500 outline-none ${
+                              isDark ? 'bg-[#242a37] text-white border-white/10' : 'bg-slate-50 text-slate-900 border-slate-300'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMapPickMode('dest');
+                              setIsBottomDockExpanded(false);
+                            }}
+                            className={`px-2.5 py-2 rounded-xl border text-xs font-bold shrink-0 cursor-pointer transition ${
+                              mapPickMode === 'dest'
+                                ? 'bg-amber-500 text-slate-950 border-amber-500'
+                                : isDark
+                                  ? 'bg-white/10 text-slate-300 border-white/10 hover:bg-white/20'
+                                  : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                            }`}
+                            title="تحديد على الخريطة"
+                          >
+                            🗺️ الخريطة
+                          </button>
+                        </div>
                         {isSearchingDest && (
                           <div className="text-[10px] text-amber-500 pt-1 animate-pulse">جارٍ البحث في خريطة العراق...</div>
                         )}
@@ -2558,6 +2736,9 @@ export default function DriverHomePage() {
                                   setFixedDestName(p.name);
                                   setDestSearchQuery(p.name);
                                   setDestSearchResults([]);
+                                  if (mapRef.current) {
+                                    mapRef.current.flyTo({ center: [p.lng, p.lat], zoom: 15, duration: 1000 });
+                                  }
                                 }}
                                 className={`p-2.5 cursor-pointer text-right transition ${isDark ? 'hover:bg-emerald-500/20' : 'hover:bg-emerald-50'}`}
                               >
@@ -2591,27 +2772,27 @@ export default function DriverHomePage() {
                         />
                       </div>
 
-                      {/* أزرار الحفظ والإلغاء */}
+                      {/* أزرار الحفظ */}
                       <div className="flex gap-2 pt-1">
                         <button
                           type="button"
                           disabled={isSavingRoute}
-                          onClick={handleSaveFixedRoute}
+                          onClick={() => {
+                            const startPt = fixedStartPoint || (driverLocRef.current ? { lat: driverLocRef.current.lat, lng: driverLocRef.current.lng } : null);
+                            if (!startPt) {
+                              show('يرجى تحديد نقطة الانطلاق عبر البحث أو الـ GPS أو الخريطة', 'error');
+                              return;
+                            }
+                            if (!fixedDestPoint || !fixedDestName.trim()) {
+                              show('يرجى تحديد وجهة الوصول (إلى) بالبحث أو الخريطة', 'error');
+                              return;
+                            }
+                            setShowLockConfirmModal(true);
+                          }}
                           className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-[#090D16] font-black text-xs hover:brightness-110 active:scale-[0.98] transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                         >
                           <span>{isSavingRoute ? 'جارٍ التثبيت...' : 'تثبيت المسار الدائم 💾'}</span>
                         </button>
-                        {isEditingRoute && (
-                          <button
-                            type="button"
-                            onClick={() => setIsEditingRoute(false)}
-                            className={`py-2.5 px-4 rounded-xl font-bold text-xs transition cursor-pointer ${
-                              isDark ? 'bg-white/10 text-slate-300 hover:bg-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                            }`}
-                          >
-                            إلغاء
-                          </button>
-                        )}
                       </div>
                     </div>
                   )}
@@ -3188,6 +3369,122 @@ export default function DriverHomePage() {
           onAccept={handleAcceptRide}
           onReject={handleRejectRide}
         />
+      )}
+
+      {/* 8. إشعار عائم لوضع تحديد النقطة على الخريطة (Map Picking Mode HUD) */}
+      {mapPickMode !== 'none' && (
+        <div className="fixed top-20 inset-x-4 max-w-md mx-auto z-40 animate-fade-in" dir="rtl">
+          <div className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-xl flex flex-col gap-2.5 ${
+            isDark ? 'bg-[#161c28]/95 border-amber-500/40 text-white' : 'bg-white/95 border-amber-500/50 text-slate-900 shadow-xl'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black flex items-center gap-1.5 text-amber-500">
+                <span>{mapPickMode === 'start' ? '📍 تحديد نقطة الانطلاق' : '🎯 تحديد وجهة الوصول'}</span>
+              </span>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {mapPickMode === 'start' ? 'نقطة (من)' : 'نقطة (إلى)'}
+              </span>
+            </div>
+            <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+              {mapPickMode === 'start'
+                ? 'انقر على أي نقطة على الخريطة أو اسحب الدبوس الأخضر لتحديد مكان الانطلاق بدقة.'
+                : 'انقر على أي نقطة على الخريطة أو اسحب الدبوس لتحديد وجهة الخط الدائم بدقة.'}
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMapPickMode('none');
+                  setIsBottomDockExpanded(true);
+                }}
+                className="flex-1 min-h-[44px] py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-slate-950 font-bold text-xs hover:brightness-110 shadow-md cursor-pointer flex items-center justify-center gap-1"
+              >
+                <span>تأكيد الموضع</span>
+                <span>✓</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMapPickMode('none');
+                  setIsBottomDockExpanded(true);
+                }}
+                className={`min-h-[44px] py-2 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  isDark ? 'bg-white/10 text-slate-300 hover:bg-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. نافذة تأكيد قفل المسار النهائي للكابتن */}
+      {showLockConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in" dir="rtl">
+          <div className={`max-w-md w-full rounded-3xl p-5 border shadow-2xl space-y-4 ${
+            isDark ? 'bg-[#161c28] border-amber-500/40 text-white' : 'bg-white border-amber-400 text-slate-900'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center text-2xl shrink-0">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-amber-500">تأكيد تثبيت مسار الخط الدائم</h3>
+                <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>تنبيه هام لا يمكن التراجع عنه</p>
+              </div>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed font-bold ${
+              isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-200' : 'bg-amber-50 border-amber-300 text-amber-900'
+            }`}>
+              انتبه: يمكنك تحديد مسارك مرة واحدة فقط. بعد التثبيت لا يمكنك تعديله، وللتعديل راجع الإدارة.
+            </div>
+
+            <div className={`text-xs space-y-1.5 p-3 rounded-xl border ${
+              isDark ? 'bg-[#242a37]/50 border-white/5' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-500 font-bold shrink-0">الانطلاق:</span>
+                <span className="truncate">{fixedStartName || 'موقعي الحالي'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sky-500 font-bold shrink-0">الوجهة:</span>
+                <span className="truncate">{fixedDestName}</span>
+              </div>
+              {fixedRouteName && (
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-500 font-bold shrink-0">اسم الخط:</span>
+                  <span className="truncate">{fixedRouteName}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isSavingRoute}
+                onClick={handleSaveFixedRoute}
+                className="flex-1 min-h-[48px] py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-slate-950 font-black text-xs hover:brightness-110 active:scale-95 transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/30"
+              >
+                <span>{isSavingRoute ? 'جارٍ التثبيت...' : 'تأكيد وتثبيت المسار'}</span>
+                <span>🔒</span>
+              </button>
+              <button
+                type="button"
+                disabled={isSavingRoute}
+                onClick={() => setShowLockConfirmModal(false)}
+                className={`min-h-[48px] py-2.5 px-4 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  isDark ? 'bg-white/10 text-slate-300 hover:bg-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

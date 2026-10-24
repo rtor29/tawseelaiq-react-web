@@ -49,17 +49,15 @@ function getDriverColor(distKm: number): { bg: string; text: string; label: stri
   return               { bg: '#dc2626', text: '#fff', label: 'أحمر (بعيد جداً)' };
 }
 
-// سيارة صغيرة SVG ملوّنة
+// أيقونة الكابتن الموحدة = شعار توصيلة
 function CarSVG({ color }: { color: string }) {
   return (
-    <svg width="36" height="20" viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 37C12 37 17 27 31 21C45 15 75 15 85 21C97 27 110 29 113 35C116 41 114 45 110 46H10C6 46 6 40 12 37Z" fill={color} />
-      <path d="M34 19L44 8H72L84 19H34Z" fill="rgba(0,0,0,0.3)" />
-      <path d="M36 18L44 10H57V18H36Z" fill="#bfdbfe" opacity="0.9" />
-      <path d="M59 10H71L81 18H59V10Z" fill="#bfdbfe" opacity="0.9" />
-      <circle cx="28" cy="45" r="9" fill="#111" /><circle cx="28" cy="45" r="5" fill="#fff" />
-      <circle cx="92" cy="45" r="9" fill="#111" /><circle cx="92" cy="45" r="5" fill="#fff" />
-    </svg>
+    <div
+      className="w-8 h-8 rounded-xl flex items-center justify-center p-1 shadow-md border border-white/40 overflow-hidden"
+      style={{ backgroundColor: color }}
+    >
+      <img src="/logo.png" alt="توصيلة" className="w-full h-full object-contain drop-shadow" />
+    </div>
   );
 }
 

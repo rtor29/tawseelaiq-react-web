@@ -37,8 +37,8 @@ export function NearestDriverPin({
         </div>
         <div className="relative flex items-center justify-center">
           <span className="absolute w-10 h-10 rounded-full bg-amber-400/20 animate-ping"></span>
-          <div className="w-9 h-9 rounded-full bg-[#161C28] border-2 border-[#FFB77D] shadow-xl flex items-center justify-center text-[#FFB77D] text-lg font-bold">
-            🚖
+          <div className="w-9 h-9 rounded-full bg-[#161C28] border-2 border-[#FFB77D] shadow-xl flex items-center justify-center p-1">
+            <img src="/logo.png" alt="توصيلة" className="w-full h-full object-contain drop-shadow" />
           </div>
         </div>
       </div>
@@ -57,8 +57,8 @@ export function SurroundingDriverPin({
   return (
     <Marker longitude={point.lng} latitude={point.lat} anchor="center" onClick={onClick}>
       <div className="cursor-pointer select-none" role="button">
-        <div className="w-8 h-8 rounded-full bg-[#161C28]/95 border-2 border-[#FFB77D]/80 shadow-lg flex items-center justify-center text-[#FFB77D] text-sm hover:scale-110 transition-transform">
-          🚖
+        <div className="w-8 h-8 rounded-full bg-[#161C28]/95 border-2 border-[#FFB77D]/80 shadow-lg flex items-center justify-center p-1 hover:scale-110 transition-transform">
+          <img src="/logo.png" alt="توصيلة" className="w-full h-full object-contain drop-shadow" />
         </div>
       </div>
     </Marker>
