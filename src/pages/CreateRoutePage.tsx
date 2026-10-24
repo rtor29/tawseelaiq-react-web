@@ -568,6 +568,7 @@ export default function CreateRoutePage() {
         <div className={`relative min-h-[360px] flex-1 transition-colors ${isDark ? 'bg-[#080E1A]' : 'bg-[#E2E8F0]'}`}>
           <Map
             ref={mapRef}
+            reuseMaps
             mapboxAccessToken={config.mapboxToken}
             mapStyle={isDark ? 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om' : config.navigationStyle}
             initialViewState={{ longitude: startPoint.lng, latitude: startPoint.lat, zoom: 13 }}

@@ -206,6 +206,7 @@ export default function LiveTrackingPage() {
       <div className="relative flex-1 touch-none" style={{ touchAction: 'none' }}>
         <Map
           ref={mapRef}
+          reuseMaps
           mapboxAccessToken={config.mapboxToken}
           mapStyle={config.navigationStyle}
           initialViewState={{ longitude: driverPos.lng, latitude: driverPos.lat, zoom: 15.5 }}

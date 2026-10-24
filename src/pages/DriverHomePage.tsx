@@ -1770,6 +1770,7 @@ export default function DriverHomePage() {
       <div className="absolute inset-0 w-full h-full z-0 touch-none" style={{ touchAction: 'none' }}>
         <MapGL
           ref={mapRef}
+          reuseMaps
           mapboxAccessToken={config.mapboxToken}
           mapStyle={selectedMapStyle || mapStyle || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'}
           initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
