@@ -8,9 +8,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { config, IRAQ_DEFAULT_CENTER } from '../lib/config';
 import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
-import type { LngLat, RouteBroadcastEvent } from '../types';
+import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
-import { RouteLines, type RouteLineData } from '../components/map/MapPins';
 import { applyArabicAndEnhancedLabels } from '../lib/mapbox';
 import { Button } from '../components/ui';
 import { coordinatesLabel } from '../lib/format';
@@ -25,7 +24,6 @@ export default function LiveTrackingPage() {
   const [driverPos, setDriverPos] = useState<LngLat>({ lat: IRAQ_DEFAULT_CENTER.lat, lng: IRAQ_DEFAULT_CENTER.lon });
   const [heading, setHeading] = useState(0);
   const [connected, setConnected] = useState(false);
-  const [routePoints, setRoutePoints] = useState<Array<{ latitude: number; longitude: number }>>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -41,20 +39,14 @@ export default function LiveTrackingPage() {
         mapRef.current?.easeTo({ center: [e.longitude, e.latitude], zoom: 16, duration: 900 });
       });
 
-      const unsubRoute = realtime.onRouteBroadcast((data: RouteBroadcastEvent) => {
-        if (mounted && data.points) setRoutePoints(data.points);
-      });
-
       await realtime.joinTrip(bookingId);
       if (!mounted) {
         unsubLoc();
-        unsubRoute();
         return;
       }
 
       return () => {
         unsubLoc();
-        unsubRoute();
       };
     }
 
@@ -67,10 +59,6 @@ export default function LiveTrackingPage() {
       void realtime.leaveTrip(bookingId);
     };
   }, [bookingId]);
-
-  const lines: RouteLineData[] = routePoints.length
-    ? [{ id: 'live-route', coordinates: routePoints.map((p) => [p.longitude, p.latitude]), color: '#F59E0B' }]
-    : [];
 
   return (
     <div className="flex h-dvh flex-col bg-brand-surface text-right font-cairo" dir="rtl">
@@ -101,7 +89,7 @@ export default function LiveTrackingPage() {
           onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
         >
           <NavigationControl position="bottom-left" showCompass={false} />
-          <RouteLines lines={lines} />
+          {/* تم إزالة رسم المسار تماماً في التتبع المباشر لتوفير تكلفة Mapbox Directions */}
           <VehicleMarker targetLat={driverPos.lat} targetLng={driverPos.lng} targetHeading={heading} title={driverName} />
         </Map>
 

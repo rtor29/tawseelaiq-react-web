@@ -70,7 +70,7 @@ export function VehicleMarker({
   targetLng,
   targetHeading,
   title,
-  isAvailable = true,
+  isAvailable: _isAvailable = true,
   onClick,
 }: VehicleMarkerProps) {
   const current = useAnimatedPosition(targetLat, targetLng, targetHeading);
@@ -79,71 +79,24 @@ export function VehicleMarker({
     <Marker longitude={current.lng} latitude={current.lat} anchor="center" onClick={onClick}>
       <div className="relative flex flex-col items-center justify-center cursor-pointer select-none">
         {title && (
-          <span className="absolute -top-7 rounded-md bg-[#1B4965] px-2 py-0.5 text-[10px] font-bold text-white shadow-md whitespace-nowrap z-10 border border-white/20">
+          <span className="absolute -top-7 rounded-md bg-[#161C28] px-2 py-0.5 text-[10px] font-black text-amber-300 shadow-md whitespace-nowrap z-20 border border-amber-500/40">
             {title}
           </span>
         )}
         <div
-          className="transition-transform duration-500 ease-out will-change-transform filter drop-shadow-[0_4px_10px_rgba(27,73,101,0.38)]"
+          className="relative flex items-center justify-center transition-transform duration-500 ease-out will-change-transform"
           style={{ transform: `rotate(${current.heading}deg)` }}
         >
-          {/* أيقونة سيارة مسطحة وعصرية من الأعلى (Flat Minimal Top-down SVG) */}
-          <svg
-            width="42"
-            height="42"
-            viewBox="0 0 48 48"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {/* ظل خفيف للسيارة */}
-            <rect x="11" y="6" width="26" height="38" rx="7" fill="rgba(0,0,0,0.18)" />
+          {/* حلقة نبض هادئة */}
+          <span className="absolute w-12 h-12 rounded-full bg-amber-400/20 animate-ping pointer-events-none" />
 
-            {/* مرايا جانبية */}
-            <rect x="8.5" y="16" width="3.5" height="5.5" rx="1.75" fill="#1B4965" stroke="#14364A" strokeWidth="0.75" />
-            <rect x="36" y="16" width="3.5" height="5.5" rx="1.75" fill="#1B4965" stroke="#14364A" strokeWidth="0.75" />
+          {/* مؤشر اتجاه أمامي مميز */}
+          <div className="absolute -top-2 w-3 h-3 rotate-45 bg-amber-400 border border-slate-900 shadow-sm z-0" />
 
-            {/* هيكل السيارة الأساسي - كحلي التوصيلة #1B4965 */}
-            <rect x="12" y="5" width="24" height="38" rx="6.5" fill="#1B4965" stroke="#14364A" strokeWidth="1" />
-
-            {/* مصابيح أمامية مضيئة - كهرماني دافئ */}
-            <rect x="13.5" y="5.5" width="4" height="2" rx="1" fill="#FBBF24" />
-            <rect x="30.5" y="5.5" width="4" height="2" rx="1" fill="#FBBF24" />
-
-            {/* شفة الصدام الأمامي - لمسة كهرمانية دافئة #D97706 */}
-            <rect x="18" y="5.2" width="12" height="1.6" rx="0.8" fill="#D97706" />
-
-            {/* الزجاج الأمامي - سماوي ناعم */}
-            <path
-              d="M 15 17.5 L 33 17.5 C 32 12.5 31.5 10.5 30 9.5 C 28.5 8.5 19.5 8.5 18 9.5 C 16.5 10.5 16 12.5 15 17.5 Z"
-              fill="#BAE6FD"
-              stroke="#7DD3FC"
-              strokeWidth="0.5"
-            />
-
-            {/* النوافذ الجانبية - سماوي ناعم */}
-            <path d="M 14.2 19 L 15.5 19 L 15.5 30 L 14.2 29.5 Z" fill="#BAE6FD" />
-            <path d="M 32.5 19 L 33.8 19 L 33.8 29.5 L 32.5 30 Z" fill="#BAE6FD" />
-
-            {/* سقف السيارة الداخلي مع شعار توصيلة */}
-            <rect x="16.5" y="18.5" width="15" height="12" rx="2.5" fill="#163A50" />
-            <image href="/logo.png" x="18" y="19" width="12" height="11" preserveAspectRatio="xMidYMid meet" />
-
-            {/* لافتة تاكسي على السقف / شارة كهرمانية أنيقة #D97706 */}
-            <rect x="20" y="23" width="8" height="3.2" rx="1.6" fill={isAvailable ? '#F59E0B' : '#D97706'} />
-            <circle cx="24" cy="24.6" r="0.75" fill={isAvailable ? '#FEF08A' : '#FEF3C7'} />
-
-            {/* الزجاج الخلفي - سماوي ناعم */}
-            <path
-              d="M 16 31.5 L 32 31.5 C 31 34.5 30 35.5 28.5 36 C 27 36.5 21 36.5 19.5 36 C 18 35.5 17 34.5 16 31.5 Z"
-              fill="#BAE6FD"
-              stroke="#7DD3FC"
-              strokeWidth="0.5"
-            />
-
-            {/* المصابيح الخلفية - أحمر أنيق */}
-            <rect x="13.5" y="41.5" width="4" height="1.5" rx="0.75" fill="#EF4444" />
-            <rect x="30.5" y="41.5" width="4" height="1.5" rx="0.75" fill="#EF4444" />
-          </svg>
+          {/* قرص شعار توصيلة الموحد */}
+          <div className="relative z-10 w-11 h-11 rounded-full bg-[#161C28] border-2 border-[#FFB77D] shadow-[0_4px_14px_rgba(245,158,11,0.35)] flex items-center justify-center p-1.5 hover:scale-105 transition-transform">
+            <img src="/logo.png" alt="توصيلة" className="w-full h-full object-contain drop-shadow" />
+          </div>
         </div>
       </div>
     </Marker>

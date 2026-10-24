@@ -271,7 +271,6 @@ export default function CustomerHomePage() {
   const [liveDriverPosition, setLiveDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [driverHeading, setDriverHeading] = useState<number>(0);
   const prevDriverPositionRef = useRef<{ lat: number; lng: number } | null>(null);
-  const lastRouteUpdateTimeRef = useRef<number>(0);
 
   // حالة البحث النصي للأماكن
   const [searchQuery, setSearchQuery] = useState('');
@@ -1579,32 +1578,12 @@ export default function CustomerHomePage() {
       prevDriverPositionRef.current = newPos;
       setLiveDriverPosition(newPos);
 
-      // رسم وتحديث خط المسار من موقع السائق المباشر إلى موقع الراكب
-      const now = Date.now();
-      const targetPoint = (rideStatus === 'InProgress' || rideStatus === 'in_progress') ? dropoff : pickup;
-      if (
-        stage === 'driver_arriving' &&
-        targetPoint &&
-        targetPoint.lat &&
-        targetPoint.lng &&
-        now - lastRouteUpdateTimeRef.current > 6000
-      ) {
-        lastRouteUpdateTimeRef.current = now;
-        void getDirections(newPos, targetPoint)
-          .then((res) => {
-            if (res.coordinates?.length) {
-              setRouteCoordinates(res.coordinates.map((c) => [c.lng, c.lat]));
-            }
-          })
-          .catch(() => {
-            setRouteCoordinates([
-              [newPos.lng, newPos.lat],
-              [targetPoint.lng, targetPoint.lat],
-            ]);
-          });
+      // في التتبع المباشر: تم إيقاف استدعاء Directions API نهائياً (0 استدعاءات) لتوفير Mapbox، ولا يُرسم خط مسار أثناء التتبع
+      if (stage === 'driver_arriving' || rideStatus === 'accepted' || rideStatus === 'arrived' || rideStatus === 'InProgress' || rideStatus === 'in_progress') {
+        if (routeCoordinates) setRouteCoordinates(null);
       }
     },
-    [stage, rideStatus, pickup, dropoff]
+    [stage, rideStatus, pickup, dropoff, routeCoordinates]
   );
 
   // معالجة تغييرات حالة الرحلة مركزياً
@@ -1993,8 +1972,10 @@ export default function CustomerHomePage() {
   );
 
   // إعداد طبقة خط المسار الانسيابي النحيف (Sleek Slim Polyline - 2.8px / 3.0px)
+  // إلغاء رسم خط المسار نهائياً أثناء التتبع الحي لتوفير استدعاءات Mapbox
+  const isLiveTrackingDriver = stage === 'driver_arriving' || rideStatus === 'accepted' || rideStatus === 'arrived' || rideStatus === 'inprogress' || rideStatus === 'InProgress' || rideStatus === 'in_progress';
   const routeLines: RouteLineData[] = [];
-  if (routeCoordinates && routeCoordinates.length) {
+  if (!isLiveTrackingDriver && routeCoordinates && routeCoordinates.length) {
     routeLines.push({ id: 'route-line', coordinates: routeCoordinates, color: '#F59E0B' });
   }
   if (commuteRouteCoordinates && commuteRouteCoordinates.length) {

@@ -1246,15 +1246,15 @@ export default function DailyRoutePage() {
                   onClick={() => setCancelReason(r)}
                   className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition ${
                     cancelReason === r
-                      ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold'
-                      : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
+                      ? (isDark ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold' : 'bg-amber-50 border-amber-500 text-amber-900 font-bold')
+                      : (isDark ? 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10' : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100')
                   }`}
                 >
                   <span className="text-[13.5px]">{r}</span>
                   <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${
-                    cancelReason === r ? 'border-amber-400 bg-amber-400' : 'border-white/30'
+                    cancelReason === r ? 'border-amber-400 bg-amber-400' : (isDark ? 'border-white/30' : 'border-slate-300')
                   }`}>
-                    {cancelReason === r && <div className="h-1.5 w-1.5 rounded-full bg-slate-900" />}
+                    {cancelReason === r && <div className={`h-1.5 w-1.5 rounded-full ${isDark ? 'bg-slate-900' : 'bg-white'}`} />}
                   </div>
                 </label>
               ))}
@@ -1262,7 +1262,7 @@ export default function DailyRoutePage() {
 
             {/* حقل نصي لتفاصيل إضافية */}
             <div>
-              <label className="block text-[12.5px] font-bold text-white/80 mb-1">
+              <label className={`block text-[12.5px] font-bold mb-1 ${isDark ? 'text-white/80' : 'text-slate-700'}`}>
                 تفاصيل إضافية (اختياري):
               </label>
               <textarea
@@ -1270,7 +1270,9 @@ export default function DailyRoutePage() {
                 value={cancelDetails}
                 onChange={(e) => setCancelDetails(e.target.value)}
                 placeholder="أدخل أي تفاصيل إضافية لمشاركتها مع الكابتن والإدارة..."
-                className="w-full rounded-xl bg-white/5 border border-white/15 p-2.5 text-[13px] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className={`w-full rounded-xl border p-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                  isDark ? 'bg-white/5 border-white/15 text-white placeholder-white/40' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+                }`}
               />
             </div>
 
@@ -1278,7 +1280,9 @@ export default function DailyRoutePage() {
               <button
                 type="button"
                 onClick={() => setIsCancelModalOpen(false)}
-                className="flex-1 rounded-xl bg-white/10 hover:bg-white/20 py-3 text-center text-[13.5px] font-bold text-white transition active:scale-95 cursor-pointer"
+                className={`flex-1 rounded-xl py-3 text-center text-[13.5px] font-bold transition active:scale-95 cursor-pointer ${
+                  isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                }`}
               >
                 تراجع
               </button>
