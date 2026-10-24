@@ -2437,40 +2437,46 @@ export default function DriverHomePage() {
 
               {/* تثبيت ومسار الخط الدائم للكابتن (من ➔ إلى) */}
               {(workStatus === 'permanent' || workStatus === 'both') && (
-                <div className="bg-[#242a37]/60 rounded-2xl p-3 border border-emerald-500/30 space-y-2.5 text-right" dir="rtl">
+                <div className={`rounded-2xl p-3 border space-y-2.5 text-right ${
+                  isDark ? 'bg-[#242a37]/60 border-emerald-500/30' : 'bg-emerald-50/50 border-emerald-500/30'
+                }`} dir="rtl">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       {isFixedRouteActive && !isEditingRoute ? 'مسار مثبت ومفعل 🟢' : 'إعداد المسار 📍'}
                     </span>
-                    <h4 className="text-xs font-black text-white flex items-center gap-1.5">
+                    <h4 className={`text-xs font-black flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       <span>🛣️</span>
                       <span>مسار الخط الدائم (من ← إلى)</span>
                     </h4>
                   </div>
 
                   {isFixedRouteActive && !isEditingRoute ? (
-                    <div className="bg-[#161c28] p-3 rounded-xl border border-white/10 space-y-2">
+                    <div className={`p-3 rounded-xl border space-y-2 ${
+                      isDark ? 'bg-[#161c28] border-white/10' : 'bg-white border-slate-200 shadow-sm'
+                    }`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-amber-400">
+                        <span className="text-xs font-bold text-amber-500">
                           {fixedRouteName || `${fixedStartName} ➔ ${fixedDestName}`}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-mono">خط دائمي</span>
+                        <span className={`text-[10px] font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>خط دائمي</span>
                       </div>
-                      <div className="text-[11.5px] text-slate-300 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-emerald-400 font-bold">من:</span>
+                      <div className={`text-[11.5px] flex items-center gap-1.5 flex-wrap ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <span className="text-emerald-500 font-bold">من:</span>
                         <span>{fixedStartName || 'نقطة الانطلاق'}</span>
-                        <span className="text-slate-500">➔</span>
-                        <span className="text-sky-400 font-bold">إلى:</span>
+                        <span className="text-slate-400">➔</span>
+                        <span className="text-sky-500 font-bold">إلى:</span>
                         <span>{fixedDestName || 'الوجهة'}</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-white/5">
+                      <div className={`grid grid-cols-2 gap-2 pt-1.5 border-t ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
                         <button
                           type="button"
                           onClick={() => {
                             setIsEditingRoute(true);
                             setDestSearchQuery(fixedDestName);
                           }}
-                          className="py-1.5 rounded-lg bg-white/10 text-slate-200 text-xs font-bold hover:bg-white/20 transition cursor-pointer flex items-center justify-center gap-1"
+                          className={`py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
+                            isDark ? 'bg-white/10 text-slate-200 hover:bg-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
                         >
                           <span>تعديل المسار</span>
                           <span>✏️</span>
@@ -2486,10 +2492,12 @@ export default function DriverHomePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-[#161c28] p-3 rounded-xl border border-white/10 space-y-2.5">
+                    <div className={`p-3 rounded-xl border space-y-2.5 ${
+                      isDark ? 'bg-[#161c28] border-white/10' : 'bg-white border-slate-200 shadow-sm'
+                    }`}>
                       {/* حقل نقطة الانطلاق */}
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                        <label className={`text-[11px] font-bold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                           نقطة الانطلاق (من) 📍
                         </label>
                         <div className="flex gap-1.5">
@@ -2498,7 +2506,9 @@ export default function DriverHomePage() {
                             value={fixedStartName}
                             onChange={(e) => setFixedStartName(e.target.value)}
                             placeholder="حدد موقع انطلاق الخط (مثال: حي الجامعة)..."
-                            className="flex-1 bg-[#242a37] text-white text-xs rounded-xl px-2.5 py-2 border border-white/10 focus:border-emerald-500 outline-none"
+                            className={`flex-1 text-xs rounded-xl px-2.5 py-2 border focus:border-emerald-500 outline-none ${
+                              isDark ? 'bg-[#242a37] text-white border-white/10' : 'bg-slate-50 text-slate-900 border-slate-300'
+                            }`}
                           />
                           <button
                             type="button"
@@ -2511,7 +2521,7 @@ export default function DriverHomePage() {
                                 show('تعذر قراءة GPS حالياً', 'error');
                               }
                             }}
-                            className="px-2.5 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold shrink-0 cursor-pointer hover:bg-emerald-500/30"
+                            className="px-2.5 py-2 rounded-xl bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 text-xs font-bold shrink-0 cursor-pointer hover:bg-emerald-500/30"
                             title="استخدام موقع GPS الحالي"
                           >
                             GPS 🎯
@@ -2521,7 +2531,7 @@ export default function DriverHomePage() {
 
                       {/* حقل الوجهة لكل العراق */}
                       <div className="relative">
-                        <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                        <label className={`text-[11px] font-bold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                           الوجهة (إلى) — بحث حر لكل محافظات العراق 🎯
                         </label>
                         <input
@@ -2529,13 +2539,17 @@ export default function DriverHomePage() {
                           value={destSearchQuery}
                           onChange={(e) => handleDestSearchInput(e.target.value)}
                           placeholder="ابحث عن الوجهة في أي محافظة (مثال: جامعة الكوفة، مطار النجف، بغداد)..."
-                          className="w-full bg-[#242a37] text-white text-xs rounded-xl px-2.5 py-2 border border-white/10 focus:border-emerald-500 outline-none"
+                          className={`w-full text-xs rounded-xl px-2.5 py-2 border focus:border-emerald-500 outline-none ${
+                            isDark ? 'bg-[#242a37] text-white border-white/10' : 'bg-slate-50 text-slate-900 border-slate-300'
+                          }`}
                         />
                         {isSearchingDest && (
-                          <div className="text-[10px] text-amber-400 pt-1 animate-pulse">جارٍ البحث في خريطة العراق...</div>
+                          <div className="text-[10px] text-amber-500 pt-1 animate-pulse">جارٍ البحث في خريطة العراق...</div>
                         )}
                         {destSearchResults.length > 0 && (
-                          <div className="absolute z-50 inset-x-0 top-full mt-1 bg-[#1A2232] border border-amber-500/30 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-white/5">
+                          <div className={`absolute z-50 inset-x-0 top-full mt-1 border border-amber-500/30 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y ${
+                            isDark ? 'bg-[#1A2232] divide-white/5 text-white' : 'bg-white divide-slate-100 text-slate-900'
+                          }`}>
                             {destSearchResults.map((p, idx) => (
                               <div
                                 key={idx}
@@ -2545,25 +2559,25 @@ export default function DriverHomePage() {
                                   setDestSearchQuery(p.name);
                                   setDestSearchResults([]);
                                 }}
-                                className="p-2.5 hover:bg-emerald-500/20 cursor-pointer text-right transition"
+                                className={`p-2.5 cursor-pointer text-right transition ${isDark ? 'hover:bg-emerald-500/20' : 'hover:bg-emerald-50'}`}
                               >
-                                <div className="text-xs font-bold text-white">{p.name}</div>
-                                {p.address && <div className="text-[10px] text-slate-400 truncate">{p.address}</div>}
+                                <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{p.name}</div>
+                                {p.address && <div className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{p.address}</div>}
                               </div>
                             ))}
                           </div>
                         )}
                         {fixedDestPoint && (
-                          <div className="text-[10px] text-emerald-400 pt-1 flex items-center gap-1 font-bold">
+                          <div className="text-[10px] text-emerald-500 pt-1 flex items-center gap-1 font-bold">
                             <span>✓ الوجهة المحددة:</span>
-                            <span className="text-white">{fixedDestName}</span>
+                            <span className={isDark ? "text-white" : "text-slate-900"}>{fixedDestName}</span>
                           </div>
                         )}
                       </div>
 
                       {/* حقل اسم الخط (اختياري) */}
                       <div>
-                        <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                        <label className={`text-[11px] font-bold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                           اسم الخط (اختياري) 🏷️
                         </label>
                         <input
@@ -2571,7 +2585,9 @@ export default function DriverHomePage() {
                           value={fixedRouteName}
                           onChange={(e) => setFixedRouteName(e.target.value)}
                           placeholder={fixedStartName && fixedDestName ? `${fixedStartName} ➔ ${fixedDestName}` : 'مثال: خط جامعة الكوفة الصباحي'}
-                          className="w-full bg-[#242a37] text-white text-xs rounded-xl px-2.5 py-2 border border-white/10 focus:border-emerald-500 outline-none"
+                          className={`w-full text-xs rounded-xl px-2.5 py-2 border focus:border-emerald-500 outline-none ${
+                            isDark ? 'bg-[#242a37] text-white border-white/10' : 'bg-slate-50 text-slate-900 border-slate-300'
+                          }`}
                         />
                       </div>
 
@@ -2589,7 +2605,9 @@ export default function DriverHomePage() {
                           <button
                             type="button"
                             onClick={() => setIsEditingRoute(false)}
-                            className="py-2.5 px-4 rounded-xl bg-white/10 text-slate-300 font-bold text-xs hover:bg-white/20 transition cursor-pointer"
+                            className={`py-2.5 px-4 rounded-xl font-bold text-xs transition cursor-pointer ${
+                              isDark ? 'bg-white/10 text-slate-300 hover:bg-white/20' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
                           >
                             إلغاء
                           </button>
@@ -2602,12 +2620,14 @@ export default function DriverHomePage() {
 
               {/* طلبات حجز المقاعد الواردة في الخط الدائمي */}
               {pendingSeatRequests.length > 0 && (
-                <div className="bg-[#242a37]/70 rounded-2xl p-3 border border-emerald-500/40 space-y-2.5 text-right" dir="rtl">
+                <div className={`rounded-2xl p-3 border border-emerald-500/40 space-y-2.5 text-right ${
+                  isDark ? 'bg-[#242a37]/70 text-white' : 'bg-emerald-50/70 text-slate-900'
+                }`} dir="rtl">
                   <div className="flex items-center justify-between">
                     <span className="rounded-full bg-amber-500 text-slate-950 px-2.5 py-0.5 text-[10px] font-black animate-pulse">
                       {pendingSeatRequests.length} طلب جديد
                     </span>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                    <h4 className={`text-xs font-bold flex items-center gap-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       <span>📢</span>
                       <span>طلبات حجز واردة (الخط الدائم)</span>
                     </h4>

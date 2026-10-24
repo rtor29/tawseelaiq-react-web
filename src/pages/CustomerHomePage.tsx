@@ -198,8 +198,8 @@ export default function CustomerHomePage() {
   // تبويب الخدمات في البطاقة: تكسي أو بوكس
   const [selectedServiceTab, setSelectedServiceTab] = useState<'taxi' | 'box'>('taxi');
 
-  // فلترة عرض الكباتن على الخريطة: تكسي | خط دائمي | كلاهما
-  const [serviceFilter, setServiceFilter] = useState<'taxi' | 'commute' | 'both'>('both');
+  // إظهار كباتن الخطوط الدائمية على الخريطة فوق كباتن التكسي
+  const [showCommuteRoutes, setShowCommuteRoutes] = useState<boolean>(false);
   const [commuteDrivers, setCommuteDrivers] = useState<any[]>([]);
   const [selectedCommuteDriver, setSelectedCommuteDriver] = useState<any | null>(null);
 
@@ -441,10 +441,6 @@ export default function CustomerHomePage() {
   const [nearbyDriversCount, setNearbyDriversCount] = useState<number | null>(null);
 
   useEffect(() => {
-    if (serviceFilter === 'commute') {
-      setNearbyDriversCount(0);
-      return;
-    }
     let isCancelled = false;
     async function checkNearbyDrivers() {
       try {
@@ -471,11 +467,11 @@ export default function CustomerHomePage() {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [pickup.lat, pickup.lng, selectedTierId, serviceFilter]);
+  }, [pickup.lat, pickup.lng, selectedTierId]);
 
-  // جلب سائقي الخط الدائم من المعالج المتزامن (PostgreSQL + Redis)
+  // جلب سائقي الخط الدائم من المعالج المتزامن (PostgreSQL + Redis) عند تفعيل زر الخطوط الدائمية
   useEffect(() => {
-    if (serviceFilter === 'taxi') {
+    if (!showCommuteRoutes) {
       setCommuteDrivers([]);
       return;
     }
@@ -506,7 +502,7 @@ export default function CustomerHomePage() {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [pickup.lat, pickup.lng, serviceFilter]);
+  }, [pickup.lat, pickup.lng, showCommuteRoutes]);
 
   // حالة الـ GPS والتنبيهات المخصصة لـ iOS Safari
   const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
@@ -2022,6 +2018,39 @@ export default function CustomerHomePage() {
             />
           </div>
 
+          {/* الوسط: زر «الخطوط الدائمية» الأحادي الصغير والأنيق بين زر الهوم وزر الحساب */}
+          <div className="pointer-events-auto flex items-center mx-1">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCommuteRoutes(prev => {
+                  const next = !prev;
+                  if (!next) setSelectedCommuteDriver(null);
+                  return next;
+                });
+              }}
+              className={`min-h-[44px] h-11 px-3 sm:px-3.5 rounded-full backdrop-blur-xl border flex items-center gap-1.5 font-cairo font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-lg select-none ${
+                showCommuteRoutes
+                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.45)] ring-2 ring-emerald-500/30'
+                  : isDark
+                  ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-emerald-400/50'
+                  : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-emerald-500 shadow-sm'
+              }`}
+              title={showCommuteRoutes ? 'إخفاء الخطوط الدائمية' : 'إظهار الخطوط الدائمية على الخريطة'}
+              aria-label="الخطوط الدائمية"
+              aria-pressed={showCommuteRoutes}
+            >
+              <span className="text-base leading-none">🚌</span>
+              <span className="leading-tight">الخطوط الدائمية</span>
+              {showCommuteRoutes && (
+                <span className="flex h-2 w-2 relative mr-0.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* اليسار: ترحيب المستخدم وزر تبديل الوضع وزر الحساب الموحد الذي يفتح AppDrawer */}
           <div className="pointer-events-auto flex items-center gap-2">
             <div className="text-left hidden sm:block">
@@ -2184,8 +2213,10 @@ export default function CustomerHomePage() {
                 className="flex flex-col items-center select-none cursor-pointer group"
                 title="تعديل نقطة الانطلاق"
               >
-                <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 px-3.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.5)] border border-amber-500/40 transition-transform group-hover:scale-105">
-                  <span className="text-[13px] font-black text-amber-300 font-cairo">الانطلاق</span>
+                <div className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 shadow-lg border border-amber-500/40 transition-transform group-hover:scale-105 ${
+                  isDark ? 'bg-[#161C28]/95' : 'bg-white/95'
+                }`}>
+                  <span className={`text-[13px] font-black font-cairo ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>الانطلاق</span>
                   <div className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500">
                     <div className="h-2 w-2 rounded-full bg-[#090D16]" />
                   </div>
@@ -2208,8 +2239,8 @@ export default function CustomerHomePage() {
             />
           )}
 
-          {/* دبابيس الكباتن المحيطة وأقرب كابتن (٣ دقيقة) المعتمدة في التصميم للتكسي */}
-          {(serviceFilter === 'taxi' || serviceFilter === 'both') && !assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && (
+          {/* دبابيس كباتن التكسي — تظهر دائماً على الخريطة ولا يمكن إخفاؤها */}
+          {!assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && (
             <>
               {/* أقرب كابتن مع كبسولة «٣ دقيقة» النطاطة bg-[#FFC174] */}
               <NearestDriverPin
@@ -2223,8 +2254,8 @@ export default function CustomerHomePage() {
             </>
           )}
 
-          {/* دبابيس كباتن الخط الدائم (محددة بنقطة الانطلاق الثابتة والشارات الملونة) */}
-          {(serviceFilter === 'commute' || serviceFilter === 'both') && !assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && commuteDrivers.map((drv: any, idx: number) => {
+          {/* دبابيس كباتن الخط الدائم — تظهر فوق كباتن التكسي عند تفعيل زر الخطوط الدائمية */}
+          {showCommuteRoutes && !assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && commuteDrivers.map((drv: any, idx: number) => {
             const dLat = Number(drv.fixed_lat ?? drv.lat ?? drv.latitude);
             const dLng = Number(drv.fixed_lng ?? drv.lng ?? drv.longitude);
             if (isNaN(dLat) || isNaN(dLng)) return null;
@@ -2332,7 +2363,9 @@ export default function CustomerHomePage() {
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             {stage === 'pickup' ? (
               <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in select-none">
-                <div className="px-2.5 py-0.5 rounded-full bg-[#161C28]/95 border border-[#56E5A9]/50 text-[#56E5A9] text-[11px] font-bold mb-1 shadow-lg backdrop-blur-md">
+                <div className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold mb-1 shadow-lg backdrop-blur-md ${
+                  isDark ? 'bg-[#161C28]/95 border-[#56E5A9]/50 text-[#56E5A9]' : 'bg-white/95 border-emerald-500 text-emerald-700 shadow-sm'
+                }`}>
                   موقعك الحالي
                 </div>
                 <div className="relative flex items-center justify-center">
@@ -2346,7 +2379,9 @@ export default function CustomerHomePage() {
               </div>
             ) : (
               <div className="relative flex flex-col items-center -translate-y-full mb-1 animate-fade-in select-none">
-                <div className="px-2.5 py-0.5 rounded-full bg-[#161C28]/95 border border-amber-500/50 text-amber-300 text-[11px] font-bold mb-1 shadow-lg backdrop-blur-md">
+                <div className={`px-2.5 py-0.5 rounded-full border text-[11px] font-bold mb-1 shadow-lg backdrop-blur-md ${
+                  isDark ? 'bg-[#161C28]/95 border-amber-500/50 text-amber-300' : 'bg-white/95 border-amber-500 text-amber-700 shadow-sm'
+                }`}>
                   نقطة الوصول
                 </div>
                 <div className="relative flex items-center justify-center">
@@ -2362,69 +2397,24 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* شريط فلترة الخدمة الثلاثي: تكسي 🚖 | كلاهما ✨ | خط دائمي 🚌 */}
-        {stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4" dir="rtl">
-            <div className={`flex items-center p-1 rounded-full backdrop-blur-md shadow-xl border transition-all ${
-              isDark ? 'bg-[#161C28]/95 border-white/15' : 'bg-white/95 border-slate-200'
-            }`}>
-              <button
-                type="button"
-                onClick={() => { setServiceFilter('taxi'); setSelectedCommuteDriver(null); }}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  serviceFilter === 'taxi'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>🚖</span>
-                <span>تكسي</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setServiceFilter('both'); }}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  serviceFilter === 'both'
-                    ? 'bg-amber-500 text-slate-950 shadow-sm'
-                    : isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>✨</span>
-                <span>كلاهما</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setServiceFilter('commute'); }}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  serviceFilter === 'commute'
-                    ? 'bg-emerald-500 text-white shadow-sm'
-                    : isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>🚌</span>
-                <span>خط دائمي</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* شارة الكباتن المتوفرين قربك الآن (مشروطة بوجود كباتن فعليين > 0 فقط لمنع التناقض) */}
+        {/* شارة الكباتن المتوفرين قربك الآن */}
         {stage !== 'searching' && stage !== 'driver_arriving' && (() => {
-          const totalNearby = serviceFilter === 'commute'
-            ? commuteDrivers.length
-            : serviceFilter === 'taxi'
-            ? (nearbyDriversCount || 0)
-            : (nearbyDriversCount || 0) + commuteDrivers.length;
+          const totalNearby = showCommuteRoutes
+            ? (nearbyDriversCount || 0) + commuteDrivers.length
+            : (nearbyDriversCount || 0);
           if (totalNearby <= 0) return null;
           return (
-            <div className="pointer-events-auto absolute top-[calc(7.85rem+env(safe-area-inset-top,1rem))] right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-1.5 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
+            <div className={`pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] right-4 z-20 flex items-center gap-2 rounded-full backdrop-blur-md px-3.5 py-1.5 text-xs font-bold shadow-xl border animate-fade-in ${
+              isDark ? 'bg-[#161C28]/95 border-amber-500/30 text-white' : 'bg-white/95 border-amber-400 text-slate-800 shadow-md'
+            }`} dir="rtl">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
               </span>
               <span>
-                {totalNearby} {totalNearby === 1 ? 'كابتن متوفر' : totalNearby === 2 ? 'كابتنان متوفران' : 'كباتن متوفرين'}
-                {serviceFilter === 'commute' ? ' (خط دائمي)' : serviceFilter === 'taxi' ? ' (تكسي)' : ''}
+                {showCommuteRoutes && commuteDrivers.length > 0
+                  ? `${nearbyDriversCount || 0} تكسي • ${commuteDrivers.length} خط دائم`
+                  : `${totalNearby} ${totalNearby === 1 ? 'كابتن متوفر' : totalNearby === 2 ? 'كابتنان متوفران' : 'كباتن متوفرين'}`}
               </span>
               <span className="text-amber-400 text-sm">⚡</span>
             </div>
@@ -2432,11 +2422,13 @@ export default function CustomerHomePage() {
         })()}
 
         {stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(7.85rem+env(safe-area-inset-top,1rem))] left-4 z-20 flex items-center gap-2">
+          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] left-4 z-20 flex items-center gap-2">
             <button
               type="button"
               onClick={() => show('خدمة الطوارئ والأمان 🛡️', 'info')}
-              className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/10 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+              className={`w-9 h-9 min-w-[36px] min-h-[36px] rounded-full backdrop-blur-md border shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform ${
+                isDark ? 'bg-[#161C28]/95 border-white/10 text-amber-400' : 'bg-white/95 border-slate-200 text-amber-600 shadow-md'
+              }`}
               title="طوارئ وأمان"
               aria-label="طوارئ"
             >
@@ -2447,8 +2439,10 @@ export default function CustomerHomePage() {
 
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
         {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(10.75rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
-            <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-amber-400 shadow-xl border border-amber-500/30">
+          <div className="pointer-events-auto absolute top-[calc(7.85rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
+            <div className={`flex items-center gap-2 rounded-full backdrop-blur-md px-4 py-2 text-[12.5px] font-bold shadow-xl border ${
+              isDark ? 'bg-[#161C28]/95 border-amber-500/30 text-amber-400' : 'bg-white/95 border-amber-400/50 text-amber-700 shadow-md'
+            }`}>
               <span>يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍</span>
               <button
                 type="button"
@@ -2472,7 +2466,11 @@ export default function CustomerHomePage() {
               stage === 'ride_options'
                 ? 'bottom-[calc(22rem+env(safe-area-inset-bottom))]'
                 : 'bottom-[calc(14rem+env(safe-area-inset-bottom))]'
-            } left-4 z-30 bg-[#161C28]/95 backdrop-blur-md p-3 rounded-full shadow-xl border border-amber-500/30 active:scale-95 transition-all text-amber-400 flex items-center justify-center cursor-pointer hover:bg-[#1E293B] hover:text-amber-300 hover:border-amber-400 ${
+            } left-4 z-30 backdrop-blur-md p-3 rounded-full shadow-xl active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+              isDark 
+                ? 'bg-[#161C28]/95 border border-amber-500/30 text-amber-400 hover:bg-[#1E293B] hover:text-amber-300 hover:border-amber-400' 
+                : 'bg-white/95 border border-slate-200 text-amber-600 hover:bg-slate-50 hover:text-amber-700 hover:border-amber-400 shadow-md'
+            } ${
               isLocatingCurrent ? 'opacity-80' : ''
             }`}
             title="موقعي الحالي عبر الـ GPS"
@@ -2501,7 +2499,7 @@ export default function CustomerHomePage() {
         {selectedCommuteDriver && (
           <div className="pointer-events-auto absolute bottom-[calc(14rem+env(safe-area-inset-bottom,1rem))] inset-x-4 sm:inset-x-auto sm:right-6 sm:w-96 z-40 animate-slide-up" dir="rtl">
             <div className={`p-4 rounded-3xl shadow-2xl border backdrop-blur-xl ${
-              isDark ? 'bg-[#161C28]/95 border-amber-500/40 text-white' : 'bg-white/95 border-slate-300 text-slate-900'
+              isDark ? 'bg-[#161C28]/95 border-amber-500/40 text-white' : 'bg-white/95 border-slate-300 text-slate-900 shadow-xl'
             }`}>
               {/* رأس البطاقة: اسم الكابتن والتقييم والإغلاق */}
               <div className="flex items-start justify-between gap-3 mb-3">
@@ -2512,11 +2510,11 @@ export default function CustomerHomePage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-base font-black">{selectedCommuteDriver.firstName || selectedCommuteDriver.fullName || 'كابتن خط دائم'}</span>
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 text-xs font-bold border border-amber-500/30">
                         ★ {Number(selectedCommuteDriver.rating || 5.0).toFixed(1)}
                       </span>
                     </div>
-                    <span className="text-xs text-slate-400">
+                    <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {selectedCommuteDriver.vehicleModel || 'سيارة خط دائم'} {selectedCommuteDriver.vehicleColor ? `• ${selectedCommuteDriver.vehicleColor}` : ''}
                     </span>
                   </div>
@@ -2524,58 +2522,79 @@ export default function CustomerHomePage() {
                 <button
                   type="button"
                   onClick={() => setSelectedCommuteDriver(null)}
-                  className="w-8 h-8 rounded-full bg-slate-800/50 hover:bg-slate-700/80 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+                  className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors ${
+                    isDark ? 'bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900'
+                  }`}
                   aria-label="إغلاق"
                 >
                   ✕
                 </button>
               </div>
 
-              {/* مسار الخط: الانطلاق ➔ الوجهة */}
-              <div className={`p-3 rounded-2xl mb-3 border ${
-                isDark ? 'bg-[#0B101B]/80 border-white/10' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <div className="flex items-center gap-2 text-xs font-bold mb-1.5">
-                  <span className="text-emerald-400">🟢</span>
-                  <span className="text-slate-400">الانطلاق:</span>
-                  <span className="truncate">{selectedCommuteDriver.fixed_label || 'نقطة الانطلاق'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold">
-                  <span className="text-amber-400">🏁</span>
-                  <span className="text-slate-400">الوجهة:</span>
-                  <span className="truncate">{selectedCommuteDriver.fixed_dest_label || 'الوجهة المحددة'}</span>
-                </div>
-              </div>
+              {/* مسار الخط الحقيقي: الانطلاق ➔ الوجهة المحددة بدقة */}
+              {(() => {
+                const startLabel = selectedCommuteDriver.fixed_label 
+                  || (selectedCommuteDriver.route && selectedCommuteDriver.route.includes('➔') ? selectedCommuteDriver.route.split('➔')[0].trim() : '')
+                  || selectedCommuteDriver.from 
+                  || 'نقطة الانطلاق';
+
+                const destLabel = selectedCommuteDriver.fixed_dest_label
+                  || selectedCommuteDriver.route_name
+                  || (selectedCommuteDriver.route && selectedCommuteDriver.route.includes('➔') ? selectedCommuteDriver.route.split('➔')[1].trim() : selectedCommuteDriver.route)
+                  || selectedCommuteDriver.to
+                  || 'وجهة الخط الدائم';
+
+                return (
+                  <div className={`p-3 rounded-2xl mb-3 border ${
+                    isDark ? 'bg-[#0B101B]/80 border-white/10' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center gap-2 text-xs font-bold mb-1.5">
+                      <span className="text-emerald-500">🟢</span>
+                      <span className={isDark ? "text-slate-400" : "text-slate-500"}>الانطلاق:</span>
+                      <span className={`truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{startLabel}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      <span className="text-amber-500">🏁</span>
+                      <span className={isDark ? "text-slate-400" : "text-slate-500"}>الوجهة:</span>
+                      <span className={`truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{destLabel}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* مؤشرات المسافة وحالة المقاعد */}
               <div className="flex items-center justify-between text-xs font-bold mb-3 px-1">
                 <span className="flex items-center gap-1.5">
-                  <span className="text-slate-400">المسافة منك:</span>
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>المسافة منك:</span>
                   <span className={`px-2 py-0.5 rounded-full font-mono font-bold ${
                     selectedCommuteDriver.distanceBand === 'green'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
                       : selectedCommuteDriver.distanceBand === 'purple'
-                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                      : 'bg-rose-500/20 text-rose-500 border border-rose-500/30'
                   }`}>
                     {selectedCommuteDriver.distanceM != null ? `${selectedCommuteDriver.distanceM < 1000 ? `${selectedCommuteDriver.distanceM}م` : `${(selectedCommuteDriver.distanceM / 1000).toFixed(1)}كم`}` : 'قريب'}
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="text-slate-400">المقاعد:</span>
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>المقاعد:</span>
                   <span className={`px-2 py-0.5 rounded-full ${
-                    selectedCommuteDriver.isFull ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    selectedCommuteDriver.isFull ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
                   }`}>
                     {selectedCommuteDriver.isFull ? 'مكتمل' : 'مقاعد متوفرة'}
                   </span>
                 </span>
               </div>
 
-              {/* زر حجز مقعد في هذا الخط */}
+              {/* زر حجز مقعد في هذا الخط — ينقل مباشرة إلى صفحة /daily مع تحديد الكابتن */}
               <button
                 type="button"
                 onClick={() => {
-                  navigate('/daily');
+                  navigate('/daily', {
+                    state: {
+                      selectedDriverId: selectedCommuteDriver.driverId || selectedCommuteDriver.id,
+                    },
+                  });
                 }}
                 className="w-full min-h-[48px] rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
@@ -2588,18 +2607,24 @@ export default function CustomerHomePage() {
 
         {/* 6. البطاقة السفلية الفاخرة في مرحلتي الانطلاق والوصول */}
         {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-2xl bg-[#161C28]/95 backdrop-blur-md px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white">
+          <div className={`absolute inset-x-0 bottom-0 z-30 rounded-t-2xl backdrop-blur-md px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t ${
+            isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]'
+          }`}>
             <div className="flex justify-center mb-3">
-              <div className="h-1 w-10 rounded-full bg-slate-700" />
+              <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
             </div>
 
             <div
               onClick={() => { setIsSearchOpen(true); setSearchResults([]); }}
-              className="mb-4 flex items-center justify-between rounded-xl bg-[#0B101B] border border-amber-500/30 p-3.5 cursor-pointer transition active:scale-[0.99] hover:border-amber-500/60"
+              className={`mb-4 flex items-center justify-between rounded-xl p-3.5 cursor-pointer transition active:scale-[0.99] border ${
+                isDark 
+                  ? 'bg-[#0B101B] border-amber-500/30 hover:border-amber-500/60' 
+                  : 'bg-slate-50 border-slate-200 hover:border-amber-500'
+              }`}
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <svg
-                  className="h-5 w-5 text-amber-400 shrink-0"
+                  className="h-5 w-5 text-amber-500 shrink-0"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -2610,7 +2635,7 @@ export default function CustomerHomePage() {
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <span className="truncate text-[15px] font-bold text-slate-100">
+                <span className={`truncate text-[15px] font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                   {stage === 'pickup' ? pickupName || DEFAULT_PICKUP_NAME : dropoffName || DEFAULT_DROPOFF_NAME}
                 </span>
               </div>
@@ -2945,22 +2970,28 @@ export default function CustomerHomePage() {
 
         {/* 7. بطاقة البحث الفاخرة — جاري انتظار موافقة الكابتن */}
         {stage === 'searching' && (
-          <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-xl text-white border-t border-amber-500/30 shadow-[0_-12px_40px_rgba(0,0,0,0.85)] animate-fade-in pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)]" dir="rtl">
+          <div className={`absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] backdrop-blur-xl border-t shadow-[0_-12px_40px_rgba(0,0,0,0.85)] animate-fade-in pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] ${
+            isDark ? 'bg-[#161C28]/95 border-amber-500/30 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-xl'
+          }`} dir="rtl">
             {/* مقبض علوي */}
             <div className="flex justify-center py-3">
-              <div className="h-1.5 w-10 rounded-full bg-slate-700" />
+              <div className={`h-1.5 w-10 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
             </div>
 
             <div className="px-5 space-y-4">
               {/* رادار البحث النابض */}
-              <div className="flex flex-row-reverse overflow-hidden rounded-2xl shadow-xl border border-amber-500/30 bg-[#0B101B]" style={{ minHeight: '120px' }}>
+              <div className={`flex flex-row-reverse overflow-hidden rounded-2xl shadow-xl border ${
+                isDark ? 'border-amber-500/30 bg-[#0B101B]' : 'border-slate-200 bg-slate-50'
+              }`} style={{ minHeight: '120px' }}>
                 <div className="flex flex-col items-center justify-center bg-gradient-to-b from-amber-400 via-amber-500 to-amber-600 px-5 min-w-[110px] text-slate-950 font-black">
                   <span className="text-[12px] opacity-80 mb-0.5">طلب تكسي</span>
                   <span className="text-[22px] font-black leading-tight">{currentTier.name}</span>
                   <div className="mt-1"><CarBadgeIllustration badge={currentTier.badge} size="sm" /></div>
                 </div>
-                <div className="flex flex-1 flex-col items-center justify-center bg-[#0B101B] gap-1.5 p-4 text-center">
-                  <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 text-[26px] border border-amber-400/40 shadow-md">
+                <div className={`flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center ${
+                  isDark ? 'bg-[#0B101B]' : 'bg-slate-50'
+                }`}>
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/20 text-amber-500 text-[26px] border border-amber-400/40 shadow-md">
                     <span className="animate-ping absolute h-12 w-12 rounded-full bg-amber-500/30" />
                     <span>🚖</span>
                   </div>
@@ -2969,37 +3000,41 @@ export default function CustomerHomePage() {
                       <div key={i} className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: `${i * 0.18}s` }} />
                     ))}
                   </div>
-                  <span className="text-xs font-bold text-amber-300">جاري البحث عن كابتن بانتظار الموافقة...</span>
+                  <span className="text-xs font-bold text-amber-500">جاري البحث عن كابتن بانتظار الموافقة...</span>
                 </div>
               </div>
 
               {/* تفاصيل المسار والأجرة */}
-              <div className="rounded-2xl bg-[#0B101B] border border-white/10 p-3.5 space-y-2 text-xs">
-                <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                  <span className="text-slate-400">الأجرة التقديرية</span>
-                  <span className="text-base font-black text-amber-400 font-mono">
+              <div className={`rounded-2xl border p-3.5 space-y-2 text-xs ${
+                isDark ? 'bg-[#0B101B] border-white/10 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+              }`}>
+                <div className={`flex items-center justify-between pb-2 border-b ${
+                  isDark ? 'border-white/10' : 'border-slate-200'
+                }`}>
+                  <span className={isDark ? "text-slate-400" : "text-slate-500"}>الأجرة التقديرية</span>
+                  <span className="text-base font-black text-amber-500 font-mono">
                     {calculatedPrice.toLocaleString()} د.ع
                   </span>
                 </div>
-                <div className="space-y-1 text-slate-300 text-start">
-                  <p className="truncate">🟢 من: <span className="text-white font-bold">{pickupName}</span></p>
-                  <p className="truncate">🔴 إلى: <span className="text-white font-bold">{dropoffName}</span></p>
+                <div className="space-y-1 text-start">
+                  <p className="truncate">🟢 من: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pickupName}</span></p>
+                  <p className="truncate">🔴 إلى: <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{dropoffName}</span></p>
                   {isRoundTrip && (
-                    <p className="text-amber-400 font-bold flex items-center gap-1 pt-0.5">
+                    <p className="text-amber-500 font-bold flex items-center gap-1 pt-0.5">
                       <span>🔄</span>
                       <span>رحلة ذهاب وإياب</span>
                     </p>
                   )}
                   {secondDestination && (
-                    <p className="text-amber-300 flex items-center gap-1 pt-0.5">
+                    <p className="text-amber-500 flex items-center gap-1 pt-0.5">
                       <span>📍</span>
-                      <span>محطة إضافية: <b className="text-white">{secondDestination}</b></span>
+                      <span>محطة إضافية: <b className={isDark ? "text-white" : "text-slate-900"}>{secondDestination}</b></span>
                     </p>
                   )}
                   {stopDuration ? (
-                    <p className="text-amber-300 flex items-center gap-1 pt-0.5">
+                    <p className="text-amber-500 flex items-center gap-1 pt-0.5">
                       <span>⏱️</span>
-                      <span>توقف في الطريق: <b className="text-white">{stopDuration} دقائق</b></span>
+                      <span>توقف في الطريق: <b className={isDark ? "text-white" : "text-slate-900"}>{stopDuration} دقائق</b></span>
                     </p>
                   ) : null}
                 </div>
@@ -3125,7 +3160,9 @@ export default function CustomerHomePage() {
                   : 'translateY(calc(100% - 78px))',
               transition: 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-hidden rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md text-white border-t border-amber-500/20 pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl will-change-transform animate-fade-in"
+            className={`absolute inset-x-0 bottom-0 z-30 flex flex-col max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-hidden rounded-t-[28px] backdrop-blur-md border-t pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl will-change-transform animate-fade-in ${
+              isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-xl'
+            }`}
           >
             {/* مقبض السحب وترويسة الورقة مع دعم Pointer Events وإمكانية الوصول */}
             <div
@@ -3742,9 +3779,13 @@ export default function CustomerHomePage() {
 
       {/* 9. نافذة البحث الفاخرة عن الأماكن */}
       {isSearchOpen && (
-        <div className="fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col bg-[#0D131F] text-white">
-          <div className="flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b border-slate-800">
-            <h2 className="text-[18px] font-bold text-white">
+        <div className={`fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col ${
+          isDark ? 'bg-[#0D131F] text-white' : 'bg-slate-50 text-slate-900'
+        }`}>
+          <div className={`flex items-center justify-between px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3 border-b ${
+            isDark ? 'border-slate-800' : 'border-slate-200 bg-white'
+          }`}>
+            <h2 className={`text-[18px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {stage === 'pickup' ? 'حدد نقطة الانطلاق' : 'حدد وجهة الوصول'}
             </h2>
             <button
@@ -3754,7 +3795,9 @@ export default function CustomerHomePage() {
                 setSearchQuery('');
                 setSearchResults([]);
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+              }`}
               aria-label="إغلاق"
             >
               <svg
@@ -3774,20 +3817,24 @@ export default function CustomerHomePage() {
 
           {/* مربع البحث العلوي المندمج */}
           <div className="px-4 py-3">
-            <div className="flex items-center rounded-xl bg-[#0B101B] border border-amber-500/30 px-3 py-2.5 transition-all focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20">
+            <div className={`flex items-center rounded-xl border px-3 py-2.5 transition-all focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20 ${
+              isDark ? 'bg-[#0B101B] border-amber-500/30' : 'bg-white border-slate-300 shadow-sm'
+            }`}>
               <button
                 type="button"
                 onClick={() => setIsCitySelectorOpen(true)}
-                className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg bg-[#161C28] border border-amber-500/30 text-[12px] font-bold text-amber-300 hover:border-amber-400 transition cursor-pointer"
+                className={`flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg border text-[12px] font-bold transition cursor-pointer ${
+                  isDark ? 'bg-[#161C28] border-amber-500/30 text-amber-300 hover:border-amber-400' : 'bg-slate-100 border-slate-200 text-amber-700 hover:border-amber-400'
+                }`}
                 title="تغيير المحافظة"
               >
                 <span>محافظتك: {selectedCity}</span>
                 <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
 
-              <div className="mx-2.5 h-4 w-[1px] bg-slate-800" />
+              <div className={`mx-2.5 h-4 w-[1px] ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`} />
 
-              <div className="mr-1 text-amber-400/80">
+              <div className="mr-1 text-amber-500">
                 <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -3810,7 +3857,9 @@ export default function CustomerHomePage() {
                 placeholder={
                   stage === 'pickup' ? 'ابحث عن موقع الانطلاق...' : 'ابحث عن وجهة الوصول...'
                 }
-                className="flex-1 bg-transparent text-[14px] font-medium text-white outline-none placeholder-slate-500 font-map-search"
+                className={`flex-1 bg-transparent text-[14px] font-medium outline-none placeholder-slate-400 font-map-search ${
+                  isDark ? 'text-white' : 'text-slate-900'
+                }`}
               />
 
               <button
@@ -3839,7 +3888,9 @@ export default function CustomerHomePage() {
           </div>
 
           {/* شريط الأماكن السريعة */}
-          <div className="flex items-center gap-2.5 px-4 pb-3 overflow-x-auto no-scrollbar border-b border-slate-800">
+          <div className={`flex items-center gap-2.5 px-4 pb-3 overflow-x-auto no-scrollbar border-b ${
+            isDark ? 'border-slate-800' : 'border-slate-200'
+          }`}>
             {QUICK_CHIPS.map((chip) => (
               <div
                 key={chip.name}
@@ -3848,10 +3899,12 @@ export default function CustomerHomePage() {
                   e.stopPropagation();
                   handleSelectPlace(chip);
                 }}
-                className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#161C28] hover:border-amber-500/40 px-3.5 py-2 cursor-pointer transition-all duration-200 active:scale-95 shadow-sm shrink-0"
+                className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 cursor-pointer transition-all duration-200 active:scale-95 shadow-sm shrink-0 ${
+                  isDark ? 'border-slate-800 bg-[#161C28] text-slate-200 hover:border-amber-500/40' : 'border-slate-200 bg-white text-slate-800 hover:border-amber-500'
+                }`}
               >
-                <span className="text-[13px] font-bold text-slate-200">{chip.name}</span>
-                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/20 text-amber-400">
+                <span className="text-[13px] font-bold">{chip.name}</span>
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500/20 text-amber-500">
                   <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
@@ -3863,18 +3916,18 @@ export default function CustomerHomePage() {
           {/* قائمة الأماكن */}
           <div
             onMouseDown={(e) => e.preventDefault()}
-            className="flex-1 overflow-y-auto px-4 py-3 bg-[#080E1A]"
+            className={`flex-1 overflow-y-auto px-4 py-3 ${isDark ? 'bg-[#080E1A]' : 'bg-white'}`}
           >
             {isSearchingPlaces && (
               <div className="flex items-center justify-center py-8 text-slate-400">
-                <Spinner className="h-5 w-5 ml-2 text-amber-400" />
+                <Spinner className="h-5 w-5 ml-2 text-amber-500" />
                 <span className="text-xs font-semibold">جاري البحث في الأماكن والمعالم...</span>
               </div>
             )}
 
             {!isSearchingPlaces && searchResults.length > 0 && (
               <div className="space-y-1.5">
-                <p className="mb-2 text-[12px] font-bold text-slate-400 px-1">
+                <p className={`mb-2 text-[12px] font-bold px-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   {searchQuery.trim().length === 0 ? 'أماكن مقترحة' : `نتائج البحث (${searchResults.length})`}
                 </p>
                 {searchResults.map((place, idx) => (
@@ -3885,20 +3938,26 @@ export default function CustomerHomePage() {
                       e.stopPropagation();
                       handleSelectPlace(place);
                     }}
-                    className="group flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-[#0B101B] hover:border-amber-500/50 hover:shadow-md transition-all duration-200 cursor-pointer"
+                    className={`group flex items-center justify-between p-3 rounded-xl border transition-all duration-200 cursor-pointer ${
+                      isDark ? 'border-slate-800 bg-[#0B101B] hover:border-amber-500/50' : 'border-slate-200 bg-slate-50 hover:border-amber-500 hover:bg-amber-50/20'
+                    }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 group-hover:bg-amber-500/20 transition-colors">
                         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                           <circle cx="12" cy="10" r="3" />
                         </svg>
                       </div>
                       <div className="truncate font-map-search">
-                        <p className="text-[14.5px] font-bold text-slate-200 group-hover:text-amber-300 transition-colors truncate">
+                        <p className={`text-[14.5px] font-bold transition-colors truncate ${
+                          isDark ? 'text-slate-200 group-hover:text-amber-300' : 'text-slate-900 group-hover:text-amber-700'
+                        }`}>
                           {place.name}
                         </p>
-                        <p className="text-[12px] font-medium text-slate-400 mt-0.5 truncate">
+                        <p className={`text-[12px] font-medium mt-0.5 truncate ${
+                          isDark ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
                           {place.subName || 'النجف الأشرف'}
                         </p>
                       </div>

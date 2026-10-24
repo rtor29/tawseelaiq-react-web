@@ -4,7 +4,7 @@
 // - عند الضغط على سائق تظهر ورقة تفاصيله
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Map as MapGL, Marker, type MapRef, type MapMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { http } from '../lib/api';
@@ -65,6 +65,8 @@ function CarSVG({ color }: { color: string }) {
 
 export default function DailyRoutePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const hasAutoSelectedRef = useRef(false);
   const { show } = useToast();
   const { mapStyle, isDark } = useTheme();
   const mapRef = useRef<MapRef | null>(null);
@@ -370,6 +372,19 @@ export default function DailyRoutePage() {
             };
           });
           setDrivers(mapped);
+
+          // تحديد الكابتن تلقائياً وفتح بطاقته إذا تم التمرير من شاشة الراكب
+          const targetDriverId = (location.state as any)?.selectedDriverId;
+          if (targetDriverId && !hasAutoSelectedRef.current) {
+            const found = mapped.find(
+              (m: any) => String(m.driverId || m.id) === String(targetDriverId)
+            );
+            if (found) {
+              setSelectedDriver(found);
+              hasAutoSelectedRef.current = true;
+              mapRef.current?.flyTo({ center: [found.lng, found.lat], zoom: 15.5, duration: 600 });
+            }
+          }
         })
         .catch(() => {});
     };
@@ -774,7 +789,11 @@ export default function DailyRoutePage() {
       <button
         type="button"
         onClick={handleUseCurrentLocation}
-        className={`absolute ${selectedDriver ? 'bottom-28' : 'bottom-60'} right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-[#161C28]/95 text-amber-400 border border-white/15 shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all active:scale-95 cursor-pointer hover:bg-[#161C28]`}
+        className={`absolute ${selectedDriver ? 'bottom-28' : 'bottom-60'} right-4 z-20 flex h-12 w-12 items-center justify-center rounded-full border shadow-xl transition-all active:scale-95 cursor-pointer ${
+          isDark 
+            ? 'bg-[#161C28]/95 text-amber-400 border-white/15 hover:bg-[#161C28]' 
+            : 'bg-white/95 text-amber-600 border-slate-200 hover:bg-slate-50 shadow-md'
+        }`}
         title="موقعي الحالي عبر الـ GPS"
         aria-label="تحديد موقعي"
       >
@@ -798,8 +817,10 @@ export default function DailyRoutePage() {
 
       {/* مفتاح الألوان */}
       {!selectedDriver && (
-        <div className="absolute bottom-28 right-4 z-20 rounded-2xl bg-[#161C28]/95 border border-white/15 px-4 py-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)] text-white">
-          <p className="text-[13px] font-black text-amber-400 mb-2">الخريطة</p>
+        <div className={`absolute bottom-28 right-4 z-20 rounded-2xl border px-4 py-3 shadow-xl ${
+          isDark ? 'bg-[#161C28]/95 border-white/15 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-md'
+        }`}>
+          <p className="text-[13px] font-black text-amber-500 mb-2">الخريطة</p>
           {[
             { color: '#16a34a', label: 'أخضر (قريب جداً < 500م)' },
             { color: '#7c3aed', label: 'بنفسجي (بعيد)' },
@@ -807,7 +828,7 @@ export default function DailyRoutePage() {
           ].map(item => (
             <div key={item.color} className="flex items-center gap-2 mb-1">
               <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-              <span className="text-[11px] font-bold text-slate-300">{item.label}</span>
+              <span className={`text-[11px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{item.label}</span>
             </div>
           ))}
         </div>
@@ -816,8 +837,12 @@ export default function DailyRoutePage() {
       {/* الزر السفلي الافتراضي */}
       {!selectedDriver && (
         <div className="fixed inset-x-0 bottom-0 z-20 flex flex-col items-center pointer-events-none" dir="rtl">
-          <div className="pointer-events-auto w-full max-w-lg bg-[#161C28]/95 px-5 pt-3 pb-8 shadow-2xl rounded-t-3xl border-t border-white/15 text-white">
-            <div className="flex justify-center mb-3"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
+          <div className={`pointer-events-auto w-full max-w-lg px-5 pt-3 pb-8 shadow-2xl rounded-t-3xl border-t ${
+            isDark ? 'bg-[#161C28]/95 border-white/15 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-lg'
+          }`}>
+            <div className="flex justify-center mb-3">
+              <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-white/20' : 'bg-slate-300'}`} />
+            </div>
             <button type="button" onClick={() => show('اختر سائقاً من الخريطة أولاً', 'info')}
               className="w-full rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 py-3.5 text-center text-[16px] font-black text-slate-950 shadow-xl shadow-amber-500/25 cursor-pointer hover:brightness-105 transition-all duration-200 ease-in-out active:scale-[0.98]">
               تأكيد نقطة الانطلاق
@@ -835,19 +860,21 @@ export default function DailyRoutePage() {
         return (
           <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col items-center pointer-events-none" dir="rtl">
             <div 
-              className="pointer-events-auto w-full max-w-lg rounded-t-[24px] bg-[#1e1e2e] text-white pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-y-auto overscroll-contain"
+              className={`pointer-events-auto w-full max-w-lg rounded-t-[24px] pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-y-auto overscroll-contain border-t ${
+                isDark ? 'bg-[#1e1e2e] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+              }`}
               style={{ maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))' }}
             >
               <div className="flex justify-center pt-3 mb-1 cursor-pointer" onClick={() => setSelectedDriver(null)}>
-                <div className="h-1 w-10 rounded-full bg-white/30" />
+                <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-white/30' : 'bg-slate-300'}`} />
               </div>
 
             {/* صف السائق */}
-            <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-white/10">
+            <div className={`flex items-center justify-between px-5 pt-2 pb-3 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-[19px] font-black">{selectedDriver.name}</p>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded border border-amber-500/30 text-amber-300 bg-amber-500/10">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded border border-amber-500/30 text-amber-500 bg-amber-500/10">
                     {selectedDriver.vehicleType === 'super' || selectedDriver.vehicleType === 'سوبر' ? '⚡ سوبر' : (selectedDriver.vehicleType === 'plus' || selectedDriver.vehicleType === 'بلس' || selectedDriver.vehicleType === 'vip') ? '💎 بلس' : '🚕 توفير'}
                   </span>
                 </div>
@@ -865,10 +892,12 @@ export default function DailyRoutePage() {
             </div>
 
             {/* تقييم + لوحة + سيارة */}
-            <div className="flex items-center gap-4 px-5 py-3 border-b border-white/10">
+            <div className={`flex items-center gap-4 px-5 py-3 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
               <div className="flex flex-col items-center gap-1">
-                <span className="text-[13px] font-bold text-yellow-400">⭐ {selectedDriver.rating}</span>
-                <div className="rounded-lg border border-white/40 px-2 py-1 text-center">
+                <span className="text-[13px] font-bold text-yellow-500">⭐ {selectedDriver.rating}</span>
+                <div className={`rounded-lg border px-2 py-1 text-center ${
+                  isDark ? 'border-white/40 text-white' : 'border-slate-300 text-slate-800 bg-slate-50'
+                }`}>
                   <p className="text-[11px] font-black tracking-wide">{selectedDriver.plate}</p>
                 </div>
               </div>
@@ -877,28 +906,28 @@ export default function DailyRoutePage() {
                 <div className="flex items-center justify-end gap-1 mb-1">
                   <span className="text-[13px] font-bold">{selectedDriver.from}</span>
                   <div className="h-2.5 w-2.5 rounded-full bg-blue-400" />
-                  <span className="text-[11px] text-white/50">من:</span>
+                  <span className={`text-[11px] ${isDark ? 'text-white/50' : 'text-slate-500'}`}>من:</span>
                 </div>
                 <div className="flex items-center justify-end gap-1">
                   <span className="text-[13px] font-bold">{selectedDriver.to}</span>
-                  <div className="h-2.5 w-2.5 rounded-full bg-white/60" />
-                  <span className="text-[11px] text-white/50">إلى:</span>
+                  <div className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+                  <span className={`text-[11px] ${isDark ? 'text-white/50' : 'text-slate-500'}`}>إلى:</span>
                 </div>
               </div>
             </div>
 
             {/* مقاعد */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+            <div className={`flex items-center justify-between px-5 py-3 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
               <div className="flex gap-1">
                 {Array.from({ length: selectedDriver.seats }).map((_, i) => (
-                  <svg key={i} className={`h-6 w-6 ${i < selectedDriver.takenSeats ? 'text-white/30' : 'text-white'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                  <svg key={i} className={`h-6 w-6 ${i < selectedDriver.takenSeats ? (isDark ? 'text-white/30' : 'text-slate-300') : (isDark ? 'text-white' : 'text-slate-800')}`} viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <div className="rounded-full px-3 py-1 text-[12px] font-bold" style={{ backgroundColor: remaining > 0 ? '#16a34a' : '#dc2626' }}>
+                <div className="rounded-full px-3 py-1 text-[12px] font-bold text-white" style={{ backgroundColor: remaining > 0 ? '#16a34a' : '#dc2626' }}>
                   {remaining > 0 ? `متبقي ${remaining === 1 ? 'مقعد' : remaining === 2 ? 'مقعدين' : `${remaining} مقاعد`}` : 'مكتمل'}
                 </div>
-                <p className="text-[12px] text-white/50">الراكب المطلوبة: {selectedDriver.takenSeats} / {selectedDriver.seats}</p>
+                <p className={`text-[12px] ${isDark ? 'text-white/50' : 'text-slate-500'}`}>الراكب المطلوبة: {selectedDriver.takenSeats} / {selectedDriver.seats}</p>
               </div>
             </div>
 
@@ -906,27 +935,27 @@ export default function DailyRoutePage() {
             <div className="flex flex-col gap-2.5 px-5 pt-4">
               {isCancellationPending ? (
                 <div className="space-y-2">
-                  <div className="w-full rounded-xl bg-amber-500/25 border border-amber-400/50 py-3.5 text-center text-[14.5px] font-black text-amber-300 flex items-center justify-center gap-2 shadow-xs">
+                  <div className="w-full rounded-xl bg-amber-500/25 border border-amber-400/50 py-3.5 text-center text-[14.5px] font-black text-amber-500 flex items-center justify-center gap-2 shadow-xs">
                     <span>طلب الإلغاء قيد مراجعة الكابتن</span>
                     <span className="text-[17px] animate-pulse">⏳</span>
                   </div>
-                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-semibold text-amber-200">
+                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-semibold text-amber-600">
                     تم إرسال طلبك ({matchingBooking?.cancellationReason || cancelReason}) وبانتظار مراجعة الكابتن.
                   </p>
                 </div>
               ) : isBookingPending ? (
                 <div className="space-y-2">
-                  <div className="w-full rounded-xl bg-amber-500/20 border border-amber-400/40 py-3.5 text-center text-[15px] font-black text-amber-300 flex items-center justify-center gap-2 shadow-xs">
+                  <div className="w-full rounded-xl bg-amber-500/20 border border-amber-400/40 py-3.5 text-center text-[15px] font-black text-amber-500 flex items-center justify-center gap-2 shadow-xs">
                     <span>طلبك قيد انتظار موافقة الكابتن</span>
                     <span className="text-[17px] animate-pulse">⏳</span>
                   </div>
-                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-300">
+                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-600">
                     تم إرسال طلب حجز المقعد للكابتن. بانتظار موافقة صاحب الخط لتأكيد مقعدك.
                   </p>
                   <button
                     type="button"
                     onClick={() => setIsCancelModalOpen(true)}
-                    className="w-full rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 py-2.5 text-center text-[13px] font-bold text-red-300 transition active:scale-95 cursor-pointer"
+                    className="w-full rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 py-2.5 text-center text-[13px] font-bold text-red-500 transition active:scale-95 cursor-pointer"
                   >
                     إلغاء طلب الحجز المعلق ✕
                   </button>
@@ -941,13 +970,13 @@ export default function DailyRoutePage() {
                     <span>مشترك بالفعل في هذا الخط</span>
                     <span className="text-[17px]">✅</span>
                   </button>
-                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-300">
+                  <p className="rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-center text-[12px] font-bold text-amber-600">
                     أنت مسجل بالفعل في هذا الخط. يمكنك التواصل المباشر مع الكابتن أدناه.
                   </p>
                   <button
                     type="button"
                     onClick={() => setIsCancelModalOpen(true)}
-                    className="w-full rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 py-2.5 text-center text-[13px] font-bold text-red-300 transition active:scale-95 cursor-pointer"
+                    className="w-full rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 py-2.5 text-center text-[13px] font-bold text-red-500 transition active:scale-95 cursor-pointer"
                   >
                     طلب إلغاء الاشتراك في الخط ✕
                   </button>
@@ -955,11 +984,11 @@ export default function DailyRoutePage() {
               ) : (
                 hasAnyActiveCommute && !matchingBooking ? (
                   <div className="space-y-2">
-                    <div className="w-full rounded-xl bg-red-500/15 border border-red-500/40 py-3.5 text-center text-[14px] font-black text-red-300 flex items-center justify-center gap-2">
+                    <div className="w-full rounded-xl bg-red-500/15 border border-red-500/40 py-3.5 text-center text-[14px] font-black text-red-500 flex items-center justify-center gap-2">
                       <span>لديك اشتراك نشط في خط آخر</span>
                       <span className="text-[17px]">🚫</span>
                     </div>
-                    <p className="rounded-lg bg-red-500/10 border border-red-500/25 px-3 py-1.5 text-center text-[12px] font-semibold text-red-300">
+                    <p className="rounded-lg bg-red-500/10 border border-red-500/25 px-3 py-1.5 text-center text-[12px] font-semibold text-red-500">
                       يجب إلغاء اشتراكك الحالي وتأكيد الإلغاء قبل الاشتراك في خط آخر.
                     </p>
                   </div>
@@ -989,7 +1018,9 @@ export default function DailyRoutePage() {
                     if (selectedDriver.phone) window.open(`tel:${selectedDriver.phone}`);
                     else show('رقم هاتف السائق غير متوفر', 'info');
                   }}
-                  className="flex-1 flex min-h-[48px] h-12 items-center justify-center gap-1.5 rounded-xl border border-white/30 text-white text-[13px] font-bold cursor-pointer hover:bg-white/10 active:scale-95 transition"
+                  className={`flex-1 flex min-h-[48px] h-12 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold cursor-pointer transition active:scale-95 ${
+                    isDark ? 'border-white/30 text-white hover:bg-white/10' : 'border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+                  }`}
                 >
                   <svg className="w-5 h-5 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                   <span>اتصال</span>
@@ -1004,7 +1035,9 @@ export default function DailyRoutePage() {
                       show('رقم هاتف السائق غير متوفر', 'info');
                     }
                   }}
-                  className="flex-1 flex min-h-[48px] h-12 items-center justify-center gap-1.5 rounded-xl border border-white/30 text-white text-[13px] font-bold cursor-pointer hover:bg-white/10 active:scale-95 transition"
+                  className={`flex-1 flex min-h-[48px] h-12 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold cursor-pointer transition active:scale-95 ${
+                    isDark ? 'border-white/30 text-white hover:bg-white/10' : 'border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+                  }`}
                 >
                   <svg className="w-5 h-5 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   <span>واتساب</span>
@@ -1019,19 +1052,21 @@ export default function DailyRoutePage() {
       {/* نافذة طلب إلغاء الاشتراك في الخط الدائمي */}
       {isCancelModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-fade-in" dir="rtl">
-          <div className="w-full max-w-md rounded-2xl bg-[#1e293b] border border-white/10 p-5 shadow-2xl text-right text-white space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+          <div className={`w-full max-w-md rounded-2xl border p-5 shadow-2xl text-right space-y-4 ${
+            isDark ? 'bg-[#1e293b] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+          }`}>
+            <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
               <h3 className="text-[16px] font-black">طلب إلغاء الاشتراك في الخط</h3>
               <button
                 type="button"
                 onClick={() => setIsCancelModalOpen(false)}
-                className="rounded-full p-1 text-white/50 hover:bg-white/10 transition cursor-pointer"
+                className={`rounded-full p-1 transition cursor-pointer ${isDark ? 'text-white/50 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100'}`}
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-[13px] text-white/70">
+            <p className={`text-[13px] ${isDark ? 'text-white/70' : 'text-slate-600'}`}>
               يرجى تحديد سبب الإلغاء لمراجعته مع الكابتن ({selectedDriver?.name}):
             </p>
 
