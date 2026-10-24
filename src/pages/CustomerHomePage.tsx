@@ -2685,7 +2685,11 @@ export default function CustomerHomePage() {
                   : 'translateY(calc(100% - 108px))',
               transition: isTierDraggingRef.current ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
-            className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] bg-[#161C28]/95 backdrop-blur-md pt-1 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t border-amber-500/20 text-white animate-fade-in will-change-transform motion-reduce:transition-none select-none max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-hidden"
+            className={`absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[28px] backdrop-blur-md pt-1 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t animate-fade-in will-change-transform motion-reduce:transition-none select-none max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-hidden ${
+              isDark
+                ? 'bg-[#161C28]/95 border-amber-500/20 text-white'
+                : 'bg-white/95 border-slate-200 text-slate-900 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]'
+            }`}
             dir="rtl"
           >
             {/* مقبض السحب القابل للمس مع مساحة 48px وتحريك ناعم */}
@@ -2702,7 +2706,9 @@ export default function CustomerHomePage() {
               aria-label="مقبض سحب وتغيير حجم قائمة الفئات"
             >
               <div className="py-2 px-10 flex justify-center items-center min-h-[48px]">
-                <div className="h-1.5 w-12 rounded-full bg-slate-400 hover:bg-slate-300 active:bg-amber-400 transition-colors" />
+                <div className={`h-1.5 w-12 rounded-full transition-colors ${
+                  isDark ? 'bg-slate-500 hover:bg-slate-400 active:bg-amber-400' : 'bg-slate-300 hover:bg-slate-400 active:bg-amber-400'
+                }`} />
               </div>
 
               {/* حالة مصغّرة (minimized): مقبض + الفئة المحددة + زر الطلب فتظهر الخريطة كاملة */}
@@ -2719,12 +2725,14 @@ export default function CustomerHomePage() {
                     <TawseelaTierLogo badge={currentTier.badge} size="sm" />
                     <div className="text-right">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[15px] font-black text-white">{currentTier.name}</span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        <span className={`text-[15px] font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{currentTier.name}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                          isDark ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-amber-100 text-amber-800 border-amber-300'
+                        }`}>
                           محدد ↕️
                         </span>
                       </div>
-                      <span className="text-[14px] font-black text-amber-400">{calculatedPrice.toLocaleString()} د.ع</span>
+                      <span className={`text-[14px] font-black ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{calculatedPrice.toLocaleString()} د.ع</span>
                     </div>
                   </div>
 
@@ -2745,14 +2753,14 @@ export default function CustomerHomePage() {
             {/* الحاوية القابلة للتمرير الداخلي عند ضيق الشاشة (Scrollable Body) */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1.5 touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
               {/* التبويبات العلوية: تكسي و بوكس (RTL: تكسي يمين، بوكس يسار) */}
-              <div className="flex border-b border-slate-800 px-4" dir="rtl">
+              <div className={`flex border-b px-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`} dir="rtl">
                 <button
                   type="button"
                   onClick={() => setSelectedServiceTab('taxi')}
                   className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
                     selectedServiceTab === 'taxi'
-                      ? 'text-amber-400 border-b-2 border-amber-500'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? isDark ? 'text-amber-400 border-b-2 border-amber-500' : 'text-amber-600 border-b-2 border-amber-500'
+                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   تكسي
@@ -2762,8 +2770,8 @@ export default function CustomerHomePage() {
                   onClick={() => setSelectedServiceTab('box')}
                   className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
                     selectedServiceTab === 'box'
-                      ? 'text-amber-400 border-b-2 border-amber-500'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? isDark ? 'text-amber-400 border-b-2 border-amber-500' : 'text-amber-600 border-b-2 border-amber-500'
+                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   بوكس
@@ -2772,23 +2780,31 @@ export default function CustomerHomePage() {
 
               {/* شارة الذروة أو الخصم الذكي المفعّل */}
               {dynamicPricingData.surgeBadge && (
-                <div className="mx-4 mt-2 mb-1 p-2 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between text-amber-200 animate-fade-in shadow-xs" dir="rtl">
+                <div className={`mx-4 mt-2 mb-1 p-2 rounded-xl flex items-center justify-between animate-fade-in shadow-xs ${
+                  isDark ? 'bg-amber-950/60 border border-amber-500/50 text-amber-200' : 'bg-amber-50 border border-amber-300 text-amber-900'
+                }`} dir="rtl">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">⚡</span>
-                    <span className="text-[12px] font-bold text-amber-200">{dynamicPricingData.surgeBadge.text}</span>
+                    <span className={`text-[12px] font-bold ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>{dynamicPricingData.surgeBadge.text}</span>
                   </div>
-                  <span className="text-[10px] font-bold text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded-md border border-amber-500/40">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                    isDark ? 'text-amber-300 bg-amber-900/60 border-amber-500/40' : 'text-amber-800 bg-amber-100 border-amber-300'
+                  }`}>
                     تحديث حي
                   </span>
                 </div>
               )}
               {dynamicPricingData.discountBadge && !dynamicPricingData.surgeBadge && (
-                <div className="mx-4 mt-2 mb-1 p-2 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between text-emerald-200 animate-fade-in shadow-xs" dir="rtl">
+                <div className={`mx-4 mt-2 mb-1 p-2 rounded-xl flex items-center justify-between animate-fade-in shadow-xs ${
+                  isDark ? 'bg-emerald-950/60 border border-emerald-500/50 text-emerald-200' : 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                }`} dir="rtl">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">🏷️</span>
-                    <span className="text-[12px] font-bold text-emerald-200">{dynamicPricingData.discountBadge.text}</span>
+                    <span className={`text-[12px] font-bold ${isDark ? 'text-emerald-200' : 'text-emerald-900'}`}>{dynamicPricingData.discountBadge.text}</span>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-500/40">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                    isDark ? 'text-emerald-300 bg-emerald-900/60 border-emerald-500/40' : 'text-emerald-800 bg-emerald-100 border-emerald-300'
+                  }`}>
                     عرض خاص
                   </span>
                 </div>
@@ -2806,8 +2822,12 @@ export default function CustomerHomePage() {
                       onClick={() => setSelectedTierId(tier.id)}
                       className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer min-h-[54px] ${
                         isSelected
-                          ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/50'
-                          : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/30'
+                          ? isDark
+                            ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/50'
+                            : 'border-amber-500 bg-amber-50/90 shadow-sm ring-1 ring-amber-400'
+                          : isDark
+                            ? 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/30'
+                            : 'border-slate-200 bg-slate-50/90 hover:border-amber-400/60'
                       }`}
                       dir="rtl"
                     >
@@ -2816,19 +2836,25 @@ export default function CustomerHomePage() {
                         <TawseelaTierLogo badge={tier.badge} size="sm" />
                         <div className="text-right">
                           <div className="flex items-center gap-1.5">
-                            <p className="text-[14.5px] font-bold text-white">{tier.name}</p>
+                            <p className={`text-[14.5px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{tier.name}</p>
                             {isSelected && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${
+                                isDark
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                  : 'bg-amber-100 text-amber-800 border-amber-300'
+                              }`}>
                                 محدد
                               </span>
                             )}
                           </div>
-                          <p className="text-[11.5px] font-medium text-slate-400">{tier.subtitle}</p>
+                          <p className={`text-[11.5px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{tier.subtitle}</p>
                         </div>
                       </div>
 
                       {/* الطرف الأيسر: السعر بالدينار العراقي */}
-                      <div className="text-left font-black text-[15px] text-amber-400 whitespace-nowrap">
+                      <div className={`text-left font-black text-[15px] whitespace-nowrap ${
+                        isDark ? 'text-amber-400' : 'text-amber-600'
+                      }`}>
                         {tierPrice.toLocaleString()} د.ع
                       </div>
                     </div>
@@ -2849,10 +2875,14 @@ export default function CustomerHomePage() {
                   <button
                     type="button"
                     onClick={() => setIsTripOptionsOpen(true)}
-                    className="flex-1 h-11 min-h-[44px] px-3 rounded-xl border border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/40 text-slate-300 hover:text-amber-300 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] cursor-pointer shadow-xs"
+                    className={`flex-1 h-11 min-h-[44px] px-3 rounded-xl border flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] cursor-pointer shadow-xs ${
+                      isDark
+                        ? 'border-slate-800 bg-[#0B101B]/80 text-slate-300 hover:border-amber-500/40 hover:text-amber-300'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-400 hover:text-amber-600'
+                    }`}
                   >
                     <svg
-                      className="h-4 w-4 text-amber-400 shrink-0"
+                      className={`h-4 w-4 shrink-0 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -2872,12 +2902,16 @@ export default function CustomerHomePage() {
                     onClick={() => setIsPromoModalOpen(true)}
                     className={`flex-1 h-11 min-h-[44px] px-3 rounded-xl border flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] cursor-pointer shadow-xs ${
                       appliedPromo 
-                        ? 'border-emerald-500/60 bg-emerald-950/40 text-emerald-300' 
-                        : 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/40 text-slate-300 hover:text-amber-300'
+                        ? isDark
+                          ? 'border-emerald-500/60 bg-emerald-950/40 text-emerald-300'
+                          : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                        : isDark
+                          ? 'border-slate-800 bg-[#0B101B]/80 hover:border-amber-500/40 text-slate-300 hover:text-amber-300'
+                          : 'border-slate-200 bg-slate-50 hover:border-amber-400 text-slate-700 hover:text-amber-600'
                     }`}
                   >
                     <svg
-                      className={`h-4 w-4 shrink-0 ${appliedPromo ? 'text-emerald-400' : 'text-amber-400'}`}
+                      className={`h-4 w-4 shrink-0 ${appliedPromo ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : (isDark ? 'text-amber-400' : 'text-amber-600')}`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
