@@ -6,10 +6,11 @@
 // - بيانات السائق الحقيقية (الاسم، الهاتف، المركبة، رقم اللوحة، المحفظة، الأرباح، المستندات)
 // - فصل تام عن واجهة وحجوزات الراكب
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession, authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
+import { http } from '../lib/api';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import TermsPrivacyModal from './TermsPrivacyModal';
@@ -26,12 +27,28 @@ export const DriverHub: React.FC<DriverHubProps> = ({ onBackToMap }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'documents' | 'safety' | 'profile'>('home');
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
 
-  const fullName = session?.fullName || storage.getFullName() || 'كابتن توصيلة النجف';
+  const initialFullName = session?.fullName || storage.getFullName() || 'كابتن توصيلة النجف';
+  const [fullName, setFullName] = useState<string>(initialFullName);
   const phone = (session as any)?.phone || storage.getPhone() || '07700000000';
-  const driverId = session?.userId || storage.getUserId() || 'drv-local';
+  const rawDriverId = session?.userId || storage.getUserId() || 'drv_local';
+  const driverId = rawDriverId.replace(/^drv-/, 'drv_');
   const avatar = (session as any)?.avatar || storage.getAvatar() || '/logo.png?v=40';
   const vehicleName = localStorage.getItem('driver_car') || 'كيا سيراتو (أبيض) - تكسي معتمد';
   const plateNumber = localStorage.getItem('driver_plate') || 'النجف 42910 / أجرة';
+
+  // مزامنة فورية مع الخادم عند فتح الواجهة لجلب الاسم المحدّث من الداش بورد
+  useEffect(() => {
+    http.get<any>('/auth/me').then(({ data }) => {
+      const freshName = data?.user?.fullName || data?.user?.name || data?.driver?.name;
+      if (freshName && freshName !== fullName) {
+        setFullName(freshName);
+        localStorage.setItem('user_fullname', freshName);
+        if (session) {
+          authStore.save({ ...session, fullName: freshName }, phone);
+        }
+      }
+    }).catch(() => {});
+  }, [fullName, phone, session]);
 
   // معالجة تسجيل خروج الكابتن وضبط حالته
   function handleLogout() {

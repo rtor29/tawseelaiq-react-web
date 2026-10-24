@@ -76,10 +76,26 @@ export default function DriverHomePage() {
   }, [isDark]);
 
   const session = authStore.getSession();
-  const driverId = session?.userId || storage.getUserId() || '';
+  const rawDriverId = session?.userId || storage.getUserId() || '';
+  const driverId = rawDriverId.replace(/^drv-/, 'drv_');
 
-  const driverName = session?.fullName || storage.getFullName() || 'الكابتن';
+  const [driverName, setDriverName] = useState<string>(() => session?.fullName || storage.getFullName() || 'الكابتن');
   const rawPhone = storage.getPhone() || '';
+
+  // مزامنة الملف الشخصي للسائق فورياً عند فتح الشاشة لضمان ظهور تعديلات الداش بورد
+  useEffect(() => {
+    http.get<any>('/auth/me').then(({ data }) => {
+      const freshName = data?.user?.fullName || data?.user?.name || data?.driver?.name;
+      if (freshName && freshName !== driverName) {
+        setDriverName(freshName);
+        localStorage.setItem('user_fullname', freshName);
+        const cur = authStore.getSession();
+        if (cur) {
+          authStore.save({ ...cur, fullName: freshName }, rawPhone);
+        }
+      }
+    }).catch(() => {});
+  }, [driverName, rawPhone]);
   const formattedPhone = rawPhone
     ? rawPhone.startsWith('+')
       ? rawPhone

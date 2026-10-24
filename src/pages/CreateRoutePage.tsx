@@ -1,8 +1,9 @@
 // تخطيط وإنشاء خط السير — بديل create_route_screen.dart
 // خريطة Mapbox بثلاثة أنماط (انطلاق/وصول/نقاط وسيطة)، مسار تلقائي على الشوارع،
-// بحث جغرافي، وGPS مع عكس العنوان العربي، دعم الثيم (isDark) وقفل المسار
+// بحث جغرافي مباشر من حقول المسار مع كاش وقائمة منسدلة، وGPS، دعم الثيم (isDark) وقفل المسار
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Map, { NavigationControl, Marker, type MapMouseEvent, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { endpoints, http } from '../lib/api';
@@ -25,10 +26,12 @@ type MapMode = 'start' | 'end' | 'waypoint';
 const DEFAULT_END_POINT: LngLat = { lat: 33.3250, lng: 44.3750 };
 
 export default function CreateRoutePage() {
+  const navigate = useNavigate();
   const mapRef = useRef<MapRef>(null);
   const { show } = useToast();
   const { isDark } = useTheme();
-  const driverId = authStore.getSession()?.userId || storage.getUserId() || '';
+  const rawId = authStore.getSession()?.userId || storage.getUserId() || '';
+  const driverId = rawId.replace(/^drv-/, 'drv_');
 
   const [routeName, setRouteName] = useState('خط يومي منتظم');
   const [startName, setStartName] = useState('نقطة الانطلاق');
@@ -48,11 +51,15 @@ export default function CreateRoutePage() {
   const [isLocating, setIsLocating] = useState(false);
   const [isRouteLocked, setIsRouteLocked] = useState(false);
 
-  // بحث الأماكن داخل نافذة مشتركة
-  const [searchOpenFor, setSearchOpenFor] = useState<'start' | 'end' | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<PlaceResult[]>([]);
-  const searchTimer = useRef<number | null>(null);
+  // اقتراحات البحث المباشر لنقطة الانطلاق
+  const [startResults, setStartResults] = useState<PlaceResult[]>([]);
+  const [isSearchingStart, setIsSearchingStart] = useState(false);
+  const startTimer = useRef<number | null>(null);
+
+  // اقتراحات البحث المباشر لنقطة الوصول
+  const [destResults, setDestResults] = useState<PlaceResult[]>([]);
+  const [isSearchingDest, setIsSearchingDest] = useState(false);
+  const destTimer = useRef<number | null>(null);
 
   const traceRoute = useCallback(async (from: LngLat, to: LngLat, wps: LngLat[]) => {
     setIsFetchingRoute(true);
@@ -93,7 +100,6 @@ export default function CreateRoutePage() {
               setEndPoint(ep);
               if (data.fixed_dest_label) setEndName(data.fixed_dest_label);
             }
-            if (data.route_name) setRouteName(data.route_name);
             void traceRoute(sp, ep, []);
           } else {
             void traceRoute(startPoint, endPoint, waypoints);
@@ -126,8 +132,13 @@ export default function CreateRoutePage() {
       return;
     }
 
-    if (mode === 'start') setStartPoint(point);
-    else setEndPoint(point);
+    if (mode === 'start') {
+      setStartPoint(point);
+      setStartResults([]);
+    } else {
+      setEndPoint(point);
+      setDestResults([]);
+    }
     void traceRoute(mode === 'start' ? point : startPoint, mode === 'start' ? endPoint : point, waypoints);
 
     const addr = await reverseGeocode(point);
@@ -141,18 +152,19 @@ export default function CreateRoutePage() {
     setIsLocating(true);
     getCurrentPositionWithFallback(
       async (pos) => {
+        setIsLocating(false);
         const point: LngLat = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setStartPoint(point);
+        setStartResults([]);
         mapRef.current?.flyTo({ center: [point.lng, point.lat], zoom: 15, duration: 800 });
-        const placeName = await reverseGeocode(point);
-        setStartName(placeName ?? `موقعي الحالي (${point.lat.toFixed(4)}, ${point.lng.toFixed(4)})`);
-        await traceRoute(point, endPoint, waypoints);
-        setIsLocating(false);
-        show('تم تحديد موقعك الحالي كنقطة الانطلاق بنجاح! 📍', 'success', 3000);
+        void traceRoute(point, endPoint, waypoints);
+        const addr = await reverseGeocode(point);
+        setStartName(addr ?? `موقعي الحالي (${point.lat.toFixed(4)}, ${point.lng.toFixed(4)})`);
+        show('تم تحديد موقعك كنقطة انطلاق 📍', 'info');
       },
-      (_err, isPermissionDenied) => {
+      (err) => {
         setIsLocating(false);
-        if (isPermissionDenied) {
+        if (err.code === 1) {
           const isIOS = isIosDevice();
           const isPWA = isStandalonePwa();
           show(
@@ -172,39 +184,70 @@ export default function CreateRoutePage() {
     );
   }
 
-  function onSearchChange(q: string) {
+  // البحث المباشر لنقطة الانطلاق (مع debounce و cache)
+  function handleStartInputChange(val: string) {
+    setStartName(val);
     if (isRouteLocked) return;
-    const cleaned = sanitizeSearchQuery(q);
-    setSearchQuery(q);
-    if (searchTimer.current) window.clearTimeout(searchTimer.current);
-    if (!cleaned) {
-      setSearchResults([]);
+    if (startTimer.current) window.clearTimeout(startTimer.current);
+    const cleaned = sanitizeSearchQuery(val);
+    if (!cleaned || cleaned.length < 2) {
+      setStartResults([]);
+      setIsSearchingStart(false);
       return;
     }
-    searchTimer.current = window.setTimeout(async () => {
-      const results = await searchPlaces(cleaned);
-      setSearchResults(results);
+    setIsSearchingStart(true);
+    startTimer.current = window.setTimeout(async () => {
+      try {
+        const results = await searchPlaces(cleaned, startPoint);
+        setStartResults(results || []);
+      } catch {
+        setStartResults([]);
+      } finally {
+        setIsSearchingStart(false);
+      }
     }, 400);
   }
 
-  function selectPlace(place: PlaceResult) {
-    if (isRouteLocked) return;
-    if (searchOpenFor === 'start') {
-      setStartPoint({ lat: place.lat, lng: place.lon });
-      setStartName(place.name);
-    } else {
-      setEndPoint({ lat: place.lat, lng: place.lon });
-      setEndName(place.name);
-    }
-    setSearchOpenFor(null);
-    setSearchQuery('');
-    setSearchResults([]);
+  function selectStartPlace(place: PlaceResult) {
+    setStartName(place.name);
+    const pt = { lat: place.lat, lng: place.lon };
+    setStartPoint(pt);
+    setStartResults([]);
     mapRef.current?.flyTo({ center: [place.lon, place.lat], zoom: 14.5, duration: 800 });
-    void traceRoute(
-      searchOpenFor === 'start' ? { lat: place.lat, lng: place.lon } : startPoint,
-      searchOpenFor === 'end' ? { lat: place.lat, lng: place.lon } : endPoint,
-      waypoints,
-    );
+    void traceRoute(pt, endPoint, waypoints);
+  }
+
+  // البحث المباشر لنقطة الوصول (مع debounce و cache)
+  function handleDestInputChange(val: string) {
+    setEndName(val);
+    if (isRouteLocked) return;
+    if (destTimer.current) window.clearTimeout(destTimer.current);
+    const cleaned = sanitizeSearchQuery(val);
+    if (!cleaned || cleaned.length < 2) {
+      setDestResults([]);
+      setIsSearchingDest(false);
+      return;
+    }
+    setIsSearchingDest(true);
+    destTimer.current = window.setTimeout(async () => {
+      try {
+        const results = await searchPlaces(cleaned, endPoint);
+        setDestResults(results || []);
+      } catch {
+        setDestResults([]);
+      } finally {
+        setIsSearchingDest(false);
+      }
+    }, 400);
+  }
+
+  function selectDestPlace(place: PlaceResult) {
+    setEndName(place.name);
+    const pt = { lat: place.lat, lng: place.lon };
+    setEndPoint(pt);
+    setDestResults([]);
+    mapRef.current?.flyTo({ center: [place.lon, place.lat], zoom: 14.5, duration: 800 });
+    void traceRoute(startPoint, pt, waypoints);
   }
 
   async function handleSaveRoute() {
@@ -228,7 +271,7 @@ export default function CreateRoutePage() {
         longitude: p.lng,
       }));
 
-      const activeTargetId = driverId || authStore.getSession()?.userId || storage.getUserId() || '';
+      const activeTargetId = driverId || 'drv_default';
 
       const { data } = await http.post<any>(endpoints.createRoute(activeTargetId), {
         driverId: activeTargetId,
@@ -256,8 +299,8 @@ export default function CreateRoutePage() {
         show('تم إنشاء وتثبيت خط النقل بنجاح مع مسار Mapbox! 🛣️', 'success');
         setIsRouteLocked(true);
         setTimeout(() => {
-          navigateBack();
-        }, 1200);
+          navigate('/drive');
+        }, 300);
       } else {
         show(data?.error || 'فشل حفظ المسار', 'error');
       }
@@ -268,8 +311,6 @@ export default function CreateRoutePage() {
       setIsSaving(false);
     }
   }
-
-  const navigateBack = () => window.history.back();
 
   return (
     <div className={`flex h-dvh flex-col text-right font-cairo transition-colors ${
@@ -298,37 +339,102 @@ export default function CreateRoutePage() {
         <aside className={`w-full space-y-3.5 overflow-y-auto p-5 lg:w-[420px] transition-colors border-t lg:border-t-0 lg:border-s ${
           isDark ? 'bg-[#161C28] border-slate-700/50 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
         }`}>
-          {/* إشعار القفل عند تثبيت المسار */}
-          {isRouteLocked && (
-            <div className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center justify-center gap-2 ${
-              isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-900'
-            }`}>
-              <span className="text-base">🔒</span>
-              <span>مسارك مثبّت. للتعديل راجع الإدارة.</span>
-            </div>
-          )}
+          <div>
+            <h2 className="text-base font-black">تفاصيل خط السير</h2>
+            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              اكتب اسم المنطقة أو انقر على الخريطة لتحديد المسار
+            </p>
+          </div>
 
           <Field
-            label="اسم الخط *"
+            label="اسم الخط"
             value={routeName}
             disabled={isRouteLocked}
             onChange={(e) => setRouteName(e.target.value)}
             className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
           />
-          <Field
-            label="نقطة الانطلاق *"
-            value={startName}
-            disabled={isRouteLocked}
-            onChange={(e) => setStartName(e.target.value)}
-            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
-          />
-          <Field
-            label="نقطة الوصول *"
-            value={endName}
-            disabled={isRouteLocked}
-            onChange={(e) => setEndName(e.target.value)}
-            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
-          />
+
+          {/* حقل نقطة الانطلاق مع قائمة الاقتراحات المنسدلة المباشرة */}
+          <div className="relative">
+            <Field
+              label="نقطة الانطلاق *"
+              value={startName}
+              disabled={isRouteLocked}
+              onChange={(e) => handleStartInputChange(e.target.value)}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+              placeholder="اكتب منطقة أو حي أو شارع..."
+            />
+            {isSearchingStart && (
+              <span className="absolute left-3 top-8 text-xs text-amber-500 animate-spin">⏳</span>
+            )}
+            {startResults.length > 0 && !isRouteLocked && (
+              <div
+                onMouseDown={(e) => e.preventDefault()}
+                className={`absolute inset-x-0 top-full mt-1 z-30 max-h-52 overflow-y-auto rounded-xl border shadow-xl divide-y font-map-search ${
+                  isDark ? 'bg-[#161C28] border-slate-700 divide-slate-700/60 text-white' : 'bg-white border-slate-200 divide-slate-100 text-slate-800'
+                }`}
+              >
+                {startResults.map((p, i) => (
+                  <button
+                    key={`start-${p.lat}-${p.lon}-${i}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectStartPlace(p)}
+                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-right text-xs cursor-pointer transition ${
+                      isDark ? 'hover:bg-amber-500/20 text-white' : 'hover:bg-amber-50 text-slate-800'
+                    }`}
+                  >
+                    <span className="text-emerald-500 shrink-0">📍</span>
+                    <div className="flex flex-col text-right truncate">
+                      <span className="truncate font-bold">{p.name}</span>
+                      <span className={`truncate text-[10.5px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{p.subName || p.fullName || ''}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* حقل نقطة الوصول مع قائمة الاقتراحات المنسدلة المباشرة */}
+          <div className="relative">
+            <Field
+              label="نقطة الوصول *"
+              value={endName}
+              disabled={isRouteLocked}
+              onChange={(e) => handleDestInputChange(e.target.value)}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+              placeholder="اكتب وجهة الوصول..."
+            />
+            {isSearchingDest && (
+              <span className="absolute left-3 top-8 text-xs text-amber-500 animate-spin">⏳</span>
+            )}
+            {destResults.length > 0 && !isRouteLocked && (
+              <div
+                onMouseDown={(e) => e.preventDefault()}
+                className={`absolute inset-x-0 top-full mt-1 z-30 max-h-52 overflow-y-auto rounded-xl border shadow-xl divide-y font-map-search ${
+                  isDark ? 'bg-[#161C28] border-slate-700 divide-slate-700/60 text-white' : 'bg-white border-slate-200 divide-slate-100 text-slate-800'
+                }`}
+              >
+                {destResults.map((p, i) => (
+                  <button
+                    key={`dest-${p.lat}-${p.lon}-${i}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectDestPlace(p)}
+                    className={`flex w-full items-center gap-2.5 px-3 py-2 text-right text-xs cursor-pointer transition ${
+                      isDark ? 'hover:bg-amber-500/20 text-white' : 'hover:bg-amber-50 text-slate-800'
+                    }`}
+                  >
+                    <span className="text-amber-500 shrink-0">🎯</span>
+                    <div className="flex flex-col text-right truncate">
+                      <span className="truncate font-bold">{p.name}</span>
+                      <span className={`truncate text-[10.5px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{p.subName || p.fullName || ''}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <SelectField
@@ -398,19 +504,11 @@ export default function CreateRoutePage() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              className={`flex-1 text-sm ${isDark ? 'border-slate-700 text-slate-200 hover:bg-white/5' : ''}`}
+              className={`w-full text-sm ${isDark ? 'border-slate-700 text-slate-200 hover:bg-white/5' : ''}`}
               onClick={useGpsAsStart}
               disabled={isLocating || isRouteLocked}
             >
               {isLocating ? <Spinner className="h-4 w-4" /> : '📍'} موقعي كانطلاق
-            </Button>
-            <Button
-              variant="outline"
-              className={`flex-1 text-sm ${isDark ? 'border-slate-700 text-slate-200 hover:bg-white/5' : ''}`}
-              onClick={() => setSearchOpenFor(mode === 'end' ? 'end' : 'start')}
-              disabled={isRouteLocked}
-            >
-              🔍 بحث أماكن
             </Button>
           </div>
 
@@ -441,14 +539,14 @@ export default function CreateRoutePage() {
           )}
         </aside>
 
-        {/* الخريطة */}
-        <div className="relative min-h-[360px] flex-1">
+        {/* الخريطة مع لون خلفية متوافق لمنع الشاشة السوداء */}
+        <div className={`relative min-h-[360px] flex-1 transition-colors ${isDark ? 'bg-[#080E1A]' : 'bg-[#E2E8F0]'}`}>
           <Map
             ref={mapRef}
             mapboxAccessToken={config.mapboxToken}
             mapStyle={isDark ? 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om' : config.navigationStyle}
             initialViewState={{ longitude: startPoint.lng, latitude: startPoint.lat, zoom: 13 }}
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: '100%', height: '100%', backgroundColor: isDark ? '#080E1A' : '#E2E8F0' }}
             onClick={handleMapClick}
             onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
           >
@@ -462,77 +560,54 @@ export default function CreateRoutePage() {
                     id: 'create-route-line',
                     coordinates: route.coordinates.map((p) => [p.lng, p.lat]),
                     color: '#F59E0B',
+                    casingColor: '#B45309',
+                    width: 3.5,
                   },
                 ]}
               />
             )}
 
-            <Marker longitude={startPoint.lng} latitude={startPoint.lat} anchor="center">
-              <span className="text-3xl drop-shadow select-none cursor-pointer" title={`الانطلاق: ${startName}`}>🟢</span>
+            {/* دبوس الانطلاق الأخضر */}
+            <Marker longitude={startPoint.lng} latitude={startPoint.lat} draggable={!isRouteLocked} onDragEnd={(e) => {
+              const pt = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+              setStartPoint(pt);
+              setStartResults([]);
+              void traceRoute(pt, endPoint, waypoints);
+            }}>
+              <div className="flex flex-col items-center">
+                <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white shadow">الانطلاق</span>
+                <span className="text-2xl drop-shadow">🟢</span>
+              </div>
             </Marker>
-            {waypoints.map((w, i) => (
-              <Marker key={i} longitude={w.lng} latitude={w.lat} anchor="center">
-                <span className="text-2xl select-none cursor-pointer">{`📍${i + 1}`}</span>
+
+            {/* نقاط وسيطة اختيارية */}
+            {waypoints.map((wp, i) => (
+              <Marker key={`${wp.lat}-${wp.lng}-${i}`} longitude={wp.lng} latitude={wp.lat} draggable={!isRouteLocked} onDragEnd={(e) => {
+                const next = [...waypoints];
+                next[i] = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+                setWaypoints(next);
+                void traceRoute(startPoint, endPoint, next);
+              }}>
+                <div className="flex flex-col items-center">
+                  <span className="rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">{i + 1}</span>
+                  <span className="text-xl">📌</span>
+                </div>
               </Marker>
             ))}
-            <Marker longitude={endPoint.lng} latitude={endPoint.lat} anchor="center">
-              <span className="text-3xl drop-shadow select-none cursor-pointer" title={`الوصول: ${endName}`}>🔴</span>
+
+            {/* دبوس الوصول الأحمر */}
+            <Marker longitude={endPoint.lng} latitude={endPoint.lat} draggable={!isRouteLocked} onDragEnd={(e) => {
+              const pt = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+              setEndPoint(pt);
+              setDestResults([]);
+              void traceRoute(startPoint, pt, waypoints);
+            }}>
+              <div className="flex flex-col items-center">
+                <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-black text-white shadow">الوصول</span>
+                <span className="text-2xl drop-shadow">🔴</span>
+              </div>
             </Marker>
           </Map>
-
-          {/* نافذة البحث الموحدة المستجيبة للثيم */}
-          {searchOpenFor && (
-            <div className={`absolute inset-x-4 top-4 z-20 rounded-2xl p-4 border shadow-2xl font-map-search ${
-              isDark ? 'bg-[#161C28] text-white border-slate-700' : 'bg-white text-slate-900 border-slate-200'
-            }`}>
-              <div className="mb-2 flex items-center justify-between">
-                <p className={`text-sm font-extrabold font-map-search ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  بحث عن {searchOpenFor === 'start' ? 'نقطة الانطلاق' : 'نقطة الوصول'}
-                </p>
-                <button type="button" onClick={() => setSearchOpenFor(null)} className="text-slate-400 hover:text-white" aria-label="إغلاق">
-                  ✕
-                </button>
-              </div>
-              <input
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="ابحث عن منطقة أو حي أو شارع في أي محافظة..."
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none font-map-search ${
-                  isDark ? 'bg-[#242A37] border-slate-700 text-white focus:border-amber-500' : 'bg-white border-slate-200 text-slate-900 focus:border-amber-500'
-                }`}
-              />
-              {searchResults.length > 0 && (
-                <div
-                  onMouseDown={(e) => e.preventDefault()}
-                  className={`mt-2 max-h-52 overflow-y-auto rounded-xl border font-map-search divide-y ${
-                    isDark ? 'bg-[#161C28] border-slate-700 divide-slate-700/50' : 'bg-white border-slate-100 divide-slate-100'
-                  }`}
-                >
-                  {searchResults.map((p, i) => (
-                    <button
-                      key={`${p.lat}-${p.lon}-${i}`}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectPlace(p);
-                      }}
-                      className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-right text-sm cursor-pointer font-map-search transition ${
-                        isDark ? 'hover:bg-amber-500/20 text-white' : 'hover:bg-amber-50 text-slate-800'
-                      }`}
-                    >
-                      <span className="text-amber-500 shrink-0">📍</span>
-                      <div className="flex flex-col text-right truncate font-map-search">
-                        <span className="truncate font-bold">{p.name}</span>
-                        <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{p.subName || p.fullName || ''}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>
