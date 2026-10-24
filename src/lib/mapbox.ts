@@ -656,3 +656,201 @@ export function applyMapEnhancements(rawMap: any, isDark = true) {
     enhanceDayMapRoads(rawMap);
   }
 }
+
+// ---------------------------------------------------------------------------
+// تمييز خط المسار والأماكن الواقعة عليه بالأصفر الفاقع (#FFEA00) والحاشية السوداء
+// مستخرج حصرياً من طبقات الخريطة النقطية والفيكتور المحملة (Vector Tiles) - صفر استدعاء خارجي
+// ---------------------------------------------------------------------------
+
+interface OriginalSymbolLayerStyle {
+  textColor: any;
+  haloColor: any;
+  haloWidth: any;
+}
+
+const originalSymbolLayerStyles = new Map<string, OriginalSymbolLayerStyle>();
+
+function distanceToSegmentSquared(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  if (dx === 0 && dy === 0) {
+    const dpx = px - x1;
+    const dpy = py - y1;
+    return dpx * dpx + dpy * dpy;
+  }
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+  const dpx = px - projX;
+  const dpy = py - projY;
+  return dpx * dpx + dpy * dpy;
+}
+
+export function isPointNearPolyline(point: [number, number], line: [number, number][], thresholdDegrees = 0.005): boolean {
+  if (!line || line.length === 0) return false;
+  const thresholdSq = thresholdDegrees * thresholdDegrees;
+  const [px, py] = point;
+  for (let i = 0; i < line.length - 1; i++) {
+    const [x1, y1] = line[i];
+    const [x2, y2] = line[i + 1];
+    const minX = Math.min(x1, x2) - thresholdDegrees;
+    const maxX = Math.max(x1, x2) + thresholdDegrees;
+    const minY = Math.min(y1, y2) - thresholdDegrees;
+    const maxY = Math.max(y1, y2) + thresholdDegrees;
+    if (px < minX || px > maxX || py < minY || py > maxY) continue;
+
+    if (distanceToSegmentSquared(px, py, x1, y1, x2, y2) <= thresholdSq) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * استخراج أسماء الأماكن والأحياء والشوارع القريبة من المسار من طبقات الخريطة نفسها دون أي استدعاء خارجي
+ */
+export function extractPlacesFromMapLayers(rawMap: any, routeCoords: [number, number][]): string[] {
+  const map = typeof rawMap?.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map || !routeCoords || routeCoords.length === 0) return [];
+
+  const style = map.getStyle?.();
+  if (!style || !Array.isArray(style.layers)) return [];
+
+  const symbolLayers = style.layers.filter((l: any) => l.type === 'symbol' && l.layout && l.layout['text-field']);
+  const layerIds = symbolLayers.map((l: any) => l.id);
+
+  let renderedFeatures: any[] = [];
+  try {
+    renderedFeatures = map.queryRenderedFeatures({ layers: layerIds }) || [];
+  } catch (err) {
+    console.warn('[Mapbox Places] queryRenderedFeatures:', err);
+  }
+
+  const namesSet = new Set<string>();
+
+  for (const f of renderedFeatures) {
+    let pt: [number, number] | null = null;
+    if (f.geometry?.type === 'Point' && Array.isArray(f.geometry.coordinates)) {
+      pt = f.geometry.coordinates as [number, number];
+    } else if (f.geometry?.type === 'LineString' && Array.isArray(f.geometry.coordinates) && f.geometry.coordinates.length > 0) {
+      pt = f.geometry.coordinates[Math.floor(f.geometry.coordinates.length / 2)] as [number, number];
+    }
+
+    if (!pt) continue;
+
+    if (isPointNearPolyline(pt, routeCoords, 0.006)) {
+      const p = f.properties || {};
+      const name = p.name_ar || p.name || p.name_en || p.text;
+      if (typeof name === 'string') {
+        const trimmed = name.trim();
+        if (trimmed.length > 1 && !/^\d+$/.test(trimmed)) {
+          namesSet.add(trimmed);
+        }
+      }
+    }
+  }
+
+  return Array.from(namesSet);
+}
+
+/**
+ * تلوين نصوص الأماكن على المسار بالأصفر الفاقع (#FFEA00) مع حاشية سوداء (#000000)
+ * باستخدام طبقات الخريطة الحالية فقط
+ */
+export function highlightRoutePlacesOnMap(
+  rawMap: any,
+  routeCoords: [number, number][],
+  cachedPlaces?: string[],
+  isDark = true
+): string[] {
+  const map = typeof rawMap?.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map || !routeCoords || routeCoords.length === 0) return [];
+
+  // استعادة أي تلوين سابق أولاً
+  restoreRoutePlacesOnMap(map, isDark);
+
+  let placeNames: string[] = [];
+
+  // إذا كانت القائمة مخزنة مسبقاً نستخدمها فوراً دون إعادة الحساب الهندسي (الجزء 3)
+  if (Array.isArray(cachedPlaces) && cachedPlaces.length > 0) {
+    placeNames = cachedPlaces;
+  } else {
+    // استخراج من طبقات الخريطة المحملة محلياً (الجزء 2)
+    placeNames = extractPlacesFromMapLayers(map, routeCoords);
+  }
+
+  if (placeNames.length === 0) return [];
+
+  const style = map.getStyle?.();
+  if (!style || !Array.isArray(style.layers)) return placeNames;
+
+  const symbolLayers = style.layers.filter((l: any) => l.type === 'symbol' && l.layout && l.layout['text-field']);
+
+  const matchExpr = [
+    'any',
+    ['in', ['get', 'name'], ['literal', placeNames]],
+    ['in', ['get', 'name_ar'], ['literal', placeNames]],
+    ['in', ['get', 'name_en'], ['literal', placeNames]]
+  ];
+
+  for (const layer of symbolLayers) {
+    try {
+      if (!originalSymbolLayerStyles.has(layer.id)) {
+        originalSymbolLayerStyles.set(layer.id, {
+          textColor: map.getPaintProperty(layer.id, 'text-color') ?? (isDark ? '#FFFFFF' : '#0F172A'),
+          haloColor: map.getPaintProperty(layer.id, 'text-halo-color') ?? (isDark ? '#090D16' : '#FFFFFF'),
+          haloWidth: map.getPaintProperty(layer.id, 'text-halo-width') ?? 2.0,
+        });
+      }
+
+      const orig = originalSymbolLayerStyles.get(layer.id)!;
+
+      // أصفر فاقع جداً #FFEA00 للنص
+      map.setPaintProperty(layer.id, 'text-color', [
+        'case',
+        matchExpr,
+        '#FFEA00',
+        orig.textColor
+      ]);
+
+      // حاشية/هالة سوداء صلبة #000000
+      map.setPaintProperty(layer.id, 'text-halo-color', [
+        'case',
+        matchExpr,
+        '#000000',
+        orig.haloColor
+      ]);
+
+      // سماكة الحاشية 2.5px لإبرازها بوضوح
+      map.setPaintProperty(layer.id, 'text-halo-width', [
+        'case',
+        matchExpr,
+        2.5,
+        orig.haloWidth
+      ]);
+    } catch (_) {}
+  }
+
+  return placeNames;
+}
+
+/**
+ * إعادة جميع الأماكن لألوانها الأصلية عند إخفاء المسار
+ */
+export function restoreRoutePlacesOnMap(rawMap: any, _isDark = true): void {
+  const map = typeof rawMap?.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map) return;
+
+  if (originalSymbolLayerStyles.size > 0) {
+    for (const [layerId, orig] of originalSymbolLayerStyles.entries()) {
+      try {
+        if (map.getLayer(layerId)) {
+          map.setPaintProperty(layerId, 'text-color', orig.textColor);
+          map.setPaintProperty(layerId, 'text-halo-color', orig.haloColor);
+          map.setPaintProperty(layerId, 'text-halo-width', orig.haloWidth);
+        }
+      } catch (_) {}
+    }
+    originalSymbolLayerStyles.clear();
+  }
+}

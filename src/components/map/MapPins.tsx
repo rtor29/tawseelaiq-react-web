@@ -140,12 +140,13 @@ export interface RouteLineData {
   color?: string;
   width?: number;
   casingColor?: string;
+  casingWidth?: number;
+  casingBlur?: number;
+  casingOpacity?: number;
   dashed?: boolean;
 }
 
-// مسار ملاحي ذهبي عنبري متوهج #F59E0B:
-// - خط رئيسي route-core بعرض 3px بلون #F59E0B
-// - هالة ضوئية متوهجة route-glow بعرض 8px و blur: 4 وشفافية 0.45 بلون rgba(245, 158, 11, 0.45)
+// مسار ملاحي مخصص أو أصفر فاقع #FFEA00 مع حاشية سوداء صلبة #000000
 export function RouteLines({ lines }: { lines: RouteLineData[] }) {
   return (
     <>
@@ -154,6 +155,7 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
         const innerId = line.id === 'route-line' ? 'route-core' : `route-core-${line.id}`;
         const innerColor = line.color || '#F59E0B';
         const casingColor = line.casingColor || '#F59E0B';
+        const isBlackCasing = casingColor.toLowerCase() === '#000000' || casingColor.toLowerCase() === '#000';
 
         return (
           <Source
@@ -166,14 +168,14 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
               geometry: { type: 'LineString', coordinates: line.coordinates },
             }}
           >
-            {/* 1. الهالة الضوئية المتوهجة 8px مع blur 4 وشفافية 0.45 */}
+            {/* 1. الحاشية/الهالة السفلية (مثلاً 8px أسود صلب أو هالة متوهجة) */}
             <Layer
               id={casingId}
               type="line"
               layout={{ 'line-join': 'round', 'line-cap': 'round' }}
               paint={{
                 'line-color': casingColor,
-                'line-width': [
+                'line-width': line.casingWidth !== undefined ? line.casingWidth : [
                   'interpolate',
                   ['linear'],
                   ['zoom'],
@@ -184,11 +186,11 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
                   18,
                   10.0,
                 ],
-                'line-blur': 4,
-                'line-opacity': 0.45,
+                'line-blur': line.casingBlur !== undefined ? line.casingBlur : (isBlackCasing ? 0 : 4),
+                'line-opacity': line.casingOpacity !== undefined ? line.casingOpacity : (isBlackCasing ? 1.0 : 0.45),
               }}
             />
-            {/* 2. خط المسار الرئيسي المتوهج route-core بعرض 3px */}
+            {/* 2. خط المسار الرئيسي (مثلاً خط أصفر فاقع 5px) */}
             <Layer
               id={innerId}
               type="line"
@@ -198,7 +200,7 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
               }}
               paint={{
                 'line-color': innerColor,
-                'line-width': [
+                'line-width': line.width !== undefined ? line.width : [
                   'interpolate',
                   ['linear'],
                   ['zoom'],

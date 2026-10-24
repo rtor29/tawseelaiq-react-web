@@ -15,7 +15,7 @@ import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { RouteLines } from '../components/map/MapPins';
-import { applyMapEnhancements, searchPlaces, type PlaceResult } from '../lib/mapbox';
+import { applyMapEnhancements, searchPlaces, highlightRoutePlacesOnMap, restoreRoutePlacesOnMap, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
 import { useTheme } from '../context/ThemeContext';
@@ -90,6 +90,8 @@ export default function DailyRoutePage() {
   const [selectedDriverRoute, setSelectedDriverRoute] = useState<[number, number][] | null>(null);
   const [showCaptainRoute, setShowCaptainRoute] = useState(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [isSheetMinimized, setIsSheetMinimized] = useState(false);
+  const routeAutoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifiedRejectedBookingIdsRef = useRef<Set<string>>(new Set());
 
   // نافذة طلب إلغاء الاشتراك للراكب
@@ -216,17 +218,39 @@ export default function DailyRoutePage() {
     };
   }, [processBookings]);
 
-  // إعادة ضبط مسار الكابتن عند تغيير أو إغلاق السائق — لا رسم تلقائي لتوفير Mapbox
+  // إعادة ضبط مسار الكابتن واستعادة ألوان الخريطة عند تغيير أو إغلاق السائق
   useEffect(() => {
     setShowCaptainRoute(false);
     setSelectedDriverRoute(null);
-  }, [selectedDriver?.id]);
+    setIsSheetMinimized(false);
+    if (routeAutoCloseTimerRef.current) {
+      clearTimeout(routeAutoCloseTimerRef.current);
+      routeAutoCloseTimerRef.current = null;
+    }
+    restoreRoutePlacesOnMap(mapRef.current, isDark);
+  }, [selectedDriver?.id, isDark]);
 
-  // إظهار أو إخفاء مسار الكابتن على الشوارع من الخادم (Redis Cache) دون استدعاء Mapbox متكرر
+  // تنظيف المؤقت وتلوين الأماكن عند إلغاء تحميل الصفحة
+  useEffect(() => {
+    return () => {
+      if (routeAutoCloseTimerRef.current) {
+        clearTimeout(routeAutoCloseTimerRef.current);
+      }
+      restoreRoutePlacesOnMap(mapRef.current, isDark);
+    };
+  }, [isDark]);
+
+  // إظهار أو إخفاء مسار الكابتن بالأصفر الفاقع وإبراز الأماكن على المسار
   async function handleToggleCaptainRoute() {
     if (showCaptainRoute) {
       setShowCaptainRoute(false);
       setSelectedDriverRoute(null);
+      setIsSheetMinimized(false);
+      if (routeAutoCloseTimerRef.current) {
+        clearTimeout(routeAutoCloseTimerRef.current);
+        routeAutoCloseTimerRef.current = null;
+      }
+      restoreRoutePlacesOnMap(mapRef.current, isDark);
       return;
     }
     if (!selectedDriver) return;
@@ -235,13 +259,24 @@ export default function DailyRoutePage() {
       const res = await http.get<{
         success?: boolean;
         coordinates?: [number, number][];
+        places?: string[];
         source?: string;
       }>(`/drivers/${selectedDriver.id}/route-geometry`);
       if (res.data?.success && Array.isArray(res.data.coordinates) && res.data.coordinates.length > 0) {
-        setSelectedDriverRoute(res.data.coordinates);
+        const coords = res.data.coordinates;
+        setSelectedDriverRoute(coords);
         setShowCaptainRoute(true);
+        setIsSheetMinimized(true); // تنزل بطاقة الكابتن ليُرى المسار كاملاً على الخريطة
+
+        // إبراز نصوص الأماكن والأحياء على المسار بالأصفر الفاقع (#FFEA00) مع حاشية سوداء (#000000)
+        const highlighted = highlightRoutePlacesOnMap(mapRef.current, coords, res.data.places, isDark);
+
+        // حفظ قائمة الأماكن على المسار على الخادم إذا لم تكن مخزنة سابقاً (الجزء 3)
+        if ((!res.data.places || res.data.places.length === 0) && highlighted.length > 0) {
+          http.post(`/drivers/${selectedDriver.id}/route-places`, { places: highlighted }).catch(() => {});
+        }
+
         try {
-          const coords = res.data.coordinates;
           let minLng = coords[0][0], maxLng = coords[0][0];
           let minLat = coords[0][1], maxLat = coords[0][1];
           coords.forEach(([lng, lat]) => {
@@ -252,9 +287,18 @@ export default function DailyRoutePage() {
           });
           mapRef.current?.fitBounds(
             [[minLng, minLat], [maxLng, maxLat]],
-            { padding: { top: 100, bottom: 280, left: 40, right: 40 }, duration: 800 }
+            { padding: { top: 80, bottom: 120, left: 30, right: 30 }, duration: 800 }
           );
         } catch (_) {}
+
+        // مؤقت الإخفاء التلقائي بعد 10 دقائق (600,000 مللي ثانية)
+        if (routeAutoCloseTimerRef.current) clearTimeout(routeAutoCloseTimerRef.current);
+        routeAutoCloseTimerRef.current = setTimeout(() => {
+          setShowCaptainRoute(false);
+          setSelectedDriverRoute(null);
+          setIsSheetMinimized(false);
+          restoreRoutePlacesOnMap(mapRef.current, isDark);
+        }, 10 * 60 * 1000);
       } else {
         show('تعذر جلب مسار الكابتن حالياً', 'warning');
       }
@@ -741,14 +785,19 @@ export default function DailyRoutePage() {
           }}
           style={{ width: '100%', height: '100%' }}
         >
-          {/* مسار الملاحة الانسيابي النحيف بين الراكب وسائق الخط الدائمي */}
+          {/* مسار الملاحة بالأصفر الفاقع #FFEA00 مع حاشية سوداء صلبة #000000 وسماكة واضحة */}
           {selectedDriverRoute && selectedDriverRoute.length > 0 && (
             <RouteLines
               lines={[
                 {
                   id: 'daily-route-line',
                   coordinates: selectedDriverRoute,
-                  color: '#F59E0B',
+                  color: '#FFEA00',       // خط أصفر فاقع جداً 5px
+                  width: 5,
+                  casingColor: '#000000', // حاشية سوداء صلبة 8px تحته
+                  casingWidth: 8,
+                  casingBlur: 0,
+                  casingOpacity: 1.0,
                 },
               ]}
             />
@@ -862,15 +911,74 @@ export default function DailyRoutePage() {
         const distLabel = dist < 1 ? `${Math.round(dist * 1000)} متر` : `${dist.toFixed(1)} كم`;
         return (
           <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col items-center pointer-events-none" dir="rtl">
-            <div 
-              className={`pointer-events-auto w-full max-w-lg rounded-t-[24px] pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-y-auto overscroll-contain border-t ${
-                isDark ? 'bg-[#1e1e2e] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
-              }`}
-              style={{ maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))' }}
-            >
-              <div className="flex justify-center pt-3 mb-1 cursor-pointer" onClick={() => setSelectedDriver(null)}>
-                <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-white/30' : 'bg-slate-300'}`} />
+            {isSheetMinimized ? (
+              <div 
+                className={`pointer-events-auto w-full max-w-lg rounded-t-[20px] px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in border-t flex items-center justify-between transition-all ${
+                  isDark ? 'bg-[#1e1e2e]/95 border-white/10 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-2xl'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-[18px]">🧑‍✈️</div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[14.5px] font-black">{selectedDriver.name}</p>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-500/30 text-amber-500 bg-amber-500/10">
+                        {selectedDriver.vehicleType === 'super' || selectedDriver.vehicleType === 'سوبر' ? '⚡ سوبر' : (selectedDriver.vehicleType === 'plus' || selectedDriver.vehicleType === 'بلس' || selectedDriver.vehicleType === 'vip') ? '💎 بلس' : '🚕 توفير'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-400 font-bold flex items-center gap-1 mt-0.5">
+                      <span>🛣️ المسار معروض بالأصفر</span>
+                      <span className="text-[10px] opacity-75">(يختفي بعد 10د)</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSheetMinimized(false)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer active:scale-95 ${
+                      isDark ? 'bg-white/10 hover:bg-white/15 text-white border-white/20' : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                    }`}
+                  >
+                    تفاصيل الكابتن ⬆️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggleCaptainRoute}
+                    className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 transition cursor-pointer active:scale-95"
+                  >
+                    إخفاء ✕
+                  </button>
+                </div>
               </div>
+            ) : (
+              <div 
+                className={`pointer-events-auto w-full max-w-lg rounded-t-[24px] pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-y-auto overscroll-contain border-t ${
+                  isDark ? 'bg-[#1e1e2e] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+                }`}
+                style={{ maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))' }}
+              >
+                <div className="flex justify-between items-center px-4 pt-3 mb-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsSheetMinimized(true)}
+                    className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                      isDark ? 'border-white/15 bg-white/5 text-white/70 hover:bg-white/10' : 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    إنزال البطاقة لرؤية الخريطة ⬇️
+                  </button>
+                  <div className="cursor-pointer py-1 px-3" onClick={() => setSelectedDriver(null)}>
+                    <div className={`h-1 w-10 rounded-full ${isDark ? 'bg-white/30' : 'bg-slate-300'}`} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDriver(null)}
+                    className={`text-xs font-bold px-2 py-1 cursor-pointer ${isDark ? 'text-white/60 hover:text-white' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    إغلاق ✕
+                  </button>
+                </div>
 
             {/* صف السائق */}
             <div className={`flex items-center justify-between px-5 pt-2 pb-3 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
@@ -1098,6 +1206,7 @@ export default function DailyRoutePage() {
               </div>
             </div>
           </div>
+          )}
         </div>
         );
       })()}
