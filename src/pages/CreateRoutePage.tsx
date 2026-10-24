@@ -89,6 +89,14 @@ export default function CreateRoutePage() {
         const { data } = await http.get<any>('/driver/fixed-location');
         if (isMounted && data?.success) {
           setIsRouteLocked(Boolean(data.route_locked));
+          const savedFare = data.fare || data.pricePerSeat || data.price;
+          if (savedFare) {
+            setPrice(String(savedFare));
+          }
+          if (data.route_name) setRouteName(data.route_name);
+          if (data.total_seats || data.seats) setSeats(String(data.total_seats || data.seats));
+          if (data.departure_time) setDepartureTime(data.departure_time);
+
           if (data.fixed_lat && data.fixed_lng) {
             const sp: LngLat = { lat: Number(data.fixed_lat), lng: Number(data.fixed_lng) };
             setStartPoint(sp);
@@ -318,6 +326,8 @@ export default function CreateRoutePage() {
     }`} dir="rtl">
       <TopBar
         title="تخطيط وإنشاء خط السير (Mapbox)"
+        showBack={true}
+        onBack={() => navigate(-1)}
         actions={
           <div className="flex items-center gap-1.5">
             <ThemeToggleButton />
@@ -339,11 +349,26 @@ export default function CreateRoutePage() {
         <aside className={`w-full space-y-3.5 overflow-y-auto p-5 lg:w-[420px] transition-colors border-t lg:border-t-0 lg:border-s ${
           isDark ? 'bg-[#161C28] border-slate-700/50 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-sm'
         }`}>
-          <div>
-            <h2 className="text-base font-black">تفاصيل خط السير</h2>
-            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              اكتب اسم المنطقة أو انقر على الخريطة لتحديد المسار
-            </p>
+          <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-700/60">
+            <div>
+              <h2 className="text-base font-black text-slate-900 dark:text-white">تفاصيل خط السير</h2>
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                اكتب اسم المنطقة أو انقر على الخريطة لتحديد المسار
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                isDark
+                  ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white'
+                  : 'border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200 hover:text-black shadow-xs'
+              }`}
+              title="رجوع للصفحة السابقة"
+            >
+              <span>→</span>
+              <span>رجوع</span>
+            </button>
           </div>
 
           <Field
@@ -351,7 +376,7 @@ export default function CreateRoutePage() {
             value={routeName}
             disabled={isRouteLocked}
             onChange={(e) => setRouteName(e.target.value)}
-            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : '!bg-white !border-slate-300 !text-slate-900 shadow-xs'}
           />
 
           {/* حقل نقطة الانطلاق مع قائمة الاقتراحات المنسدلة المباشرة */}
@@ -361,7 +386,7 @@ export default function CreateRoutePage() {
               value={startName}
               disabled={isRouteLocked}
               onChange={(e) => handleStartInputChange(e.target.value)}
-              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : '!bg-white !border-slate-300 !text-slate-900 shadow-xs'}
               placeholder="اكتب منطقة أو حي أو شارع..."
             />
             {isSearchingStart && (
@@ -402,7 +427,7 @@ export default function CreateRoutePage() {
               value={endName}
               disabled={isRouteLocked}
               onChange={(e) => handleDestInputChange(e.target.value)}
-              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : '!bg-white !border-slate-300 !text-slate-900 shadow-xs'}
               placeholder="اكتب وجهة الوصول..."
             />
             {isSearchingDest && (
@@ -442,7 +467,7 @@ export default function CreateRoutePage() {
               value={seats}
               disabled={isRouteLocked}
               onChange={(e) => setSeats(e.target.value)}
-              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : '!bg-white !border-slate-300 !text-slate-900 shadow-xs'}
             >
               {['1', '2', '3', '4', '5', '6'].map((n) => (
                 <option key={n} value={n}>{n}</option>
@@ -454,7 +479,7 @@ export default function CreateRoutePage() {
               value={price}
               disabled={isRouteLocked}
               onChange={(e) => setPrice(e.target.value)}
-              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+              className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : '!bg-white !border-slate-300 !text-slate-900 shadow-xs'}
             />
           </div>
 
@@ -464,7 +489,7 @@ export default function CreateRoutePage() {
             value={departureTime}
             disabled={isRouteLocked}
             onChange={(e) => setDepartureTime(e.target.value)}
-            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : ''}
+            className={isDark ? '!bg-[#242A37] !border-slate-700 !text-white' : '!bg-white !border-slate-300 !text-slate-900 shadow-xs'}
           />
 
           {/* مبدّل نمط النقر */}

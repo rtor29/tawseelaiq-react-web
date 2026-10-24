@@ -18,6 +18,8 @@ import {
   calculateBearing,
   distanceMeters,
   distanceKm,
+  minDistanceToPolylineMeters,
+  formatEtaArabic,
   getCurrentPositionWithFallback,
   isIosDevice,
   isStandalonePwa,
@@ -271,6 +273,18 @@ export default function CustomerHomePage() {
   const [liveDriverPosition, setLiveDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [driverHeading, setDriverHeading] = useState<number>(0);
   const prevDriverPositionRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  // نظام تتبع الكابتن الذكي والاقتصادي (Smart Mapbox Directions & Accurate ETA)
+  const [etaText, setEtaText] = useState<string | null>(null);
+  const [isDriverStationary, setIsDriverStationary] = useState<boolean>(false);
+  const trackingInitialDirectionsDoneRef = useRef<boolean>(false);
+  const lastDirectionsCallTimeRef = useRef<number>(0);
+  const directionsCallCountRef = useRef<number>(0);
+  const expectedRoutePointsRef = useRef<Array<[number, number]>>([]);
+  const remainingSecondsRef = useRef<number>(0);
+  const initialDurationSecondsRef = useRef<number>(0);
+  const initialDistanceMetersRef = useRef<number>(0);
+  const lastKnownDriverPosRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // حالة البحث النصي للأماكن
   const [searchQuery, setSearchQuery] = useState('');
@@ -1547,23 +1561,28 @@ export default function CustomerHomePage() {
     );
   }
 
-  // معالجة تحديث موقع السائق الحي مع حساب زاوية الاتجاه رياضياً ورسم خط المسار
+  // معالجة تحديث موقع السائق الحي مع تتبع سلس ووقت وصول ذكي واقتصادي في Mapbox
   const handleDriverPositionUpdate = useCallback(
-    (newPos: { lat: number; lng: number }, serverHeading?: number) => {
-      if (!newPos || typeof newPos.lat !== 'number' || typeof newPos.lng !== 'number') return;
+    async (newPos: { lat: number; lng: number }, serverHeading?: number) => {
+      if (!newPos || typeof newPos.lat !== 'number' || typeof newPos.lng !== 'number' || isNaN(newPos.lat) || isNaN(newPos.lng) || newPos.lat <= 0 || newPos.lng <= 0) return;
 
       const prev = prevDriverPositionRef.current;
+      let movedMeters = 0;
+      let stationary = false;
+
       if (prev) {
-        const movedMeters = distanceMeters(prev.lat, prev.lng, newPos.lat, newPos.lng);
-        // إذا تحركت السيارة بمقدار مترين أو أكثر، نقوم بحساب زاوية الاتجاه رياضياً بالمعادلة الكروية
-        if (movedMeters >= 2) {
+        movedMeters = distanceMeters(prev.lat, prev.lng, newPos.lat, newPos.lng);
+        if (movedMeters < 3) {
+          stationary = true;
+          if (typeof serverHeading === 'number' && !isNaN(serverHeading) && serverHeading > 0) {
+            setDriverHeading(serverHeading);
+          }
+        } else {
+          stationary = false;
           const computedBearing = calculateBearing(prev.lat, prev.lng, newPos.lat, newPos.lng);
           setDriverHeading(computedBearing);
-        } else if (typeof serverHeading === 'number' && !isNaN(serverHeading) && serverHeading > 0) {
-          setDriverHeading(serverHeading);
         }
       } else {
-        // عند استلام أول موقع، توجيه السيارة نحو نقطة التقاط الراكب (أو الوجهة إذا كانت الرحلة جارية)
         if (typeof serverHeading === 'number' && !isNaN(serverHeading) && serverHeading > 0) {
           setDriverHeading(serverHeading);
         } else {
@@ -1575,12 +1594,113 @@ export default function CustomerHomePage() {
         }
       }
 
+      setIsDriverStationary(stationary);
       prevDriverPositionRef.current = newPos;
+      lastKnownDriverPosRef.current = newPos;
       setLiveDriverPosition(newPos);
 
-      // في التتبع المباشر: تم إيقاف استدعاء Directions API نهائياً (0 استدعاءات) لتوفير Mapbox، ولا يُرسم خط مسار أثناء التتبع
-      if (stage === 'driver_arriving' || rideStatus === 'accepted' || rideStatus === 'arrived' || rideStatus === 'InProgress' || rideStatus === 'in_progress') {
-        if (routeCoordinates) setRouteCoordinates(null);
+      // في التتبع المباشر: لا نرسم خط مسار لتوفير استهلاك الخريطة
+      if (routeCoordinates) setRouteCoordinates(null);
+
+      // حساب وقت الوصول المتبقي (ETA) باقتصاد Mapbox
+      const isTracking = stage === 'driver_arriving' || rideStatus === 'accepted' || rideStatus === 'arrived' || rideStatus === 'InProgress' || rideStatus === 'in_progress';
+      const targetPoint = (rideStatus === 'InProgress' || rideStatus === 'in_progress') ? dropoff : pickup;
+
+      if (isTracking && targetPoint && targetPoint.lat && targetPoint.lng) {
+        const distToTarget = distanceMeters(newPos.lat, newPos.lng, targetPoint.lat, targetPoint.lng);
+
+        if (distToTarget <= 50 || rideStatus === 'arrived') {
+          setEtaText('الكابتن وصل 🚖');
+          remainingSecondsRef.current = 0;
+          return;
+        }
+
+        const now = Date.now();
+        const timeSinceLastCall = now - lastDirectionsCallTimeRef.current;
+
+        // الحالة أ: بدء التتبع (استدعاء أولي لمرة واحدة لحساب المسار والوقت الأولي)
+        if (!trackingInitialDirectionsDoneRef.current) {
+          trackingInitialDirectionsDoneRef.current = true;
+          lastDirectionsCallTimeRef.current = now;
+          directionsCallCountRef.current += 1;
+          const count = directionsCallCountRef.current;
+          (window as any).__DIRECTIONS_CALL_COUNT__ = count;
+          console.log(`[Mapbox Directions Tracker] Call #${count}: Initial route & ETA calculated`);
+
+          try {
+            const origin: LngLat = { lat: newPos.lat, lng: newPos.lng };
+            const dest: LngLat = { lat: targetPoint.lat, lng: targetPoint.lng };
+            const res = await getDirections(origin, dest);
+            if (res && res.durationMinutes) {
+              const totalSec = Math.round(res.durationMinutes * 60);
+              const totalDist = (res.distanceKm || 1) * 1000;
+              initialDurationSecondsRef.current = totalSec;
+              initialDistanceMetersRef.current = totalDist;
+              remainingSecondsRef.current = totalSec;
+              expectedRoutePointsRef.current = (res.rawGeoJson?.coordinates as Array<[number, number]>) || [];
+              setEtaText(formatEtaArabic(totalSec, distToTarget));
+            }
+          } catch (_) {
+            const fallbackSec = Math.round(distToTarget / 7);
+            remainingSecondsRef.current = fallbackSec;
+            setEtaText(formatEtaArabic(fallbackSec, distToTarget));
+          }
+          return;
+        }
+
+        // الحالة د: عند توقف الكابتن: جمّد العداد ولا تستدعِ Directions إطلاقاً
+        if (stationary) {
+          setEtaText((prev) => prev || formatEtaArabic(remainingSecondsRef.current, distToTarget));
+          return;
+        }
+
+        // الحالة ب + ج: انحراف الكابتن > 500م عن المسار المتوقع + throttle كحد أدنى 60 ثانية
+        let deviationMeters = 0;
+        if (expectedRoutePointsRef.current.length > 0) {
+          deviationMeters = minDistanceToPolylineMeters(newPos.lat, newPos.lng, expectedRoutePointsRef.current);
+        }
+
+        const shouldReroute = deviationMeters > 500 && timeSinceLastCall >= 60000;
+
+        if (shouldReroute) {
+          lastDirectionsCallTimeRef.current = now;
+          directionsCallCountRef.current += 1;
+          const count = directionsCallCountRef.current;
+          (window as any).__DIRECTIONS_CALL_COUNT__ = count;
+          console.log(`[Mapbox Directions Tracker] Call #${count}: Deviation detected (${Math.round(deviationMeters)}m > 500m), re-routing`);
+
+          try {
+            const origin: LngLat = { lat: newPos.lat, lng: newPos.lng };
+            const dest: LngLat = { lat: targetPoint.lat, lng: targetPoint.lng };
+            const res = await getDirections(origin, dest);
+            if (res && res.durationMinutes) {
+              const totalSec = Math.round(res.durationMinutes * 60);
+              const totalDist = (res.distanceKm || 1) * 1000;
+              initialDurationSecondsRef.current = totalSec;
+              initialDistanceMetersRef.current = totalDist;
+              remainingSecondsRef.current = totalSec;
+              expectedRoutePointsRef.current = (res.rawGeoJson?.coordinates as Array<[number, number]>) || [];
+              setEtaText(formatEtaArabic(totalSec, distToTarget));
+            }
+          } catch (_) {
+            const fallbackSec = Math.round(distToTarget / 7);
+            remainingSecondsRef.current = fallbackSec;
+            setEtaText(formatEtaArabic(fallbackSec, distToTarget));
+          }
+          return;
+        }
+
+        // الحركة الطبيعية على المسار: إنقاص الوقت محلياً (Zero API Calls)
+        if (initialDistanceMetersRef.current > 0 && initialDurationSecondsRef.current > 0) {
+          const ratio = Math.min(1, Math.max(0, distToTarget / initialDistanceMetersRef.current));
+          remainingSecondsRef.current = Math.round(initialDurationSecondsRef.current * ratio);
+        } else {
+          remainingSecondsRef.current = Math.round(distToTarget / 7);
+        }
+
+        setEtaText(formatEtaArabic(remainingSecondsRef.current, distToTarget));
+      } else {
+        setEtaText(null);
       }
     },
     [stage, rideStatus, pickup, dropoff, routeCoordinates]
@@ -2122,6 +2242,40 @@ export default function CustomerHomePage() {
           </button>
         )}
 
+        {/* شريط وقت الوصول المتبقي (ETA) الذكي باقتصاد Mapbox */}
+        {isLiveTrackingDriver && etaText && rideStatus?.toLowerCase() !== 'arrived' && (
+          <div className="absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
+            <div className={`w-full max-w-sm px-4 py-2.5 rounded-2xl shadow-xl flex items-center justify-between gap-3 backdrop-blur-md border ${
+              etaText.includes('وصل')
+                ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white border-emerald-400/50 shadow-emerald-500/20'
+                : isDark
+                  ? 'bg-slate-900/95 text-white border-amber-500/40 shadow-black/40'
+                  : 'bg-white/95 text-slate-900 border-amber-500/30 shadow-slate-300/40'
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xl shrink-0">🚖</span>
+                <div className="flex flex-col text-right min-w-0">
+                  <span className="text-[13.5px] font-black leading-tight">{etaText}</span>
+                  {isDriverStationary && !etaText.includes('وصل') ? (
+                    <span className="text-[10.5px] text-amber-500 font-bold flex items-center gap-1">
+                      <span>⏸️</span>
+                      <span>الكابتن متوقف في ازدحام/إشارة (العداد مجمّد)</span>
+                    </span>
+                  ) : (
+                    <span className={`text-[10.5px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {assignedDriverInfo?.driverName ? `الكابتن ${assignedDriverInfo.driverName.split(' ')[0]}` : 'في الطريق إليك'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[11px] font-bold shrink-0">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>مباشر</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* شريط تنبيه وصول الكابتن العائم في أعلى الشاشة */}
         {(rideStatus?.toLowerCase() === 'arrived') && (
           <div className="absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
@@ -2329,19 +2483,11 @@ export default function CustomerHomePage() {
 
 
 
-          {/* موقع السائق الحقيقي عند القبول والوصول */}
-          {liveDriverPosition ? (
+          {/* موقع السائق الحقيقي عند القبول والوصول مع الاحتفاظ بآخر موقع لمنع الاختفاء */}
+          {(liveDriverPosition || assignedDriverInfo?.driverLat || lastKnownDriverPosRef.current) && (stage === 'driver_arriving' || isLiveTrackingDriver) ? (
             <VehicleMarker
-              targetLat={liveDriverPosition.lat}
-              targetLng={liveDriverPosition.lng}
-              targetHeading={driverHeading}
-              title={assignedDriverInfo?.driverName ? `كابتن ${assignedDriverInfo.driverName.split(' ')[0]}` : undefined}
-              isAvailable={false}
-            />
-          ) : assignedDriverInfo?.driverLat && assignedDriverInfo?.driverLon ? (
-            <VehicleMarker
-              targetLat={assignedDriverInfo.driverLat}
-              targetLng={assignedDriverInfo.driverLon}
+              targetLat={liveDriverPosition?.lat ?? assignedDriverInfo?.driverLat ?? lastKnownDriverPosRef.current!.lat}
+              targetLng={liveDriverPosition?.lng ?? assignedDriverInfo?.driverLon ?? lastKnownDriverPosRef.current!.lng}
               targetHeading={driverHeading}
               title={assignedDriverInfo?.driverName ? `كابتن ${assignedDriverInfo.driverName.split(' ')[0]}` : undefined}
               isAvailable={false}

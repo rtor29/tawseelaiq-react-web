@@ -46,12 +46,12 @@ type FieldProps = InputHTMLAttributes<HTMLInputElement> & { label?: string; icon
 export function Field({ label, icon, error, className = '', ...rest }: FieldProps) {
   return (
     <label className="block text-right" dir="rtl">
-      {label && <span className="mb-1.5 block text-xs font-bold text-slate-700">{label}</span>}
+      {label && <span className="mb-1.5 block text-xs font-bold text-slate-800 dark:text-slate-200">{label}</span>}
       <span className="relative block">
         {icon && <span className="pointer-events-none absolute inset-y-0 start-3 flex items-center text-slate-400">{icon}</span>}
         <input
           dir="rtl"
-          className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 text-right outline-none transition placeholder:text-slate-400 placeholder:text-right focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${icon ? 'ps-10' : ''} ${className}`}
+          className={`w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#242A37] px-4 py-2.5 text-sm text-slate-900 dark:text-white text-right outline-none transition placeholder:text-slate-400 placeholder:text-right focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 disabled:bg-slate-100 disabled:text-slate-700 dark:disabled:bg-[#1E2430] dark:disabled:text-slate-300 ${icon ? 'ps-10' : ''} ${className}`}
           {...rest}
         />
       </span>
@@ -68,10 +68,10 @@ export function SelectField({
 }: SelectHTMLAttributes<HTMLSelectElement> & { label?: string }) {
   return (
     <label className="block text-right" dir="rtl">
-      {label && <span className="mb-1.5 block text-xs font-bold text-slate-700">{label}</span>}
+      {label && <span className="mb-1.5 block text-xs font-bold text-slate-800 dark:text-slate-200">{label}</span>}
       <select
         dir="rtl"
-        className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 text-right outline-none transition focus:border-[#1B4965] focus:ring-2 focus:ring-[#1B4965]/20 ${className}`}
+        className={`w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#242A37] px-4 py-2.5 text-sm text-slate-900 dark:text-white text-right outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 disabled:bg-slate-100 disabled:text-slate-700 dark:disabled:bg-[#1E2430] dark:disabled:text-slate-300 ${className}`}
         {...rest}
       >
         {children}

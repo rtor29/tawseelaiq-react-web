@@ -52,6 +52,62 @@ export function formatDistanceAr(meters: number): string {
   return `${(meters / 1000).toFixed(1)} كم`;
 }
 
+/**
+ * حساب أقصر مسافة بالأمتار بين نقطة ومسار هندسي (Polyline)
+ * يستخدم صيغة الإسقاط العمودي مع قانون هافرسين لحساب انحراف الكابتن
+ */
+export function minDistanceToPolylineMeters(
+  lat: number,
+  lon: number,
+  coordinates: Array<[number, number]>
+): number {
+  if (!coordinates || coordinates.length === 0) return 0;
+  if (coordinates.length === 1) {
+    return distanceMeters(lat, lon, coordinates[0][1], coordinates[0][0]);
+  }
+
+  let minMeters = Infinity;
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const [lon1, lat1] = coordinates[i];
+    const [lon2, lat2] = coordinates[i + 1];
+
+    const dx = lon2 - lon1;
+    const dy = lat2 - lat1;
+    const lenSq = dx * dx + dy * dy;
+
+    let projLat = lat1;
+    let projLon = lon1;
+
+    if (lenSq > 0) {
+      const u = Math.max(0, Math.min(1, ((lon - lon1) * dx + (lat - lat1) * dy) / lenSq));
+      projLon = lon1 + u * dx;
+      projLat = lat1 + u * dy;
+    }
+
+    const d = distanceMeters(lat, lon, projLat, projLon);
+    if (d < minMeters) {
+      minMeters = d;
+    }
+  }
+
+  return minMeters;
+}
+
+/**
+ * تنسيق الوقت المتبقي لوصول الكابتن باللغة العربية
+ */
+export function formatEtaArabic(secondsRemaining: number, distMeters: number): string {
+  if (distMeters <= 50 || secondsRemaining <= 0) {
+    return 'الكابتن وصل 🚖';
+  }
+  const mins = Math.max(1, Math.round(secondsRemaining / 60));
+  if (mins === 1) return 'باقي دقيقة واحدة';
+  if (mins === 2) return 'باقي دقيقتان';
+  if (mins >= 3 && mins <= 10) return `باقي ${mins} دقائق`;
+  return `باقي ${mins} دقيقة`;
+}
+
 export function iraqCenterLngLat(): LngLat {
   return { lat: IRAQ_DEFAULT_CENTER.lat, lng: IRAQ_DEFAULT_CENTER.lon };
 }
