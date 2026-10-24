@@ -799,12 +799,14 @@ export default function DailyRoutePage() {
 
       {/* الزر السفلي الافتراضي */}
       {!selectedDriver && (
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-[#161C28]/95 px-5 pt-3 pb-8 shadow-2xl rounded-t-3xl border-t border-white/15 text-white">
-          <div className="flex justify-center mb-3"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
-          <button type="button" onClick={() => show('اختر سائقاً من الخريطة أولاً', 'info')}
-            className="w-full rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 py-3.5 text-center text-[16px] font-black text-slate-950 shadow-xl shadow-amber-500/25 cursor-pointer hover:brightness-105 transition-all duration-200 ease-in-out active:scale-[0.98]">
-            تأكيد نقطة الانطلاق
-          </button>
+        <div className="fixed inset-x-0 bottom-0 z-20 flex flex-col items-center pointer-events-none" dir="rtl">
+          <div className="pointer-events-auto w-full max-w-lg bg-[#161C28]/95 px-5 pt-3 pb-8 shadow-2xl rounded-t-3xl border-t border-white/15 text-white">
+            <div className="flex justify-center mb-3"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
+            <button type="button" onClick={() => show('اختر سائقاً من الخريطة أولاً', 'info')}
+              className="w-full rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 py-3.5 text-center text-[16px] font-black text-slate-950 shadow-xl shadow-amber-500/25 cursor-pointer hover:brightness-105 transition-all duration-200 ease-in-out active:scale-[0.98]">
+              تأكيد نقطة الانطلاق
+            </button>
+          </div>
         </div>
       )}
 
@@ -815,13 +817,14 @@ export default function DailyRoutePage() {
         const remaining = selectedDriver.seats - selectedDriver.takenSeats;
         const distLabel = dist < 1 ? `${Math.round(dist * 1000)} متر` : `${dist.toFixed(1)} كم`;
         return (
-          <div 
-            className="absolute inset-x-0 bottom-0 z-30 rounded-t-[24px] bg-[#1e1e2e] text-white pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-y-auto overscroll-contain"
-            style={{ maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))' }}
-          >
-            <div className="flex justify-center pt-3 mb-1 cursor-pointer" onClick={() => setSelectedDriver(null)}>
-              <div className="h-1 w-10 rounded-full bg-white/30" />
-            </div>
+          <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col items-center pointer-events-none" dir="rtl">
+            <div 
+              className="pointer-events-auto w-full max-w-lg rounded-t-[24px] bg-[#1e1e2e] text-white pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] animate-fade-in max-h-[calc(100dvh-5.5rem-env(safe-area-inset-top,1rem))] overflow-y-auto overscroll-contain"
+              style={{ maxHeight: 'calc(100dvh - 5.5rem - env(safe-area-inset-top, 1rem))' }}
+            >
+              <div className="flex justify-center pt-3 mb-1 cursor-pointer" onClick={() => setSelectedDriver(null)}>
+                <div className="h-1 w-10 rounded-full bg-white/30" />
+              </div>
 
             {/* صف السائق */}
             <div className="flex items-center justify-between px-5 pt-2 pb-3 border-b border-white/10">
@@ -993,6 +996,7 @@ export default function DailyRoutePage() {
               </div>
             </div>
           </div>
+        </div>
         );
       })()}
 
