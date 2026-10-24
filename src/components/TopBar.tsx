@@ -1,6 +1,7 @@
-// شريط التطبيق العلوي الموحّد مع زر الحساب الموحد
+// شريط التطبيق العلوي الموحّد مع زر الحساب الموجه حسب الدور
 import { type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { storage } from '../lib/storage';
 
 interface TopBarProps {
   title: string;
@@ -10,11 +11,20 @@ interface TopBarProps {
 export function TopBar({ title, actions }: TopBarProps) {
   const navigate = useNavigate();
 
+  function handleAccountClick() {
+    const rawRole = (storage.getUserRole() || localStorage.getItem('role') || localStorage.getItem('user_role') || '').toLowerCase();
+    if (rawRole === 'driver') {
+      navigate('/driver-hub');
+    } else {
+      navigate('/hub');
+    }
+  }
+
   return (
     <header className="relative z-20 flex h-14 items-center gap-2 bg-brand-slate px-3 text-white shadow-md text-right font-cairo" dir="rtl">
       <button
         type="button"
-        onClick={() => navigate('/hub')}
+        onClick={handleAccountClick}
         className="flex h-10 w-10 items-center justify-center rounded-xl hover:bg-white/10 transition active:scale-95 cursor-pointer"
         aria-label="الحساب والإعدادات"
         title="الحساب والإعدادات"

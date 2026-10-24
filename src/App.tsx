@@ -26,6 +26,7 @@ const CreateVacancyAdPage = lazy(() => import('./pages/CreateVacancyAdPage'));
 const SupportPage = lazy(() => import('./pages/SupportPage'));
 const DailyRoutePage = lazy(() => import('./pages/DailyRoutePage'));
 const CustomerHub = lazy(() => import('./components/CustomerHub').then((m) => ({ default: m.CustomerHub })));
+const DriverHub = lazy(() => import('./components/DriverHub').then((m) => ({ default: m.DriverHub })));
 
 function PageLoader() {
   return (
@@ -155,11 +156,11 @@ export default function App() {
             <Route path="/register" element={<Navigate to="/login" replace />} />
             <Route path="/otp" element={<Navigate to="/login" replace />} />
 
-            {/* مسارات الراكب والكابتن الأساسية — حماية المسار والبقاء في نفس الصفحة عند الـ Refresh */}
+            {/* مسارات الراكب الأساسية — حماية المسار والبقاء في نفس الصفحة عند الـ Refresh */}
             <Route
               path="/hub"
               element={
-                <ProtectedRoute allowedRoles={['customer', 'driver']}>
+                <ProtectedRoute allowedRoles={['customer']}>
                   <CustomerHub />
                 </ProtectedRoute>
               }
@@ -205,6 +206,23 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['driver']}>
                   <DriverHomePage />
+                </ProtectedRoute>
+              }
+            />
+            {/* صفحة حساب وخدمات الكابتن المستقلة تماماً عن حساب الراكب */}
+            <Route
+              path="/driver-hub"
+              element={
+                <ProtectedRoute allowedRoles={['driver']}>
+                  <DriverHub />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/driver/hub"
+              element={
+                <ProtectedRoute allowedRoles={['driver']}>
+                  <DriverHub />
                 </ProtectedRoute>
               }
             />

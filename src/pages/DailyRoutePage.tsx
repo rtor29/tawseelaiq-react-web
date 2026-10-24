@@ -612,33 +612,9 @@ export default function DailyRoutePage() {
             </div>
           </div>
 
-          {/* أزرار التحكم: تبديل الوضع والحساب */}
+          {/* أزرار التحكم: تبديل الوضع النهاري والليلي */}
           <div className="pointer-events-auto flex items-center gap-2">
             <ThemeToggleButton />
-            <button
-              type="button"
-              onClick={() => navigate('/hub')}
-              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
-                isDark 
-                  ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-amber-400/50' 
-                  : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-amber-400 shadow-sm'
-              }`}
-              title="الحساب والإعدادات"
-              aria-label="الحساب"
-            >
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </button>
           </div>
         </div>
       </header>

@@ -1946,13 +1946,13 @@ export default function DriverHomePage() {
               <ThemeToggleButton />
             </div>
 
-            {/* زر حساب الكابتن والقائمة الموحدة - ينقل لصفحة /hub */}
+            {/* زر حساب الكابتن والقائمة الموحدة - ينقل لصفحة /driver-hub الخاصة بالسائق */}
             <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                navigate('/hub');
+                navigate('/driver-hub');
               }}
               className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl shadow-lg flex items-center justify-center active:scale-95 transition-all relative border cursor-pointer ${
                 isDark ? 'bg-[#161c28]/90 border-[#534434]/40 text-[#56e5a9]' : 'bg-white/95 border-emerald-400 text-emerald-700 shadow-md'
@@ -2741,7 +2741,7 @@ export default function DriverHomePage() {
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => navigate('/hub')}
+                  onClick={() => navigate('/driver-hub')}
                   className="flex-1 py-2.5 bg-[#242a37] hover:bg-[#2c3343] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-base text-[#56e5a9]">account_circle</span>
