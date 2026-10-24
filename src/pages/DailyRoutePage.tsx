@@ -15,7 +15,7 @@ import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { RouteLines } from '../components/map/MapPins';
-import { applyMapEnhancements, getDirections, searchPlaces, type PlaceResult } from '../lib/mapbox';
+import { applyMapEnhancements, searchPlaces, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
 import { useTheme } from '../context/ThemeContext';
@@ -40,6 +40,7 @@ interface DriverItem {
   vehicleType?: string;
   distanceM?: number;
   distanceBand?: string;
+  isFull?: boolean;
 }
 
 function getDriverColor(distKm: number): { bg: string; text: string; label: string } {
@@ -89,6 +90,8 @@ export default function DailyRoutePage() {
   const [subscribedDriverIds, setSubscribedDriverIds] = useState<Set<string>>(new Set());
   const [customerBookings, setCustomerBookings] = useState<any[]>([]);
   const [selectedDriverRoute, setSelectedDriverRoute] = useState<[number, number][] | null>(null);
+  const [showCaptainRoute, setShowCaptainRoute] = useState(false);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const notifiedRejectedBookingIdsRef = useRef<Set<string>>(new Set());
 
   // نافذة طلب إلغاء الاشتراك للراكب
@@ -215,32 +218,54 @@ export default function DailyRoutePage() {
     };
   }, [processBookings]);
 
-  // رسم مسار الملاحة بنمط ويز عند اختيار كابتن خط دائمي
+  // إعادة ضبط مسار الكابتن عند تغيير أو إغلاق السائق — لا رسم تلقائي لتوفير Mapbox
   useEffect(() => {
-    if (!selectedDriver) {
+    setShowCaptainRoute(false);
+    setSelectedDriverRoute(null);
+  }, [selectedDriver?.id]);
+
+  // إظهار أو إخفاء مسار الكابتن على الشوارع من الخادم (Redis Cache) دون استدعاء Mapbox متكرر
+  async function handleToggleCaptainRoute() {
+    if (showCaptainRoute) {
+      setShowCaptainRoute(false);
       setSelectedDriverRoute(null);
       return;
     }
-    let cancelled = false;
-    getDirections(userLoc, { lat: selectedDriver.lat, lng: selectedDriver.lng })
-      .then((res) => {
-        if (!cancelled && res?.coordinates) {
-          setSelectedDriverRoute(res.coordinates.map((c) => [c.lng, c.lat]));
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSelectedDriverRoute([
-            [userLoc.lng, userLoc.lat],
-            [selectedDriver.lng, selectedDriver.lat],
-          ]);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedDriver, userLoc]);
+    if (!selectedDriver) return;
+    setIsLoadingRoute(true);
+    try {
+      const res = await http.get<{
+        success?: boolean;
+        coordinates?: [number, number][];
+        source?: string;
+      }>(`/drivers/${selectedDriver.id}/route-geometry`);
+      if (res.data?.success && Array.isArray(res.data.coordinates) && res.data.coordinates.length > 0) {
+        setSelectedDriverRoute(res.data.coordinates);
+        setShowCaptainRoute(true);
+        try {
+          const coords = res.data.coordinates;
+          let minLng = coords[0][0], maxLng = coords[0][0];
+          let minLat = coords[0][1], maxLat = coords[0][1];
+          coords.forEach(([lng, lat]) => {
+            if (lng < minLng) minLng = lng;
+            if (lng > maxLng) maxLng = lng;
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+          });
+          mapRef.current?.fitBounds(
+            [[minLng, minLat], [maxLng, maxLat]],
+            { padding: { top: 100, bottom: 280, left: 40, right: 40 }, duration: 800 }
+          );
+        } catch (_) {}
+      } else {
+        show('تعذر جلب مسار الكابتن حالياً', 'warning');
+      }
+    } catch (_) {
+      show('تعذر جلب مسار الكابتن', 'error');
+    } finally {
+      setIsLoadingRoute(false);
+    }
+  }
 
   const matchingBooking = selectedDriver
     ? customerBookings.find((b: any) => {
@@ -362,11 +387,12 @@ export default function DailyRoutePage() {
               rating: Number(d.rating || d.ratingAverage || 5.0),
               plate: d.vehiclePlate || d.plateNumber || 'العراق',
               seats: 4,
-              takenSeats: d.isFull ? 4 : (d.takenSeats ?? 1),
+              takenSeats: Boolean(d.isFull || d.is_full) ? 4 : (d.takenSeats ?? 1),
               phone: d.phoneNumber || d.phone || '',
               vehicleType: d.vehicleType || d.vehicle_type || 'eco',
               distanceM: typeof d.distanceM === 'number' ? d.distanceM : undefined,
               distanceBand: d.distanceBand || undefined,
+              isFull: Boolean(d.isFull || d.is_full),
             };
           });
           setDrivers(mapped);
@@ -434,6 +460,10 @@ export default function DailyRoutePage() {
   // إرسال طلب حجز مقعد في الخط الدائمي للكابتن
   async function handleBookSeat() {
     if (!selectedDriver || isBooking || isAlreadySubscribed || isBookingPending) return;
+    if (selectedDriver.isFull || (selectedDriver.seats - selectedDriver.takenSeats) <= 0) {
+      show('الكابتن مكتمل - لا تتوفر مقاعد شاغرة حالياً 🚫', 'warning');
+      return;
+    }
     // منع تعدد الاشتراكات — الراكب يملك اشتراكاً نشطاً بالفعل
     if (hasAnyActiveCommute && !matchingBooking) {
       show('لديك اشتراك خط دائمي نشط بالفعل. يجب إلغاء اشتراكك الحالي قبل الاشتراك في خط آخر.', 'error');
@@ -734,24 +764,25 @@ export default function DailyRoutePage() {
             </div>
           </Marker>
 
-          {/* السائقون مع الألوان والمسافات الدقيقة */}
+          {/* السائقون مع الألوان والمسافات الدقيقة والشارة الرمادية للمكتمل */}
           {drivers.map(driver => {
             const dist = typeof driver.distanceM === 'number'
               ? driver.distanceM / 1000
               : distanceKm({ lat: userLoc.lat, lng: userLoc.lng }, { lat: driver.lat, lng: driver.lng });
-            const { bg } = getDriverColor(dist);
+            const markerBg = driver.isFull ? '#64748B' : getDriverColor(dist).bg;
             const isSelected = selectedDriver?.id === driver.id;
             const distLabel = dist < 1 ? `${Math.round(dist * 1000)}م` : `${dist.toFixed(1)}كم`;
             return (
               <Marker key={driver.id} longitude={driver.lng} latitude={driver.lat} anchor="bottom">
                 <div className="flex flex-col items-center cursor-pointer transition-transform hover:scale-110 active:scale-95" onClick={(e) => { e.stopPropagation(); setSelectedDriver(driver); }}>
-                  {/* اسم السائق + المسافة */}
+                  {/* اسم السائق + المسافة + شارة مكتمل */}
                   <div className="mb-0.5 flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-black text-white shadow-md"
-                    style={{ backgroundColor: bg, outline: isSelected ? '2px solid white' : 'none' }}>
+                    style={{ backgroundColor: markerBg, outline: isSelected ? '2px solid white' : 'none' }}>
+                    {driver.isFull && <span className="bg-slate-700/80 px-1 rounded text-[9.5px]">مكتمل</span>}
                     <span>{isSelected && '✓ '}{driver.name}</span>
                     <span className="text-[10px] font-sans opacity-95">({distLabel})</span>
                   </div>
-                  <CarSVG color={bg} />
+                  <CarSVG color={markerBg} />
                 </div>
               </Marker>
             );
@@ -890,6 +921,36 @@ export default function DailyRoutePage() {
               </div>
             </div>
 
+            {/* زر إظهار / إخفاء مسار الكابتن على الشوارع (خط أصفر رفيع 3px #F59E0B) */}
+            <div className={`px-5 py-2.5 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+              <button
+                type="button"
+                onClick={handleToggleCaptainRoute}
+                disabled={isLoadingRoute}
+                className={`w-full min-h-[48px] h-12 flex items-center justify-center gap-2 rounded-xl text-[13.5px] font-black transition cursor-pointer active:scale-95 border ${
+                  showCaptainRoute
+                    ? 'bg-amber-500/15 border-amber-500/50 text-amber-500 hover:bg-amber-500/25'
+                    : isDark
+                    ? 'bg-slate-800/80 border-white/20 text-white hover:bg-slate-800'
+                    : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'
+                }`}
+              >
+                {isLoadingRoute ? (
+                  <span className="animate-pulse">جاري جلب المسار...</span>
+                ) : showCaptainRoute ? (
+                  <>
+                    <span>إخفاء مسار الخط</span>
+                    <span className="text-[15px]">✕</span>
+                  </>
+                ) : (
+                  <>
+                    <span>إظهار مسار الخط على الخريطة</span>
+                    <span className="text-[17px]">🛣️</span>
+                  </>
+                )}
+              </button>
+            </div>
+
             {/* مقاعد */}
             <div className={`flex items-center justify-between px-5 py-3 border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
               <div className="flex gap-1">
@@ -898,9 +959,15 @@ export default function DailyRoutePage() {
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <div className="rounded-full px-3 py-1 text-[12px] font-bold text-white" style={{ backgroundColor: remaining > 0 ? '#16a34a' : '#dc2626' }}>
-                  {remaining > 0 ? `متبقي ${remaining === 1 ? 'مقعد' : remaining === 2 ? 'مقعدين' : `${remaining} مقاعد`}` : 'مكتمل'}
-                </div>
+                {selectedDriver.isFull || remaining <= 0 ? (
+                  <div className="rounded-full px-3 py-1 text-[12px] font-bold text-white bg-slate-600 shadow-xs border border-white/20">
+                    مكتمل - غير متاح
+                  </div>
+                ) : (
+                  <div className="rounded-full px-3 py-1 text-[12px] font-bold text-white" style={{ backgroundColor: '#16a34a' }}>
+                    {`متبقي ${remaining === 1 ? 'مقعد' : remaining === 2 ? 'مقعدين' : `${remaining} مقاعد`}`}
+                  </div>
+                )}
                 <p className={`text-[12px] ${isDark ? 'text-white/50' : 'text-slate-500'}`}>الراكب المطلوبة: {selectedDriver.takenSeats} / {selectedDriver.seats}</p>
               </div>
             </div>
@@ -954,6 +1021,20 @@ export default function DailyRoutePage() {
                   >
                     طلب إلغاء الاشتراك في الخط ✕
                   </button>
+                </div>
+              ) : selectedDriver.isFull || remaining <= 0 ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full min-h-[48px] rounded-xl bg-slate-600/90 py-3.5 text-center text-[15px] font-black text-white/90 shadow-none cursor-not-allowed flex items-center justify-center gap-2 border border-white/10"
+                  >
+                    <span>الكابتن مكتمل - غير متاح</span>
+                    <span className="text-[17px]">🚫</span>
+                  </button>
+                  <p className="rounded-lg bg-slate-500/15 border border-slate-500/30 px-3 py-1.5 text-center text-[12px] font-semibold text-slate-400">
+                    جميع مقاعد هذا الخط محجوزة بالكامل حالياً.
+                  </p>
                 </div>
               ) : (
                 hasAnyActiveCommute && !matchingBooking ? (

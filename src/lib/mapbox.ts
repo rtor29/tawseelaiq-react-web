@@ -1,7 +1,7 @@
 // خدمة Mapbox — بديل MapboxService.dart (Directions + Geocoding العكسي والبحث)
 // التوكن يُقرأ من متغير البيئة VITE_MAPBOX_TOKEN فقط
 
-import { externalGet } from './api';
+import { http, externalGet } from './api';
 import { config } from './config';
 import type { LngLat } from '../types';
 
@@ -118,6 +118,31 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
   const proximityParam = proximity
     ? `${proximity.lng},${proximity.lat}`
     : undefined;
+
+  // 0. الاستعلام أولاً من خادم التطبيق المشترك (Redis Cache) لتوفير استدعاءات Mapbox
+  try {
+    const serverRes = await http.get<{
+      success?: boolean;
+      places?: Array<{ id: string; name: string; address?: string; lat: number; lng: number }>;
+      source?: string;
+    }>('/places/search', {
+      params: { q, proximity: proximityParam },
+      timeout: 3500,
+    });
+    if (serverRes.data?.success && Array.isArray(serverRes.data.places) && serverRes.data.places.length > 0) {
+      const places: PlaceResult[] = serverRes.data.places.map((p) => ({
+        name: p.name,
+        subName: p.address || p.name,
+        fullName: p.address || p.name,
+        lat: p.lat,
+        lon: p.lng,
+      }));
+      setCachedSearchResults(q, places, proximity);
+      return places;
+    }
+  } catch (_) {
+    // السقوط الآمن على استدعاء Mapbox المباشر في حال انقطاع الخادم
+  }
 
   // 1. محرك Mapbox Geocoding API الصارم
   const fetchMapbox = async (): Promise<PlaceResult[]> => {

@@ -201,6 +201,9 @@ export default function CustomerHomePage() {
   const [showCommuteRoutes, setShowCommuteRoutes] = useState<boolean>(false);
   const [commuteDrivers, setCommuteDrivers] = useState<any[]>([]);
   const [selectedCommuteDriver, setSelectedCommuteDriver] = useState<any | null>(null);
+  const [showCommuteRoute, setShowCommuteRoute] = useState<boolean>(false);
+  const [commuteRouteCoordinates, setCommuteRouteCoordinates] = useState<[number, number][] | null>(null);
+  const [isLoadingCommuteRoute, setIsLoadingCommuteRoute] = useState<boolean>(false);
 
   // الفئة المحددة (الافتراضي: سوبر)
   const [selectedTierId, setSelectedTierId] = useState<'super' | 'saving' | 'plus'>('super');
@@ -501,6 +504,58 @@ export default function CustomerHomePage() {
       clearInterval(interval);
     };
   }, [pickup.lat, pickup.lng, showCommuteRoutes]);
+
+  // إعادة ضبط مسار الخط الدائمي عند تغيير أو إغلاق الكابتن
+  useEffect(() => {
+    setShowCommuteRoute(false);
+    setCommuteRouteCoordinates(null);
+  }, [selectedCommuteDriver?.driverId, selectedCommuteDriver?.id]);
+
+  // إظهار أو إخفاء مسار كابتن الخط الدائمي على الشوارع (Redis Cache)
+  async function handleToggleCommuteRoute() {
+    if (showCommuteRoute) {
+      setShowCommuteRoute(false);
+      setCommuteRouteCoordinates(null);
+      return;
+    }
+    if (!selectedCommuteDriver) return;
+    const drvId = selectedCommuteDriver.driverId || selectedCommuteDriver.id;
+    if (!drvId) return;
+
+    setIsLoadingCommuteRoute(true);
+    try {
+      const res = await http.get<{
+        success?: boolean;
+        coordinates?: [number, number][];
+        source?: string;
+      }>(`/drivers/${drvId}/route-geometry`);
+      if (res.data?.success && Array.isArray(res.data.coordinates) && res.data.coordinates.length > 0) {
+        setCommuteRouteCoordinates(res.data.coordinates);
+        setShowCommuteRoute(true);
+        try {
+          const coords = res.data.coordinates;
+          let minLng = coords[0][0], maxLng = coords[0][0];
+          let minLat = coords[0][1], maxLat = coords[0][1];
+          coords.forEach(([lng, lat]) => {
+            if (lng < minLng) minLng = lng;
+            if (lng > maxLng) maxLng = lng;
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+          });
+          mapRef.current?.fitBounds(
+            [[minLng, minLat], [maxLng, maxLat]],
+            { padding: { top: 120, bottom: 280, left: 40, right: 40 }, duration: 800 }
+          );
+        } catch (_) {}
+      } else {
+        show('تعذر جلب مسار الكابتن حالياً', 'warning');
+      }
+    } catch (_) {
+      show('تعذر جلب مسار الكابتن', 'error');
+    } finally {
+      setIsLoadingCommuteRoute(false);
+    }
+  }
 
   // حالة الـ GPS والتنبيهات المخصصة لـ iOS Safari
   const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
@@ -1937,10 +1992,14 @@ export default function CustomerHomePage() {
     (c) => c.name.includes(citySearchQuery.trim()) || c.sub.includes(citySearchQuery.trim())
   );
 
-  // إعداد طبقة خط المسار الانسيابي النحيف (Sleek Slim Polyline - 2.8px)
-  const routeLines: RouteLineData[] = routeCoordinates && routeCoordinates.length
-    ? [{ id: 'route-line', coordinates: routeCoordinates, color: '#F59E0B' }]
-    : [];
+  // إعداد طبقة خط المسار الانسيابي النحيف (Sleek Slim Polyline - 2.8px / 3.0px)
+  const routeLines: RouteLineData[] = [];
+  if (routeCoordinates && routeCoordinates.length) {
+    routeLines.push({ id: 'route-line', coordinates: routeCoordinates, color: '#F59E0B' });
+  }
+  if (commuteRouteCoordinates && commuteRouteCoordinates.length) {
+    routeLines.push({ id: 'commute-route-line', coordinates: commuteRouteCoordinates, color: '#F59E0B' });
+  }
 
   return (
     <div 
@@ -2234,8 +2293,9 @@ export default function CustomerHomePage() {
             const dLng = Number(drv.fixed_lng ?? drv.lng ?? drv.longitude);
             if (isNaN(dLat) || isNaN(dLng)) return null;
 
-            const band = drv.distanceBand || (drv.distanceM <= 500 ? 'green' : drv.distanceM <= 2000 ? 'purple' : 'red');
-            const bandColor = band === 'green' ? '#16a34a' : band === 'purple' ? '#7c3aed' : '#dc2626';
+            const isFull = Boolean(drv.isFull || drv.is_full);
+            const band = isFull ? 'slate' : (drv.distanceBand || (drv.distanceM <= 500 ? 'green' : drv.distanceM <= 2000 ? 'purple' : 'red'));
+            const bandColor = isFull ? '#64748B' : (band === 'green' ? '#16a34a' : band === 'purple' ? '#7c3aed' : '#dc2626');
             const isSelected = selectedCommuteDriver?.driverId === drv.driverId;
 
             return (
@@ -2262,6 +2322,7 @@ export default function CustomerHomePage() {
                     style={{ backgroundColor: bandColor }}
                   >
                     <span>🚌</span>
+                    {isFull && <span className="bg-slate-700/90 px-1 rounded text-[9.5px]">مكتمل</span>}
                     <span>{drv.firstName || 'كابتن'}</span>
                     <span className="text-[10px] opacity-90">({drv.distanceM != null ? (drv.distanceM < 1000 ? `${drv.distanceM}م` : `${(drv.distanceM / 1000).toFixed(1)}كم`) : 'خط'})</span>
                   </div>
@@ -2272,9 +2333,9 @@ export default function CustomerHomePage() {
                     style={{ backgroundColor: bandColor }}
                   >
                     <span className="text-lg">🚌</span>
-                    {drv.isFull && (
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border border-white"></span>
+                    {isFull && (
+                      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-700 border border-white text-[8px] font-bold">
+                        ✕
                       </span>
                     )}
                   </div>
@@ -2553,28 +2614,67 @@ export default function CustomerHomePage() {
                 <span className="flex items-center gap-1.5">
                   <span className={isDark ? "text-slate-400" : "text-slate-500"}>المقاعد:</span>
                   <span className={`px-2 py-0.5 rounded-full ${
-                    selectedCommuteDriver.isFull ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
+                    selectedCommuteDriver.isFull ? 'bg-slate-600/40 text-slate-300 border border-slate-500/30 font-bold' : 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
                   }`}>
-                    {selectedCommuteDriver.isFull ? 'مكتمل' : 'مقاعد متوفرة'}
+                    {selectedCommuteDriver.isFull ? 'مكتمل - غير متاح' : 'مقاعد متوفرة'}
                   </span>
                 </span>
               </div>
 
-              {/* زر حجز مقعد في هذا الخط — ينقل مباشرة إلى صفحة /daily مع تحديد الكابتن */}
+              {/* زر إظهار / إخفاء مسار الخط على الشوارع (أصفر 3px #F59E0B) */}
               <button
                 type="button"
-                onClick={() => {
-                  navigate('/daily', {
-                    state: {
-                      selectedDriverId: selectedCommuteDriver.driverId || selectedCommuteDriver.id,
-                    },
-                  });
-                }}
-                className="w-full min-h-[48px] rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+                onClick={handleToggleCommuteRoute}
+                disabled={isLoadingCommuteRoute}
+                className={`w-full min-h-[48px] rounded-2xl mb-2.5 font-bold text-xs border transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95 ${
+                  showCommuteRoute
+                    ? 'bg-amber-500/15 border-amber-500/50 text-amber-500'
+                    : isDark
+                    ? 'bg-slate-800/80 border-white/10 text-white hover:bg-slate-800'
+                    : 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200'
+                }`}
               >
-                <span>حجز مقعد في هذا الخط</span>
-                <span>🚌 ➔</span>
+                {isLoadingCommuteRoute ? (
+                  <span className="animate-pulse">جاري جلب المسار...</span>
+                ) : showCommuteRoute ? (
+                  <>
+                    <span>إخفاء مسار الخط</span>
+                    <span>✕</span>
+                  </>
+                ) : (
+                  <>
+                    <span>إظهار مسار الخط على الخريطة</span>
+                    <span>🛣️</span>
+                  </>
+                )}
               </button>
+
+              {/* زر حجز مقعد في هذا الخط — ينقل مباشرة إلى صفحة /daily مع تحديد الكابتن */}
+              {selectedCommuteDriver.isFull ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full min-h-[48px] rounded-2xl bg-slate-600/80 text-white/80 font-black text-sm shadow-none cursor-not-allowed flex items-center justify-center gap-2 border border-white/10"
+                >
+                  <span>الكابتن مكتمل - غير متاح</span>
+                  <span>🚫</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate('/daily', {
+                      state: {
+                        selectedDriverId: selectedCommuteDriver.driverId || selectedCommuteDriver.id,
+                      },
+                    });
+                  }}
+                  className="w-full min-h-[48px] rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>حجز مقعد في هذا الخط</span>
+                  <span>🚌 ➔</span>
+                </button>
+              )}
             </div>
           </div>
         )}
