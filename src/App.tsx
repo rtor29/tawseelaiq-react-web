@@ -155,11 +155,11 @@ export default function App() {
             <Route path="/register" element={<Navigate to="/login" replace />} />
             <Route path="/otp" element={<Navigate to="/login" replace />} />
 
-            {/* مسارات الراكب الأساسية — حماية المسار والبقاء في نفس الصفحة عند الـ Refresh */}
+            {/* مسارات الراكب والكابتن الأساسية — حماية المسار والبقاء في نفس الصفحة عند الـ Refresh */}
             <Route
               path="/hub"
               element={
-                <ProtectedRoute allowedRoles={['customer']}>
+                <ProtectedRoute allowedRoles={['customer', 'driver']}>
                   <CustomerHub />
                 </ProtectedRoute>
               }

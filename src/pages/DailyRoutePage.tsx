@@ -14,7 +14,6 @@ import { distanceKm, getCurrentPositionWithFallback, isIosDevice, isStandalonePw
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
-import { AppDrawer } from '../components/AppDrawer';
 import { RouteLines } from '../components/map/MapPins';
 import { applyMapEnhancements, getDirections, searchPlaces, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
@@ -97,7 +96,6 @@ export default function DailyRoutePage() {
   const [cancelReason, setCancelReason] = useState('تغير أوقات الدوام');
   const [cancelDetails, setCancelDetails] = useState('');
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // حالة البحث الجغرافي الذكي للأحياء والمعالم في النجف
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -619,7 +617,7 @@ export default function DailyRoutePage() {
             <ThemeToggleButton />
             <button
               type="button"
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={() => navigate('/hub')}
               className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
                 isDark 
                   ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-amber-400/50' 
@@ -1132,9 +1130,6 @@ export default function DailyRoutePage() {
           </div>
         </div>
       )}
-
-      {/* القائمة الجانبية ومعلومات الحساب للراكب */}
-      <AppDrawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
     </div>
   );
 }

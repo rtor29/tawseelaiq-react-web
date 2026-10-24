@@ -42,7 +42,6 @@ import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import { AppDrawer } from '../components/AppDrawer';
 
 // التحميل الكسول لنافذة الدردشة لتقليل الحزمة الأولية
 const ChatModal = lazy(() => import('../components/ChatModal'));
@@ -232,7 +231,6 @@ export default function CustomerHomePage() {
 
   // حالة النوافذ والدرج
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCitySelectorOpen, setIsCitySelectorOpen] = useState(false);
   const [isCancelTripOpen, setIsCancelTripOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<string | null>(null);
@@ -2051,7 +2049,7 @@ export default function CustomerHomePage() {
             </button>
           </div>
 
-          {/* اليسار: ترحيب المستخدم وزر تبديل الوضع وزر الحساب الموحد الذي يفتح AppDrawer */}
+          {/* اليسار: ترحيب المستخدم وزر تبديل الوضع وزر الحساب الموحد الذي ينقل لصفحة /hub */}
           <div className="pointer-events-auto flex items-center gap-2">
             <div className="text-left hidden sm:block">
               <div className={`text-[12px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>مرحباً بك 👋</div>
@@ -2061,7 +2059,7 @@ export default function CustomerHomePage() {
             <ThemeToggleButton className="!rounded-full" />
             <button
               type="button"
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={() => navigate('/hub')}
               className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
                 isDark 
                   ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-amber-400/50' 
@@ -4205,8 +4203,6 @@ export default function CustomerHomePage() {
         </div>
       )}
 
-      {/* 11. القائمة الجانبية الموحدة للراكب (AppDrawer) */}
-      <AppDrawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
 
 
       {/* نافذة المحادثة المباشرة بين الراكب والسائق */}

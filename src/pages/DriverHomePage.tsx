@@ -8,7 +8,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import mapboxgl from 'mapbox-gl';
 import { config } from '../lib/config';
 import { RouteLines, PickupPin, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin } from '../components/map/MapPins';
-import { AppDrawer } from '../components/AppDrawer';
+import { useNavigate } from 'react-router-dom';
 import { applyMapEnhancements, searchPlaces } from '../lib/mapbox';
 import { playIncomingTripAlert } from '../lib/sound';
 import { useTheme } from '../context/ThemeContext';
@@ -49,6 +49,7 @@ interface PendingSeatBooking {
 }
 
 export default function DriverHomePage() {
+  const navigate = useNavigate();
   const { show: originalShow } = useToast();
   const show = useCallback((msg: string, type?: 'success' | 'error' | 'info' | 'warning', duration?: number) => {
     if (!msg || typeof msg !== 'string') return;
@@ -272,7 +273,6 @@ export default function DriverHomePage() {
   const [showSosAlert, setShowSosAlert] = useState(false);
 
   // نافذة الحساب الشخصي وطبقات الخريطة والدرج السفلي (screen_3.png)
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showLayersModal, setShowLayersModal] = useState(false);
   const [selectedMapStyle, setSelectedMapStyle] = useState<string | null>(null);
   const [isBottomDockExpanded, setIsBottomDockExpanded] = useState(false);
@@ -1946,13 +1946,13 @@ export default function DriverHomePage() {
               <ThemeToggleButton />
             </div>
 
-            {/* زر حساب الكابتن والقائمة الموحدة - يفتح AppDrawer بأمان تام دون تسجيل خروج */}
+            {/* زر حساب الكابتن والقائمة الموحدة - ينقل لصفحة /hub */}
             <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setIsProfileOpen(true);
+                navigate('/hub');
               }}
               className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl shadow-lg flex items-center justify-center active:scale-95 transition-all relative border cursor-pointer ${
                 isDark ? 'bg-[#161c28]/90 border-[#534434]/40 text-[#56e5a9]' : 'bg-white/95 border-emerald-400 text-emerald-700 shadow-md'
@@ -2741,7 +2741,7 @@ export default function DriverHomePage() {
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setIsProfileOpen(true)}
+                  onClick={() => navigate('/hub')}
                   className="flex-1 py-2.5 bg-[#242a37] hover:bg-[#2c3343] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-base text-[#56e5a9]">account_circle</span>
@@ -2851,8 +2851,6 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {/* 8. القائمة الجانبية الموحدة (AppDrawer) */}
-      <AppDrawer open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
 
 
       {/* نافذة المحادثة المباشرة مع الراكب */}
