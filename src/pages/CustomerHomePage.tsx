@@ -198,6 +198,11 @@ export default function CustomerHomePage() {
   // تبويب الخدمات في البطاقة: تكسي أو بوكس
   const [selectedServiceTab, setSelectedServiceTab] = useState<'taxi' | 'box'>('taxi');
 
+  // فلترة عرض الكباتن على الخريطة: تكسي | خط دائمي | كلاهما
+  const [serviceFilter, setServiceFilter] = useState<'taxi' | 'commute' | 'both'>('both');
+  const [commuteDrivers, setCommuteDrivers] = useState<any[]>([]);
+  const [selectedCommuteDriver, setSelectedCommuteDriver] = useState<any | null>(null);
+
   // الفئة المحددة (الافتراضي: سوبر)
   const [selectedTierId, setSelectedTierId] = useState<'super' | 'saving' | 'plus'>('super');
 
@@ -436,6 +441,10 @@ export default function CustomerHomePage() {
   const [nearbyDriversCount, setNearbyDriversCount] = useState<number | null>(null);
 
   useEffect(() => {
+    if (serviceFilter === 'commute') {
+      setNearbyDriversCount(0);
+      return;
+    }
     let isCancelled = false;
     async function checkNearbyDrivers() {
       try {
@@ -462,7 +471,42 @@ export default function CustomerHomePage() {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [pickup.lat, pickup.lng, selectedTierId]);
+  }, [pickup.lat, pickup.lng, selectedTierId, serviceFilter]);
+
+  // جلب سائقي الخط الدائم من المعالج المتزامن (PostgreSQL + Redis)
+  useEffect(() => {
+    if (serviceFilter === 'taxi') {
+      setCommuteDrivers([]);
+      return;
+    }
+    let isCancelled = false;
+    async function fetchCommuteDrivers() {
+      try {
+        const { data } = await http.get<any>('/drivers/nearby', {
+          params: {
+            lat: pickup.lat,
+            lon: pickup.lng,
+            tripType: 'commute',
+          },
+        });
+        if (!isCancelled) {
+          const raw = data;
+          const list: any[] = Array.isArray(raw)
+            ? raw
+            : (Array.isArray(raw?.drivers) ? raw.drivers : (Array.isArray(raw?.data) ? raw.data : []));
+          setCommuteDrivers(list);
+        }
+      } catch (_) {
+        if (!isCancelled) setCommuteDrivers([]);
+      }
+    }
+    fetchCommuteDrivers();
+    const interval = setInterval(fetchCommuteDrivers, 15000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [pickup.lat, pickup.lng, serviceFilter]);
 
   // حالة الـ GPS والتنبيهات المخصصة لـ iOS Safari
   const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
@@ -2164,8 +2208,8 @@ export default function CustomerHomePage() {
             />
           )}
 
-          {/* دبابيس الكباتن المحيطة وأقرب كابتن (٣ دقيقة) المعتمدة في التصميم */}
-          {!assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && (
+          {/* دبابيس الكباتن المحيطة وأقرب كابتن (٣ دقيقة) المعتمدة في التصميم للتكسي */}
+          {(serviceFilter === 'taxi' || serviceFilter === 'both') && !assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && (
             <>
               {/* أقرب كابتن مع كبسولة «٣ دقيقة» النطاطة bg-[#FFC174] */}
               <NearestDriverPin
@@ -2178,6 +2222,63 @@ export default function CustomerHomePage() {
               <SurroundingDriverPin point={{ lng: (pickup?.lng || DEFAULT_PICKUP.lng) - 0.0049, lat: (pickup?.lat || DEFAULT_PICKUP.lat) - 0.0060 }} />
             </>
           )}
+
+          {/* دبابيس كباتن الخط الدائم (محددة بنقطة الانطلاق الثابتة والشارات الملونة) */}
+          {(serviceFilter === 'commute' || serviceFilter === 'both') && !assignedDriverInfo && !liveDriverPosition && stage !== 'searching' && stage !== 'driver_arriving' && commuteDrivers.map((drv: any, idx: number) => {
+            const dLat = Number(drv.fixed_lat ?? drv.lat ?? drv.latitude);
+            const dLng = Number(drv.fixed_lng ?? drv.lng ?? drv.longitude);
+            if (isNaN(dLat) || isNaN(dLng)) return null;
+
+            const band = drv.distanceBand || (drv.distanceM <= 500 ? 'green' : drv.distanceM <= 2000 ? 'purple' : 'red');
+            const bandColor = band === 'green' ? '#16a34a' : band === 'purple' ? '#7c3aed' : '#dc2626';
+            const isSelected = selectedCommuteDriver?.driverId === drv.driverId;
+
+            return (
+              <Marker
+                key={`commute-${drv.driverId || idx}`}
+                latitude={dLat}
+                longitude={dLng}
+                anchor="bottom"
+              >
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedCommuteDriver(drv);
+                    mapRef.current?.flyTo({ center: [dLng, dLat], zoom: 15.5, duration: 600 });
+                  }}
+                  className={`flex flex-col items-center select-none cursor-pointer transition-transform duration-200 ${
+                    isSelected ? 'scale-110 z-30' : 'hover:scale-105 z-20'
+                  }`}
+                  title={`كابتن خط دائم: ${drv.firstName || drv.fullName || ''}`}
+                >
+                  {/* شارة المسافة العلوية */}
+                  <div
+                    className="mb-1 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-black text-white shadow-lg border border-white/20"
+                    style={{ backgroundColor: bandColor }}
+                  >
+                    <span>🚌</span>
+                    <span>{drv.firstName || 'كابتن'}</span>
+                    <span className="text-[10px] opacity-90">({drv.distanceM != null ? (drv.distanceM < 1000 ? `${drv.distanceM}م` : `${(drv.distanceM / 1000).toFixed(1)}كم`) : 'خط'})</span>
+                  </div>
+
+                  {/* أيقونة الباص المخصصة للخط الدائم */}
+                  <div
+                    className="relative flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-xl border-2 border-white"
+                    style={{ backgroundColor: bandColor }}
+                  >
+                    <span className="text-lg">🚌</span>
+                    {drv.isFull && (
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border border-white"></span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-2 w-1 rounded-full -mt-0.5" style={{ backgroundColor: bandColor }} />
+                  <div className="h-1.5 w-4 rounded-full bg-black/40 blur-[1px]" />
+                </div>
+              </Marker>
+            );
+          })}
 
 
 
@@ -2261,24 +2362,81 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* شارة الكباتن المتوفرين قربك الآن (مشروطة بوجود كباتن فعليين > 0 فقط لمنع التناقض) */}
-        {stage !== 'searching' && stage !== 'driver_arriving' && nearbyDriversCount !== null && nearbyDriversCount > 0 && (
-          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-2 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-            </span>
-            <span>{nearbyDriversCount} {nearbyDriversCount === 1 ? 'كابتن متوفر' : nearbyDriversCount === 2 ? 'كابتنان متوفران' : 'كباتن متوفرين'} قربك الآن</span>
-            <span className="text-amber-400 text-sm">⚡</span>
+        {/* شريط فلترة الخدمة الثلاثي: تكسي 🚖 | كلاهما ✨ | خط دائمي 🚌 */}
+        {stage !== 'searching' && stage !== 'driver_arriving' && (
+          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4" dir="rtl">
+            <div className={`flex items-center p-1 rounded-full backdrop-blur-md shadow-xl border transition-all ${
+              isDark ? 'bg-[#161C28]/95 border-white/15' : 'bg-white/95 border-slate-200'
+            }`}>
+              <button
+                type="button"
+                onClick={() => { setServiceFilter('taxi'); setSelectedCommuteDriver(null); }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  serviceFilter === 'taxi'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🚖</span>
+                <span>تكسي</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setServiceFilter('both'); }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  serviceFilter === 'both'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>✨</span>
+                <span>كلاهما</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setServiceFilter('commute'); }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  serviceFilter === 'commute'
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : isDark ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🚌</span>
+                <span>خط دائمي</span>
+              </button>
+            </div>
           </div>
         )}
 
+        {/* شارة الكباتن المتوفرين قربك الآن (مشروطة بوجود كباتن فعليين > 0 فقط لمنع التناقض) */}
+        {stage !== 'searching' && stage !== 'driver_arriving' && (() => {
+          const totalNearby = serviceFilter === 'commute'
+            ? commuteDrivers.length
+            : serviceFilter === 'taxi'
+            ? (nearbyDriversCount || 0)
+            : (nearbyDriversCount || 0) + commuteDrivers.length;
+          if (totalNearby <= 0) return null;
+          return (
+            <div className="pointer-events-auto absolute top-[calc(7.85rem+env(safe-area-inset-top,1rem))] right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-1.5 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              <span>
+                {totalNearby} {totalNearby === 1 ? 'كابتن متوفر' : totalNearby === 2 ? 'كابتنان متوفران' : 'كباتن متوفرين'}
+                {serviceFilter === 'commute' ? ' (خط دائمي)' : serviceFilter === 'taxi' ? ' (تكسي)' : ''}
+              </span>
+              <span className="text-amber-400 text-sm">⚡</span>
+            </div>
+          );
+        })()}
+
         {stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] left-4 z-20 flex items-center gap-2">
+          <div className="pointer-events-auto absolute top-[calc(7.85rem+env(safe-area-inset-top,1rem))] left-4 z-20 flex items-center gap-2">
             <button
               type="button"
               onClick={() => show('خدمة الطوارئ والأمان 🛡️', 'info')}
-              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/10 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+              className="w-9 h-9 min-w-[36px] min-h-[36px] rounded-full bg-[#161C28]/95 backdrop-blur-md border border-white/10 text-amber-400 shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
               title="طوارئ وأمان"
               aria-label="طوارئ"
             >
@@ -2289,7 +2447,7 @@ export default function CustomerHomePage() {
 
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
         {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
+          <div className="pointer-events-auto absolute top-[calc(10.75rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
             <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-amber-400 shadow-xl border border-amber-500/30">
               <span>يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍</span>
               <button
@@ -2337,6 +2495,95 @@ export default function CustomerHomePage() {
               <line x1="19" y1="12" x2="22" y2="12" />
             </svg>
           </button>
+        )}
+
+        {/* بطاقة تفاصيل كابتن الخط الدائم المحدد من الخريطة */}
+        {selectedCommuteDriver && (
+          <div className="pointer-events-auto absolute bottom-[calc(14rem+env(safe-area-inset-bottom,1rem))] inset-x-4 sm:inset-x-auto sm:right-6 sm:w-96 z-40 animate-slide-up" dir="rtl">
+            <div className={`p-4 rounded-3xl shadow-2xl border backdrop-blur-xl ${
+              isDark ? 'bg-[#161C28]/95 border-amber-500/40 text-white' : 'bg-white/95 border-slate-300 text-slate-900'
+            }`}>
+              {/* رأس البطاقة: اسم الكابتن والتقييم والإغلاق */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shrink-0">
+                    🚌
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-black">{selectedCommuteDriver.firstName || selectedCommuteDriver.fullName || 'كابتن خط دائم'}</span>
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30">
+                        ★ {Number(selectedCommuteDriver.rating || 5.0).toFixed(1)}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      {selectedCommuteDriver.vehicleModel || 'سيارة خط دائم'} {selectedCommuteDriver.vehicleColor ? `• ${selectedCommuteDriver.vehicleColor}` : ''}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCommuteDriver(null)}
+                  className="w-8 h-8 rounded-full bg-slate-800/50 hover:bg-slate-700/80 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+                  aria-label="إغلاق"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* مسار الخط: الانطلاق ➔ الوجهة */}
+              <div className={`p-3 rounded-2xl mb-3 border ${
+                isDark ? 'bg-[#0B101B]/80 border-white/10' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className="flex items-center gap-2 text-xs font-bold mb-1.5">
+                  <span className="text-emerald-400">🟢</span>
+                  <span className="text-slate-400">الانطلاق:</span>
+                  <span className="truncate">{selectedCommuteDriver.fixed_label || 'نقطة الانطلاق'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <span className="text-amber-400">🏁</span>
+                  <span className="text-slate-400">الوجهة:</span>
+                  <span className="truncate">{selectedCommuteDriver.fixed_dest_label || 'الوجهة المحددة'}</span>
+                </div>
+              </div>
+
+              {/* مؤشرات المسافة وحالة المقاعد */}
+              <div className="flex items-center justify-between text-xs font-bold mb-3 px-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-slate-400">المسافة منك:</span>
+                  <span className={`px-2 py-0.5 rounded-full font-mono font-bold ${
+                    selectedCommuteDriver.distanceBand === 'green'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : selectedCommuteDriver.distanceBand === 'purple'
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  }`}>
+                    {selectedCommuteDriver.distanceM != null ? `${selectedCommuteDriver.distanceM < 1000 ? `${selectedCommuteDriver.distanceM}م` : `${(selectedCommuteDriver.distanceM / 1000).toFixed(1)}كم`}` : 'قريب'}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="text-slate-400">المقاعد:</span>
+                  <span className={`px-2 py-0.5 rounded-full ${
+                    selectedCommuteDriver.isFull ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {selectedCommuteDriver.isFull ? 'مكتمل' : 'مقاعد متوفرة'}
+                  </span>
+                </span>
+              </div>
+
+              {/* زر حجز مقعد في هذا الخط */}
+              <button
+                type="button"
+                onClick={() => {
+                  navigate('/daily');
+                }}
+                className="w-full min-h-[48px] rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>حجز مقعد في هذا الخط</span>
+                <span>🚌 ➔</span>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* 6. البطاقة السفلية الفاخرة في مرحلتي الانطلاق والوصول */}

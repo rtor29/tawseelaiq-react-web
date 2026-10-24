@@ -39,6 +39,8 @@ interface DriverItem {
   phone: string;
   routeId?: string;
   vehicleType?: string;
+  distanceM?: number;
+  distanceBand?: string;
 }
 
 function getDriverColor(distKm: number): { bg: string; text: string; label: string } {
@@ -330,42 +332,54 @@ export default function DailyRoutePage() {
     }
   }, [autoLocateDailyRouteOnMapReady]);
 
-  // جلب سائقي الخط الدائمي الحقيقيين من الخادم
+  // جلب سائقي الخط الدائمي الحقيقيين من المعالج المتزامن (PostgreSQL + Redis)
   useEffect(() => {
-    http
-      .get<any[]>(`/drivers/nearby?lat=${userLoc.lat}&lon=${userLoc.lng}&tripType=daily&rangeKm=50`)
-      .then((res) => {
-        const data = Array.isArray(res.data) ? res.data : [];
-        const commuteOnly = data.filter((d: any) => {
-          const mode = String(d.current_mode || d.mode || d.work_mode || d.workStatus || '').toLowerCase();
-          const isBoth = mode === 'both' || mode === 'كلاهما';
-          const isTaxiOnly = (mode === 'taxi' || mode === 'مشوار قصير' || d.serviceType === 'ShortTrip') && !isBoth;
-          if (isTaxiOnly) return false;
-          if (mode === 'idle' || mode === 'offline' || mode === 'خمول') return false;
-          return true;
-        });
-        const mapped: DriverItem[] = commuteOnly.map((d: any, idx: number) => {
-          const dLat = Number(d.fixed_lat ?? d.currentLat ?? d.latitude ?? (userLoc.lat + 0.003 * (idx + 1)));
-          const dLng = Number(d.fixed_lng ?? d.currentLon ?? d.longitude ?? (userLoc.lng + 0.002 * (idx + 1)));
-          return {
-            id: d.driverId || idx + 1,
-            driverId: d.driverId || `d-${idx}`,
-            name: d.firstName || d.driverName || d.fullName || 'كابتن توصيله',
-            lat: dLat,
-            lng: dLng,
-            from: d.fixed_label || d.routeStartName || (d.route && d.route.includes('➔') ? d.route.split('➔')[0].trim() : 'نقطة الانطلاق'),
-            to: d.fixed_dest_label || d.routeEndName || (d.route && d.route.includes('➔') ? d.route.split('➔')[1].trim() : 'وجهة غير محددة'),
-            rating: Number(d.rating || d.ratingAverage || 5.0),
-            plate: d.plateNumber || 'العراق',
-            seats: 4,
-            takenSeats: d.isFull ? 4 : 1,
-            phone: d.phoneNumber || d.phone || '',
-            vehicleType: d.vehicleType || d.vehicle_type || 'eco',
-          };
-        });
-        setDrivers(mapped);
-      })
-      .catch(() => {});
+    let isCancelled = false;
+    const fetchCommuteDrivers = () => {
+      http
+        .get<any>(`/drivers/nearby?lat=${userLoc.lat}&lon=${userLoc.lng}&tripType=commute`)
+        .then((res) => {
+          if (isCancelled) return;
+          const raw = res.data;
+          const list: any[] = Array.isArray(raw)
+            ? raw
+            : (Array.isArray(raw?.drivers) ? raw.drivers : (Array.isArray(raw?.data) ? raw.data : []));
+
+          const mapped: DriverItem[] = list.map((d: any, idx: number) => {
+            const dLat = Number(d.fixed_lat ?? d.lat ?? d.latitude);
+            const dLng = Number(d.fixed_lng ?? d.lng ?? d.longitude);
+            const rStart = d.fixed_label || d.routeStartName || (d.route && d.route.includes('➔') ? d.route.split('➔')[0].trim() : 'نقطة الانطلاق');
+            const rEnd = d.fixed_dest_label || d.routeEndName || (d.route && d.route.includes('➔') ? d.route.split('➔')[1].trim() : 'الوجهة');
+
+            return {
+              id: d.driverId || idx + 1,
+              driverId: String(d.driverId || `d-${idx}`),
+              name: d.firstName || d.driverName || d.fullName || 'كابتن توصيله',
+              lat: isNaN(dLat) ? userLoc.lat : dLat,
+              lng: isNaN(dLng) ? userLoc.lng : dLng,
+              from: rStart,
+              to: rEnd,
+              rating: Number(d.rating || d.ratingAverage || 5.0),
+              plate: d.vehiclePlate || d.plateNumber || 'العراق',
+              seats: 4,
+              takenSeats: d.isFull ? 4 : (d.takenSeats ?? 1),
+              phone: d.phoneNumber || d.phone || '',
+              vehicleType: d.vehicleType || d.vehicle_type || 'eco',
+              distanceM: typeof d.distanceM === 'number' ? d.distanceM : undefined,
+              distanceBand: d.distanceBand || undefined,
+            };
+          });
+          setDrivers(mapped);
+        })
+        .catch(() => {});
+    };
+
+    fetchCommuteDrivers();
+    const interval = setInterval(fetchCommuteDrivers, 15000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
   }, [userLoc]);
 
   function handleMapClick(e: MapMouseEvent) {
@@ -733,7 +747,9 @@ export default function DailyRoutePage() {
 
           {/* السائقون مع الألوان والمسافات الدقيقة */}
           {drivers.map(driver => {
-            const dist = distanceKm({ lat: userLoc.lat, lng: userLoc.lng }, { lat: driver.lat, lng: driver.lng });
+            const dist = typeof driver.distanceM === 'number'
+              ? driver.distanceM / 1000
+              : distanceKm({ lat: userLoc.lat, lng: userLoc.lng }, { lat: driver.lat, lng: driver.lng });
             const { bg } = getDriverColor(dist);
             const isSelected = selectedDriver?.id === driver.id;
             const distLabel = dist < 1 ? `${Math.round(dist * 1000)}م` : `${dist.toFixed(1)}كم`;
