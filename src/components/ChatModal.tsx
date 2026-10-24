@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { http } from '../lib/api';
+import { config } from '../lib/config';
+import { storage } from '../lib/storage';
 
 export interface ChatMessage {
   id: string;
@@ -61,17 +63,58 @@ export default function ChatModal({
           `/chat/messages?requestId=${encodeURIComponent(requestId)}`
         );
         if (isMounted && data?.success && Array.isArray(data.messages)) {
-          setMessages(data.messages);
+          setMessages((prev) => {
+            const serverMsgs = data.messages;
+            // Retain optimistic messages that haven't yet been confirmed/matched by server
+            const unconfirmedOptimistic = prev.filter(
+              (p) =>
+                p.id.startsWith('opt-') &&
+                !serverMsgs.some((s) => s.text === p.text && s.senderRole === p.senderRole)
+            );
+            return [...serverMsgs, ...unconfirmedOptimistic];
+          });
         }
       } catch (_) {}
     };
 
     void fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
+    const interval = setInterval(fetchMessages, 2500);
+
+    // Real-time SSE listener for instant message delivery without waiting for polling
+    let es: EventSource | null = null;
+    try {
+      const token = storage.getToken() || localStorage.getItem('token') || '';
+      const streamUrl = `${config.apiBaseUrl}/ride/${encodeURIComponent(requestId)}/stream?token=${encodeURIComponent(token)}`;
+      es = new EventSource(streamUrl);
+
+      es.addEventListener('chat_message', (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          const newMsg = (payload.message || payload) as ChatMessage;
+          if (newMsg && newMsg.text && isMounted) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              const hasOpt = prev.some(
+                (m) => m.id.startsWith('opt-') && m.text === newMsg.text && m.senderRole === newMsg.senderRole
+              );
+              if (hasOpt) {
+                return prev.map((m) =>
+                  m.id.startsWith('opt-') && m.text === newMsg.text && m.senderRole === newMsg.senderRole ? newMsg : m
+                );
+              }
+              return [...prev, newMsg];
+            });
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      if (es) {
+        try { es.close(); } catch (_) {}
+      }
     };
   }, [isOpen, requestId]);
 
