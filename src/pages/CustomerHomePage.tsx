@@ -1913,103 +1913,104 @@ export default function CustomerHomePage() {
       dir="rtl"
     >
       {/* ====================================================================
-          الترويسة العلوية الثابتة مع مساحة الأمان المخصصة (Top Safe-Area Header)
-          ثابتة وظاهرة دائماً فوق كل شيء بـ z-[100] ولا تُغطى بأي نافذة سفلية أو تنبيه
+          الترويسة العلوية العائمة الثابتة فوق الخريطة (Floating HUD Header)
+          ثابتة وظاهرة دائماً فوق كل شيء بـ z-[100] ولا تُغطى بأي نافذة سفلية
+          مع عزل أحداث اللمس pointer-events-none للحاوية و pointer-events-auto للأزرار
           ==================================================================== */}
-      <header className={`px-4 pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 backdrop-blur-md border-b flex items-center justify-between sticky top-0 z-[100] shrink-0 w-full shadow-lg transition-colors pointer-events-auto ${
-        isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
-      }`}>
-        {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
-        <div className="flex items-center gap-2.5">
-          {stage === 'pickup' ? (
-            <button
-              type="button"
-              onClick={() => navigate('/hub')}
-              className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-sm flex items-center justify-center transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer ${
-                isDark 
-                  ? 'bg-[#0F172A] border-amber-500/30 text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B]' 
-                  : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'
-              }`}
-              title="الرجوع لصفحة اختيار الخدمة"
-              aria-label="الرئيسية"
-            >
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+      <header className="fixed top-0 inset-x-0 z-[100] pt-[calc(0.75rem+env(safe-area-inset-top,1rem))] pb-3 px-4 flex items-center justify-between pointer-events-none w-full" dir="rtl">
+        <div className="flex justify-between items-center max-w-lg mx-auto w-full">
+          {/* اليمين: زر الرئيسية / الرجوع وشعار توصيله */}
+          <div className="pointer-events-auto flex items-center gap-2">
+            {stage === 'pickup' ? (
+              <button
+                type="button"
+                onClick={() => navigate('/hub')}
+                className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                  isDark 
+                    ? 'bg-[#161C28]/95 border-white/15 text-amber-400 hover:text-amber-300 hover:border-amber-400/50' 
+                    : 'bg-white/95 border-slate-200 text-amber-600 hover:border-amber-400 shadow-sm'
+                }`}
+                title="الرجوع لصفحة اختيار الخدمة"
+                aria-label="الرئيسية"
               >
-                <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleBackNav}
-              className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-sm flex items-center justify-center transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer ${
-                isDark 
-                  ? 'bg-[#0F172A] border-amber-500/30 text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B]' 
-                  : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'
-              }`}
-              title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
-              aria-label="رجوع"
-            >
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBackNav}
+                className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                  isDark 
+                    ? 'bg-[#161C28]/95 border-white/15 text-amber-400 hover:text-amber-300 hover:border-amber-400/50' 
+                    : 'bg-white/95 border-slate-200 text-amber-600 hover:border-amber-400 shadow-sm'
+                }`}
+                title={stage === 'searching' ? 'إلغاء البحث' : stage === 'ride_options' ? 'الرجوع لنقطة الوصول' : 'الرجوع لنقطة الانطلاق'}
+                aria-label="رجوع"
               >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          )}
-          <img
-            src="/logo.png?v=40"
-            alt="شعار توصيلة"
-            className="h-8 w-auto max-h-8 object-contain drop-shadow select-none pointer-events-none"
-          />
-        </div>
-
-        {/* اليسار: ترحيب المستخدم وزر تبديل الوضع وزر الحساب الموحد الذي يفتح AppDrawer */}
-        <div className="flex items-center gap-2">
-          <div className="text-left hidden sm:block">
-            <div className={`text-[12px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>مرحباً بك 👋</div>
-            <div className={`text-[15px] font-black truncate max-w-[140px] sm:max-w-[180px] ${isDark ? 'text-white' : 'text-slate-900'}`}>{customerFirstName}</div>
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            )}
+            <img
+              src="/logo.png?v=40"
+              alt="شعار توصيلة"
+              className="h-8 w-auto max-h-8 object-contain drop-shadow select-none pointer-events-none hidden xs:block"
+            />
           </div>
-          {/* زر تبديل الوضع النهاري والليلي الشامل */}
-          <ThemeToggleButton />
-          <button
-            type="button"
-            onClick={() => setIsDrawerOpen(true)}
-            className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-2xl border shadow-sm flex items-center justify-center transition-all duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-[0.98] cursor-pointer ${
-              isDark 
-                ? 'bg-[#0F172A] border-amber-500/30 text-amber-400 hover:text-amber-300 hover:border-amber-400 hover:bg-[#1E293B]' 
-                : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'
-            }`}
-            aria-label="الحساب والإعدادات"
-            title="الحساب والإعدادات"
-          >
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+
+          {/* اليسار: ترحيب المستخدم وزر تبديل الوضع وزر الحساب الموحد الذي يفتح AppDrawer */}
+          <div className="pointer-events-auto flex items-center gap-2">
+            <div className="text-left hidden sm:block">
+              <div className={`text-[12px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>مرحباً بك 👋</div>
+              <div className={`text-[15px] font-black truncate max-w-[140px] sm:max-w-[180px] ${isDark ? 'text-white' : 'text-slate-900'}`}>{customerFirstName}</div>
+            </div>
+            {/* زر تبديل الوضع النهاري والليلي الشامل */}
+            <ThemeToggleButton className="!rounded-full" />
+            <button
+              type="button"
+              onClick={() => setIsDrawerOpen(true)}
+              className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                isDark 
+                  ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-amber-400/50' 
+                  : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-amber-400 shadow-sm'
+              }`}
+              aria-label="الحساب والإعدادات"
+              title="الحساب والإعدادات"
             >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -2028,7 +2029,7 @@ export default function CustomerHomePage() {
           <button
             type="button"
             onClick={() => show('ميزة الأمان قريباً 🛡️','info')}
-            className="absolute top-4 left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
+            className="absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] left-4 z-20 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#1B4965] border border-slate-200/80 shadow-subtle transition-all duration-200 ease-in-out active:scale-[0.96] cursor-pointer hover:bg-slate-50"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </button>
@@ -2036,7 +2037,7 @@ export default function CustomerHomePage() {
 
         {/* شريط تنبيه وصول الكابتن العائم في أعلى الشاشة */}
         {(rideStatus?.toLowerCase() === 'arrived') && (
-          <div className="absolute top-4 inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
+          <div className="absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
             <div className="w-full max-w-md bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-white px-4 py-3 rounded-2xl shadow-[0_8px_30px_rgba(217,119,6,0.45)] border-2 border-white/90 flex items-center justify-between gap-3 backdrop-blur-md">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-2xl animate-pulse shrink-0">🚖</span>
@@ -2055,7 +2056,7 @@ export default function CustomerHomePage() {
 
         {/* شريط تنبيه الملاحة الخارجية العائم */}
         {isExternalNavActive && (stage === 'driver_arriving' || Boolean(rideRequestId)) && (
-          <div className="absolute top-4 inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
+          <div className="absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
             <div className="w-full max-w-md bg-blue-950/95 text-blue-200 px-4 py-2.5 rounded-2xl shadow-lg border border-blue-400/40 flex items-center justify-between gap-3 backdrop-blur-md">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-xl shrink-0 animate-pulse">🧭</span>
@@ -2079,7 +2080,7 @@ export default function CustomerHomePage() {
 
         {/* شريط عداد الانتظار في المحطة الأولى لرحلات الذهاب والإياب */}
         {((rideStatus || '').toLowerCase() === 'waiting_at_destination') && (
-          <div className="absolute top-4 inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
+          <div className="absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-3 z-30 flex justify-center pointer-events-auto animate-fade-in" dir="rtl">
             <div className={`w-full max-w-md px-4 py-3 rounded-2xl shadow-xl border-2 backdrop-blur-md flex items-center justify-between gap-3 ${
               maxWaitExceeded 
                 ? 'bg-red-950/95 border-red-500/80 text-white' 
@@ -2262,7 +2263,7 @@ export default function CustomerHomePage() {
 
         {/* شارة الكباتن المتوفرين قربك الآن (مشروطة بوجود كباتن فعليين > 0 فقط لمنع التناقض) */}
         {stage !== 'searching' && stage !== 'driver_arriving' && nearbyDriversCount !== null && nearbyDriversCount > 0 && (
-          <div className="pointer-events-auto absolute top-3.5 right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-2 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
+          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] right-4 z-20 flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-3.5 py-2 text-xs font-bold shadow-xl border border-amber-500/30 text-white animate-fade-in" dir="rtl">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
@@ -2273,7 +2274,7 @@ export default function CustomerHomePage() {
         )}
 
         {stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-3.5 left-4 z-20 flex items-center gap-2">
+          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] left-4 z-20 flex items-center gap-2">
             <button
               type="button"
               onClick={() => show('خدمة الطوارئ والأمان 🛡️', 'info')}
@@ -2288,7 +2289,7 @@ export default function CustomerHomePage() {
 
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
         {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-3.5 inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
+          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
             <div className="flex items-center gap-2 rounded-full bg-[#161C28]/95 backdrop-blur-md px-4 py-2 text-[12.5px] font-bold text-amber-400 shadow-xl border border-amber-500/30">
               <span>يمكنك تحريك الخريطة لوضع الدبوس على موقعك الحالي 📍</span>
               <button
