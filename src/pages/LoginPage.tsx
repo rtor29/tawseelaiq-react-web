@@ -211,8 +211,8 @@ export default function LoginPage() {
 
       if (data.success && data.token) {
         const finalRole = (data.role === 'Driver' || data.role === 'driver') ? 'Driver' : 'Customer';
-        const rawUserId = data.userId || data.user?.id || (finalRole === 'Driver' ? 'drv_' : 'usr_') + Date.now();
-        const normalizedUserId = finalRole === 'Driver' ? String(rawUserId).replace(/^drv-/, 'drv_') : String(rawUserId);
+        const rawUserId = data.userId || data.user?.id || (finalRole === 'Driver' ? 'drv-' : 'usr-') + Date.now();
+        const normalizedUserId = String(rawUserId);
         authStore.save(
           {
             token: data.token,

@@ -77,7 +77,7 @@ export default function DriverHomePage() {
 
   const session = authStore.getSession();
   const rawDriverId = session?.userId || storage.getUserId() || '';
-  const driverId = rawDriverId.replace(/^drv-/, 'drv_');
+  const driverId = rawDriverId;
 
   const [driverName, setDriverName] = useState<string>(() => session?.fullName || storage.getFullName() || 'الكابتن');
   const rawPhone = storage.getPhone() || '';
@@ -2496,58 +2496,6 @@ export default function DriverHomePage() {
                 </div>
               )}
 
-              {/* طلبات حجز المقاعد الواردة في الخط الدائمي */}
-              {pendingSeatRequests.length > 0 && (
-                <div className={`rounded-2xl p-3 border border-emerald-500/40 space-y-2.5 text-right ${
-                  isDark ? 'bg-[#242a37]/70 text-white' : 'bg-emerald-50/70 text-slate-900'
-                }`} dir="rtl">
-                  <div className="flex items-center justify-between">
-                    <span className="rounded-full bg-amber-500 text-slate-950 px-2.5 py-0.5 text-[10px] font-black animate-pulse">
-                      {pendingSeatRequests.length} طلب جديد
-                    </span>
-                    <h4 className={`text-xs font-bold flex items-center gap-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      <span>📢</span>
-                      <span>طلبات حجز واردة (الخط الدائم)</span>
-                    </h4>
-                  </div>
-                  {pendingSeatRequests.map((req) => (
-                    <div key={req.id || req.bookingId} className="bg-[#161c28] p-3 rounded-xl border border-white/10 space-y-2 text-xs">
-                      <div className="flex items-center justify-between text-white font-bold">
-                        <span>{req.customerName || 'راكب خط'}</span>
-                        <span className="text-emerald-400 font-mono">{Number(req.totalFare || 30000).toLocaleString()} د.ع</span>
-                      </div>
-                      <div className="text-[11px] text-slate-300 space-y-0.5">
-                        <div>
-                          <span className="text-emerald-400 font-bold">المسار:</span> {req.pickupLocation} ➔ {req.dropoffLocation}
-                        </div>
-                        <div className="flex items-center gap-3 text-slate-400 text-[10.5px]">
-                          <span>المقاعد: {req.seatsBooked || 1}</span>
-                          <span>الموعد: صباحي / دوام منتظم</span>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => handleAcceptSeatBooking(req.id || req.bookingId || '')}
-                          className="py-2.5 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-500 active:scale-98 transition cursor-pointer flex items-center justify-center gap-1"
-                        >
-                          <span>قبول</span>
-                          <span>✅</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRejectSeatBooking(req.id || req.bookingId || '')}
-                          className="py-2.5 rounded-lg bg-[#242a37] text-slate-400 hover:text-white border border-white/10 font-bold text-xs active:scale-98 transition cursor-pointer flex items-center justify-center gap-1"
-                        >
-                          <span>رفض</span>
-                          <span>❌</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
               {/* مشتركو الخط الدائمي */}
               {(workStatus === 'permanent' || workStatus === 'both') && (
                 <div className="bg-[#242a37]/50 rounded-2xl p-3 border border-[#56e5a9]/20 space-y-2">
@@ -3065,7 +3013,9 @@ export default function DriverHomePage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
-                <span className="text-xs font-black text-emerald-400">طلب حجز جديد (الخط الدائم) 📢</span>
+                <span className="text-xs font-black text-emerald-400">
+                  طلب حجز جديد (الخط الدائم) 📢 {pendingSeatRequests.length > 1 ? `(1 من ${pendingSeatRequests.length})` : ''}
+                </span>
               </div>
               <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
                 {Number(pendingSeatRequests[0].totalFare || 30000).toLocaleString()} د.ع
@@ -3093,7 +3043,7 @@ export default function DriverHomePage() {
               <button
                 type="button"
                 onClick={() => handleAcceptSeatBooking(pendingSeatRequests[0].id || pendingSeatRequests[0].bookingId || '')}
-                className="min-h-[46px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="min-h-[48px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>قبول الحجز</span>
                 <span>✅</span>
@@ -3101,7 +3051,7 @@ export default function DriverHomePage() {
               <button
                 type="button"
                 onClick={() => handleRejectSeatBooking(pendingSeatRequests[0].id || pendingSeatRequests[0].bookingId || '')}
-                className="min-h-[46px] py-2.5 px-4 rounded-xl bg-[#242a37] hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 font-bold text-sm active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="min-h-[48px] py-2.5 px-4 rounded-xl bg-[#242a37] hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 font-bold text-sm active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>رفض</span>
                 <span>❌</span>

@@ -31,7 +31,7 @@ export const DriverHub: React.FC<DriverHubProps> = ({ onBackToMap }) => {
   const [fullName, setFullName] = useState<string>(initialFullName);
   const phone = (session as any)?.phone || storage.getPhone() || '07700000000';
   const rawDriverId = session?.userId || storage.getUserId() || 'drv_local';
-  const driverId = rawDriverId.replace(/^drv-/, 'drv_');
+  const driverId = rawDriverId;
   const avatar = (session as any)?.avatar || storage.getAvatar() || '/logo.png?v=40';
   const vehicleName = localStorage.getItem('driver_car') || 'كيا سيراتو (أبيض) - تكسي معتمد';
   const plateNumber = localStorage.getItem('driver_plate') || 'النجف 42910 / أجرة';

@@ -31,7 +31,7 @@ export default function CreateRoutePage() {
   const { show } = useToast();
   const { isDark } = useTheme();
   const rawId = authStore.getSession()?.userId || storage.getUserId() || '';
-  const driverId = rawId.replace(/^drv-/, 'drv_');
+  const driverId = rawId;
 
   const [routeName, setRouteName] = useState('خط يومي منتظم');
   const [startName, setStartName] = useState('نقطة الانطلاق');

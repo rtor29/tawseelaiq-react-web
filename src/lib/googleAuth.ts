@@ -34,10 +34,10 @@ export function consumeLoginTokenFromUrl(): Session | null {
   const phoneParam = params.phone;
 
   if (loginToken) {
-    const rawUid = params.userId || (roleParam === 'Driver' ? 'drv_tg' : 'usr_tg');
+    const rawUid = params.userId || (roleParam === 'Driver' ? 'drv-tg' : 'usr-tg');
     const session: Session = {
       token: loginToken,
-      userId: roleParam === 'Driver' ? rawUid.replace(/^drv-/, 'drv_') : rawUid,
+      userId: rawUid,
       role: (roleParam || (params.role as Session['role']) || 'Customer'),
       fullName: params.fullName || (roleParam === 'Driver' ? 'كابتن توصيله' : 'راكب توصيله'),
     };
@@ -56,11 +56,11 @@ export function consumeLoginTokenFromUrl(): Session | null {
   if (roleParam) {
     const existing = authStore.getSession();
     const token = existing?.token || `jwt_${roleParam.toLowerCase()}_` + Date.now();
-    const defaultUid = roleParam === 'Driver' ? `drv_${phoneParam ? phoneParam.replace(/^0+/, '') : 'auto'}` : `usr_${phoneParam ? phoneParam.replace(/^0+/, '') : 'auto'}`;
+    const defaultUid = roleParam === 'Driver' ? `drv-${phoneParam ? phoneParam.replace(/^0+/, '') : 'auto'}` : `usr-${phoneParam ? phoneParam.replace(/^0+/, '') : 'auto'}`;
     const rawUid = existing?.userId || defaultUid;
     const session: Session = {
       token,
-      userId: roleParam === 'Driver' ? rawUid.replace(/^drv-/, 'drv_') : rawUid,
+      userId: rawUid,
       role: roleParam,
       fullName: existing?.fullName || (roleParam === 'Driver' ? 'كابتن توصيله' : 'راكب توصيله'),
     };
