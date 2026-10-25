@@ -502,6 +502,7 @@ export default function DriverHomePage() {
         setPendingSeatRequests(pendingMapped);
 
         if (pendingMapped.length > 0) {
+          setIsBottomDockExpanded(true);
           const newest = pendingMapped[0];
           const newestId = newest.id || newest.bookingId || '';
           if (newestId && newestId !== lastNotifiedSeatBookingIdRef.current) {
@@ -950,6 +951,7 @@ export default function DriverHomePage() {
             const bId = innerEv?.bookingId || data?.bookingId;
             if (bId) {
               setPendingSeatRequests((prev) => prev.filter((x) => x.id !== bId && x.bookingId !== bId));
+              void fetchSubscribers();
             }
             return;
           }
@@ -3050,6 +3052,59 @@ export default function DriverHomePage() {
                 className="flex-1 min-h-[48px] rounded-xl bg-red-600 hover:bg-red-700 text-xs font-black text-white shadow-md transition active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isSubmittingCancellation ? 'جاري الإلغاء...' : 'تأكيد الإلغاء والاعتذار ✕'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* بطاقة استقبال طلب حجز الخط الدائم العائمة الفورية مع أزرار القبول والرفض */}
+      {pendingSeatRequests.length > 0 && !incomingRequest && !hasRealActiveTrip && (
+        <div className="fixed bottom-24 sm:bottom-28 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-[420px] z-40 animate-slide-up">
+          <div className="bg-[#161c28]/95 backdrop-blur-xl border-2 border-emerald-500/60 shadow-2xl shadow-emerald-500/20 rounded-2xl p-4 text-white space-y-3" dir="rtl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+                <span className="text-xs font-black text-emerald-400">طلب حجز جديد (الخط الدائم) 📢</span>
+              </div>
+              <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                {Number(pendingSeatRequests[0].totalFare || 30000).toLocaleString()} د.ع
+              </span>
+            </div>
+
+            <div className="bg-[#242a37]/80 rounded-xl p-3 space-y-1.5 text-xs border border-white/5">
+              <div className="flex items-center justify-between font-bold">
+                <span className="text-white text-sm">{pendingSeatRequests[0].customerName || 'راكب خط'}</span>
+                <span className="text-slate-300 text-[11px]">💺 {pendingSeatRequests[0].seatsBooked || 1} مقعد</span>
+              </div>
+              <div className="text-[11px] text-slate-300 space-y-1 pt-1 border-t border-white/5">
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-emerald-400 font-bold">الانطلاق:</span>
+                  <span className="truncate">{pendingSeatRequests[0].pickupLocation}</span>
+                </div>
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-sky-400 font-bold">الوجهة:</span>
+                  <span className="truncate">{pendingSeatRequests[0].dropoffLocation}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => handleAcceptSeatBooking(pendingSeatRequests[0].id || pendingSeatRequests[0].bookingId || '')}
+                className="min-h-[46px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/25 active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>قبول الحجز</span>
+                <span>✅</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRejectSeatBooking(pendingSeatRequests[0].id || pendingSeatRequests[0].bookingId || '')}
+                className="min-h-[46px] py-2.5 px-4 rounded-xl bg-[#242a37] hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/10 hover:border-rose-500/40 font-bold text-sm active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>رفض</span>
+                <span>❌</span>
               </button>
             </div>
           </div>

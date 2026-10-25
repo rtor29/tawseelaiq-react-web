@@ -461,10 +461,10 @@ export default function LoginPage() {
     }
   }
 
-  async function handleCheckTelegramLinked() {
+  async function handleCheckTelegramLinked(silent = false) {
     if (isCheckingTelegram) return;
     setIsCheckingTelegram(true);
-    setTelegramAlert(null);
+    if (!silent) setTelegramAlert(null);
     const cleanPhone = normalizePhone(phone);
     const currentUserId = session?.userId || storage.getUserId() || '';
 
@@ -478,18 +478,50 @@ export default function LoginPage() {
 
       if (res.data?.linked) {
         show('تم التحقق من ربط بوت التيليجرام بنجاح! مرحباً بك 🚖', 'success');
-        setStep('service_select');
-      } else {
+        setTelegramAlert(null);
+        navigateAfterLogin('Customer');
+      } else if (!silent) {
         setTelegramAlert('يرجى الضغط على Start داخل البوت أولاً لإتمام التفعيل');
         show('يرجى الضغط على Start داخل البوت أولاً لإتمام التفعيل', 'info');
       }
     } catch (_) {
-      setTelegramAlert('يرجى التأكد من الضغط على Start داخل البوت والمحاولة مجدداً');
-      show('يرجى الضغط على Start داخل البوت أولاً لإتمام التفعيل', 'info');
+      if (!silent) {
+        setTelegramAlert('يرجى التأكد من الضغط على Start داخل البوت والمحاولة مجدداً');
+        show('يرجى الضغط على Start داخل البوت أولاً لإتمام التفعيل', 'info');
+      }
     } finally {
       setIsCheckingTelegram(false);
     }
   }
+
+  // استطلاع تلقائي لحالة التفعيل عند فتح شاشة ربط التيليجرام وعند العودة للتطبيق
+  useEffect(() => {
+    if (step !== 'telegram_link') return;
+
+    void handleCheckTelegramLinked(true);
+
+    const interval = setInterval(() => {
+      void handleCheckTelegramLinked(true);
+    }, 2000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void handleCheckTelegramLinked(true);
+      }
+    };
+    const handleFocus = () => {
+      void handleCheckTelegramLinked(true);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [step, phone]);
 
   async function handleResendOtp() {
     if (isResending) return;
@@ -626,40 +658,42 @@ export default function LoginPage() {
             <p className="text-xs text-slate-400 mb-2">خدمة النقل الذكية في النجف الأشرف</p>
           </div>
 
-          {/* محدد الأدوار: أنا راكب / أنا كابتن (معايير Google Material 3 لمساحات اللمس) */}
-          <div className="relative w-full p-1 bg-[#1A202C] rounded-2xl flex items-center justify-between shadow-inner gap-1">
-            <button 
-              type="button"
-              onClick={() => {
-                setRole('passenger');
-                setErrorMessage(null);
-              }}
-              className={`relative z-10 flex-1 min-h-[48px] py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
-                role === 'passenger' 
-                  ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span className="text-base">🧳</span>
-              <span>أنا راكب</span>
-            </button>
+          {/* محدد الأدوار: أنا راكب / أنا كابتن (يظهر فقط في الخطوة الأولى لإدخال الرقم) */}
+          {step === 'phone' && (
+            <div className="relative w-full p-1 bg-[#1A202C] rounded-2xl flex items-center justify-between shadow-inner gap-1">
+              <button 
+                type="button"
+                onClick={() => {
+                  setRole('passenger');
+                  setErrorMessage(null);
+                }}
+                className={`relative z-10 flex-1 min-h-[48px] py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                  role === 'passenger' 
+                    ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span className="text-base">🧳</span>
+                <span>أنا راكب</span>
+              </button>
 
-            <button 
-              type="button"
-              onClick={() => {
-                setRole('driver');
-                setErrorMessage(null);
-              }}
-              className={`relative z-10 flex-1 min-h-[48px] py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
-                role === 'driver' 
-                  ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span className="text-base">🚖</span>
-              <span>أنا كابتن / سائق</span>
-            </button>
-          </div>
+              <button 
+                type="button"
+                onClick={() => {
+                  setRole('driver');
+                  setErrorMessage(null);
+                }}
+                className={`relative z-10 flex-1 min-h-[48px] py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                  role === 'driver' 
+                    ? 'text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 shadow-md' 
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span className="text-base">🚖</span>
+                <span>أنا كابتن / سائق</span>
+              </button>
+            </div>
+          )}
 
           {/* رسالة الخطأ إن وجدت */}
           {errorMessage && (
@@ -955,7 +989,7 @@ export default function LoginPage() {
                     <button
                       type="button"
                       disabled={isCheckingTelegram}
-                      onClick={handleCheckTelegramLinked}
+                      onClick={() => handleCheckTelegramLinked(false)}
                       className="w-full min-h-[50px] py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60 cursor-pointer"
                     >
                       {isCheckingTelegram ? (
