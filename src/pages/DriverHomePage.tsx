@@ -82,7 +82,7 @@ export default function DriverHomePage() {
   const [driverName, setDriverName] = useState<string>(() => session?.fullName || storage.getFullName() || 'الكابتن');
   const rawPhone = storage.getPhone() || '';
 
-  // مزامنة الملف الشخصي للسائق فورياً عند فتح الشاشة لضمان ظهور تعديلات الداش بورد
+  // مزامنة الملف الشخصي للسائق فورياً عند فتح الشاشة لضمان ظهور تعديلات الداش بورد ونمط العمل
   useEffect(() => {
     http.get<any>('/auth/me').then(({ data }) => {
       const freshName = data?.user?.fullName || data?.user?.name || data?.driver?.name;
@@ -92,6 +92,14 @@ export default function DriverHomePage() {
         const cur = authStore.getSession();
         if (cur) {
           authStore.save({ ...cur, fullName: freshName }, rawPhone);
+        }
+      }
+      const rawMode = data?.user?.workMode || data?.user?.work_mode || data?.driver?.work_mode || data?.driver?.workMode;
+      if (rawMode) {
+        const mode = rawMode === 'commute' ? 'permanent' : (rawMode === 'both' || rawMode === 'taxi' || rawMode === 'permanent' || rawMode === 'idle' ? rawMode : null);
+        if (mode) {
+          setWorkStatus(mode);
+          localStorage.setItem('driver_work_status', mode);
         }
       }
     }).catch(() => {});
@@ -787,8 +795,8 @@ export default function DriverHomePage() {
       setPollStatus('idle');
       return;
     }
-    // استطلاع الطلبات فقط عندما يكون الكابتن في وضع التكسي أو كلاهما
-    if (workStatus !== 'taxi' && workStatus !== 'both') {
+    // إذا كان الكابتن في وضع الخمول (idle)، لا نستطلع الطلبات ولا نتصل بـ SSE
+    if (workStatus === 'idle') {
       setPendingRequests([]);
       setPollStatus('idle');
       return;
@@ -834,6 +842,10 @@ export default function DriverHomePage() {
     };
 
     const fetchPending = async () => {
+      // استطلاع طلبات التكسي الاحتياطي فقط عندما يكون الكابتن في وضع التكسي أو كلاهما
+      if (workStatus !== 'taxi' && workStatus !== 'both') {
+        return;
+      }
       // كتم الاقتراع الاحتياطي تماماً إذا كانت قناة SSE في حالة اتصال نشط
       if (es && es.readyState === 1 && sseConnectedRef.current) {
         return;
@@ -2559,7 +2571,7 @@ export default function DriverHomePage() {
               )}
 
               {/* مشتركو الخط الدائمي */}
-              {(workStatus === 'permanent' || workStatus === 'both') && (
+              {(workStatus === 'permanent' || workStatus === 'both' || subscribers.length > 0) && (
                 <div className="bg-[#242a37]/50 rounded-2xl p-3 border border-[#56e5a9]/20 space-y-2">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-[#56e5a9] flex items-center gap-1.5">

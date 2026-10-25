@@ -279,7 +279,7 @@ export default function CreateRoutePage() {
         longitude: p.lng,
       }));
 
-      const activeTargetId = driverId || 'drv_default';
+      const activeTargetId = driverId || 'drv-default';
 
       const { data } = await http.post<any>(endpoints.createRoute(activeTargetId), {
         driverId: activeTargetId,
