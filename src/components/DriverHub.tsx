@@ -36,6 +36,35 @@ export const DriverHub: React.FC<DriverHubProps> = ({ onBackToMap }) => {
   const vehicleName = localStorage.getItem('driver_car') || 'كيا سيراتو (أبيض) - تكسي معتمد';
   const plateNumber = localStorage.getItem('driver_plate') || 'النجف 42910 / أجرة';
 
+  // إحصائيات الكابتن الحقيقية من مسار الخادم الجديد
+  interface DriverStatsData {
+    todayTrips: number;
+    todayEarnings: number;
+    totalTrips: number;
+    points: number;
+  }
+  const [stats, setStats] = useState<DriverStatsData | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState<boolean>(true);
+  const [_statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (driverId) {
+      setIsStatsLoading(true);
+      setStatsError(null);
+      http.get<{ success: boolean; stats?: DriverStatsData }>(`/driver/${encodeURIComponent(driverId)}/stats`)
+        .then(({ data }) => {
+          if (data?.success && data.stats) {
+            setStats(data.stats);
+            storage.setPoints(data.stats.points);
+          } else {
+            setStatsError('تعذر جلب الإحصائيات');
+          }
+        })
+        .catch(() => setStatsError('فشل الاتصال'))
+        .finally(() => setIsStatsLoading(false));
+    }
+  }, [driverId]);
+
   // مزامنة فورية مع الخادم عند فتح الواجهة لجلب الاسم المحدّث من الداش بورد
   useEffect(() => {
     http.get<any>('/auth/me').then(({ data }) => {
@@ -176,12 +205,16 @@ export const DriverHub: React.FC<DriverHubProps> = ({ onBackToMap }) => {
 
               <div className={`grid grid-cols-2 gap-2 pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
                 <div className="flex flex-col">
-                  <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>رصيد المحفظة المتاح</span>
-                  <span className="text-lg font-black text-emerald-500">48,500 <span className="text-xs font-bold">د.ع</span></span>
+                  <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>إجمالي المشاوير</span>
+                  <span className="text-lg font-black text-emerald-500">
+                    {isStatsLoading ? '...' : (stats?.totalTrips ?? 0).toLocaleString('ar-IQ')} <span className="text-xs font-bold">مشوار</span>
+                  </span>
                 </div>
                 <div className="flex flex-col text-left">
                   <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>أرباح المشاوير اليوم</span>
-                  <span className="text-lg font-black text-amber-500">32,000 <span className="text-xs font-bold">د.ع</span></span>
+                  <span className="text-lg font-black text-amber-500">
+                    {isStatsLoading ? '...' : (stats?.todayEarnings ?? 0).toLocaleString('ar-IQ')} <span className="text-xs font-bold">د.ع</span>
+                  </span>
                 </div>
               </div>
 
@@ -310,6 +343,43 @@ export const DriverHub: React.FC<DriverHubProps> = ({ onBackToMap }) => {
               <p className={`text-xs leading-relaxed max-w-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 يتم توثيق كل مشوار فور اكتماله وتحصيل الأجرة نقدياً أو إضافتها لمحفظتك الرقمية مباشرة.
               </p>
+
+              {/* بطاقات الإحصائيات الحقيقية */}
+              <div className="grid grid-cols-2 gap-2.5 w-full pt-1">
+                <div className={`p-3 rounded-xl border text-center ${
+                  isDark ? 'bg-[#0F141F] border-slate-800' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <span className={`text-[10px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>مشاوير اليوم</span>
+                  <span className="text-base font-black text-emerald-500 block mt-0.5">
+                    {isStatsLoading ? '...' : (stats?.todayTrips ?? 0).toLocaleString('ar-IQ')}
+                  </span>
+                </div>
+                <div className={`p-3 rounded-xl border text-center ${
+                  isDark ? 'bg-[#0F141F] border-slate-800' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <span className={`text-[10px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>أرباح اليوم</span>
+                  <span className="text-base font-black text-amber-500 block mt-0.5">
+                    {isStatsLoading ? '...' : (stats?.todayEarnings ?? 0).toLocaleString('ar-IQ')} <span className="text-[10px] font-bold">د.ع</span>
+                  </span>
+                </div>
+                <div className={`p-3 rounded-xl border text-center ${
+                  isDark ? 'bg-[#0F141F] border-slate-800' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <span className={`text-[10px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>إجمالي المشاوير</span>
+                  <span className={`text-base font-black block mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                    {isStatsLoading ? '...' : (stats?.totalTrips ?? 0).toLocaleString('ar-IQ')}
+                  </span>
+                </div>
+                <div className={`p-3 rounded-xl border text-center ${
+                  isDark ? 'bg-[#0F141F] border-slate-800' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <span className={`text-[10px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>نقاط الكابتن</span>
+                  <span className="text-base font-black text-amber-400 block mt-0.5">
+                    {isStatsLoading ? '...' : (stats?.points ?? 0).toLocaleString('ar-IQ')} ⭐
+                  </span>
+                </div>
+              </div>
+
               <div className="flex gap-2 w-full pt-2">
                 <button
                   type="button"

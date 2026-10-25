@@ -104,13 +104,48 @@ export default function DriverHomePage() {
       : `+964${rawPhone}`
     : '—';
 
-  // الرصيد الفعلي للسائق
-  const [driverBalance] = useState<string>('42,500');
+  // إحصائيات الكابتن الحقيقية من الخادم (PostgreSQL)
+  interface DriverStatsData {
+    todayTrips: number;
+    todayEarnings: number;
+    totalTrips: number;
+    points: number;
+  }
+  const [driverStats, setDriverStats] = useState<DriverStatsData | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState<boolean>(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
-  // نقاط الكابتن ومكافأة المشاوير (Driver Points)
+  // نقاط الكابتن الحقيقية (تُقرأ من التخزين المؤقت أو 0 افتراضياً)
   const [driverPoints, setDriverPoints] = useState<number>(() => {
-    return storage.getPoints() || 180;
+    return storage.getPoints() || 0;
   });
+
+  // دالة جلب إحصائيات الكابتن الحقيقية من مسار الخادم الجديد
+  const fetchDriverStats = useCallback(async () => {
+    if (!driverId) return;
+    try {
+      setIsStatsLoading(true);
+      setStatsError(null);
+      const res = await http.get<{ success: boolean; stats?: DriverStatsData }>(
+        `/driver/${encodeURIComponent(driverId)}/stats`
+      );
+      if (res.data?.success && res.data.stats) {
+        setDriverStats(res.data.stats);
+        setDriverPoints(res.data.stats.points);
+        storage.setPoints(res.data.stats.points);
+      } else {
+        setStatsError('تعذر جلب الإحصائيات');
+      }
+    } catch (_err) {
+      setStatsError('فشل الاتصال');
+    } finally {
+      setIsStatsLoading(false);
+    }
+  }, [driverId]);
+
+  useEffect(() => {
+    fetchDriverStats();
+  }, [fetchDriverStats]);
 
   // حالة العمل الحالية: خمول | خط دائمي | تكسي | كلاهما (تُقرأ من التخزين المحلي أولاً)
   const [workStatus, setWorkStatus] = useState<'idle' | 'permanent' | 'taxi' | 'both'>(() => {
@@ -909,6 +944,11 @@ export default function DriverHomePage() {
           // معالجة عرض وسحب المشوار المباشر الموجه للكابتن
           const innerEv = data?.event || data;
           const evType = innerEv?.event || innerEv?.type || data?.type;
+
+          // تحديث فوري لإحصائيات الكابتن الحقيقية عبر SSE عند اكتمال رحلة أو تحديث الأرقام
+          if (evType === 'stats_updated' || evType === 'ride_completed') {
+            void fetchDriverStats();
+          }
           if (evType === 'ride_offer_expired' || evType === 'ride_taken' || evType === 'ride_cancelled') {
             const expId = String(innerEv?.rideId || innerEv?.requestId || data?.rideId || data?.requestId || '');
             if (expId) {
@@ -1684,15 +1724,7 @@ export default function DriverHomePage() {
         setActiveRide(null);
         setIsFareModalOpen(false);
 
-        http
-          .get<{ success: boolean; points?: number }>(`/driver/${driverId}/points`)
-          .then((res) => {
-            if (res.data?.success && res.data.points != null) {
-              setDriverPoints(res.data.points);
-              storage.setPoints(res.data.points);
-            }
-          })
-          .catch(() => {});
+        void fetchDriverStats();
       } else {
         show(data?.message || 'تعذر إنهاء الرحلة', 'error');
       }
@@ -2396,20 +2428,50 @@ export default function DriverHomePage() {
           {/* المحتوى القابل للتوسيع (Expandable Drawer Content) */}
           {isBottomDockExpanded && (
             <div className="mt-2.5 pt-3 border-t border-[#534434]/30 max-h-[50vh] overflow-y-auto space-y-3 pb-2 animate-fade-in">
-              {/* إحصائيات سريعة للكابتن */}
+              {/* إحصائيات سريعة للكابتن (بيانات حقيقية من الخادم) */}
               <div className="grid grid-cols-3 gap-2">
-                <div className="bg-[#242a37]/60 rounded-xl p-2.5 text-center border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">مشاوير اليوم</span>
-                  <span className="text-base font-black text-[#56e5a9]">٥ مشاوير</span>
+                <div className={`rounded-xl p-2.5 text-center border transition-colors ${
+                  isDark ? 'bg-[#242a37]/60 border-white/5' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <span className={`text-[10px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>مشاوير اليوم</span>
+                  {isStatsLoading ? (
+                    <span className="text-xs text-slate-400 animate-pulse font-bold block mt-1">جاري التحميل...</span>
+                  ) : statsError ? (
+                    <span className="text-xs text-rose-400 font-bold block mt-1">تعذر الجلب</span>
+                  ) : (
+                    <span className="text-base font-black text-[#56e5a9] block mt-0.5">
+                      {driverStats?.todayTrips === 0 ? '0 مشاوير' : `${(driverStats?.todayTrips ?? 0).toLocaleString('ar-IQ')} مشوار`}
+                    </span>
+                  )}
                 </div>
-                <div className="bg-[#242a37]/60 rounded-xl p-2.5 text-center border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">أرباح اليوم</span>
-                  <span className="text-base font-black text-[#ffc174]">{driverBalance} د.ع</span>
+                <div className={`rounded-xl p-2.5 text-center border transition-colors ${
+                  isDark ? 'bg-[#242a37]/60 border-white/5' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <span className={`text-[10px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>أرباح اليوم</span>
+                  {isStatsLoading ? (
+                    <span className="text-xs text-slate-400 animate-pulse font-bold block mt-1">جاري التحميل...</span>
+                  ) : statsError ? (
+                    <span className="text-xs text-rose-400 font-bold block mt-1">تعذر الجلب</span>
+                  ) : (
+                    <span className="text-base font-black text-[#ffc174] block mt-0.5">
+                      {(driverStats?.todayEarnings ?? 0).toLocaleString('ar-IQ')} <span className="text-[10px] font-bold">د.ع</span>
+                    </span>
+                  )}
                 </div>
-                <div className="bg-[#242a37]/60 rounded-xl p-2.5 text-center border border-white/5">
-                  <span className="text-[10px] text-slate-400 block">نقاط الولاء</span>
-                  <span className="text-base font-black text-amber-400">{driverPoints} ⭐</span>
-                  <span className="text-[9px] text-slate-400 block font-mono mt-0.5">{formattedPhone}</span>
+                <div className={`rounded-xl p-2.5 text-center border transition-colors ${
+                  isDark ? 'bg-[#242a37]/60 border-white/5' : 'bg-white border-slate-200 shadow-sm'
+                }`}>
+                  <span className={`text-[10px] block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>نقاط الولاء</span>
+                  {isStatsLoading ? (
+                    <span className="text-xs text-slate-400 animate-pulse font-bold block mt-1">جاري التحميل...</span>
+                  ) : statsError ? (
+                    <span className="text-xs text-rose-400 font-bold block mt-1">تعذر الجلب</span>
+                  ) : (
+                    <span className="text-base font-black text-amber-400 block mt-0.5">
+                      {(driverStats?.points ?? driverPoints ?? 0).toLocaleString('ar-IQ')} ⭐
+                    </span>
+                  )}
+                  <span className={`text-[9px] block font-mono mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formattedPhone}</span>
                 </div>
               </div>
 
