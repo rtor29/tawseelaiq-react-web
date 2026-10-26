@@ -250,6 +250,7 @@ export default function CustomerHomePage() {
   ]);
   const [cancelFeeAmount, setCancelFeeAmount] = useState(1500);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [noDriversModalOpen, setNoDriversModalOpen] = useState(false);
 
   // المدينة المحددة
   const [selectedCity, setSelectedCity] = useState('المدينة الحالية');
@@ -679,11 +680,14 @@ export default function CustomerHomePage() {
                   // إزالة الطلب ومسح الخط عند الانتهاء أو الإلغاء
                   hasNotifiedArrivalRef.current = false;
                   localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
-                  setStage('pickup');
+                  setStage('ride_options');
                   setRideRequestId(null);
                   setAssignedDriverInfo(null);
                   setLiveDriverPosition(null);
                   setRouteCoordinates(null);
+                  if (['nodriversavailable', 'no_drivers', 'expired', 'driver_declined'].includes(s)) {
+                    setNoDriversModalOpen(true);
+                  }
                 }
 
                 if (s !== 'pending' && (req.assignedDriverName || req.assignedDriverPhone)) {
@@ -1244,6 +1248,21 @@ export default function CustomerHomePage() {
   const currentTier = RIDE_TIERS.find((t) => t.id === selectedTierId) || RIDE_TIERS[0];
   const calculatedPrice = getTierPrice(currentTier);
 
+  // إنهاء بحث الراكب وتنظيف الحالة وإظهار نافذة عدم توفر كباتن
+  const handleNoDriversAvailable = useCallback((_customMsg?: string) => {
+    hasNotifiedArrivalRef.current = false;
+    try {
+      localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+    } catch (_) {}
+    setStage('ride_options');
+    setRideRequestId(null);
+    setRideStatus(null);
+    setAssignedDriverInfo(null);
+    setLiveDriverPosition(null);
+    setRouteCoordinates(null);
+    setNoDriversModalOpen(true);
+  }, []);
+
   // طلب التكسي النهائي — إرسال حقيقي للخادم مع Idempotency-Key
   async function handleOrderTrip() {
     if (isSubmittingOrder) return;
@@ -1320,10 +1339,8 @@ export default function CustomerHomePage() {
       }
     } catch (err: any) {
       const errData = err?.response?.data;
-      if (errData?.noDriversInTier) {
-        show(errData.error || `لا يوجد كابتن ${errData.tierName || ''} متاح قريباً، جرّب فئة أخرى`, 'warning');
-      } else if (errData?.noDriversInRadius) {
-        show(errData.error || 'لا يوجد كابتن متاح بالقرب منك حالياً ضمن نطاق البحث', 'warning');
+      if (errData?.noDriversInTier || errData?.noDriversInRadius) {
+        handleNoDriversAvailable(errData.error);
       } else if (errData?.error) {
         show(errData.error, err?.response?.status === 400 && errData.activeRideExists ? 'warning' : 'error');
       } else {
@@ -1790,8 +1807,14 @@ export default function CustomerHomePage() {
       ].includes(status)
     ) {
       hasNotifiedArrivalRef.current = false;
-      localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
-      show(status.includes('cancel') ? 'تم إلغاء الرحلة' : 'نعتذر منك، لم يتوفر كابتن متاح حالياً 🚖 يمكنك إعادة المحاولة', 'warning', 6000);
+      try {
+        localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+      } catch (_) {}
+      if (['nodriversavailable', 'no_drivers', 'no_driver_found', 'expired', 'driver_declined', 'rejected', 'declined'].includes(status)) {
+        handleNoDriversAvailable();
+        return;
+      }
+      show('تم إلغاء الرحلة', 'warning', 6000);
       setStage('ride_options');
       setRideRequestId(null);
       setAssignedDriverInfo(null);
@@ -1819,7 +1842,7 @@ export default function CustomerHomePage() {
       setRideStatus('Pending');
       setAssignedDriverInfo(null);
     }
-  }, [stage, rideStatus, pickup, dropoff, show, triggerDriverRatingModal]);
+  }, [stage, rideStatus, pickup, dropoff, show, triggerDriverRatingModal, handleNoDriversAvailable]);
 
   // تتبع حالة الرحلة وبث الأحداث اللحظية عبر SSE مع احتياط نبض كل 20 ثانية (Tawseela IQ v72)
   useEffect(() => {
@@ -1879,6 +1902,15 @@ export default function CustomerHomePage() {
         } catch (_) {}
       });
 
+      es.addEventListener('no_drivers_available', (e: MessageEvent) => {
+        try {
+          isSseConnected = true;
+          const data = JSON.parse(e.data);
+          if (!handleCustomerEventId(e, data)) return;
+          handleNoDriversAvailable();
+        } catch (_) {}
+      });
+
       es.addEventListener('trip_update', (e: MessageEvent) => {
         try {
           isSseConnected = true;
@@ -1887,11 +1919,8 @@ export default function CustomerHomePage() {
 
           const evType = data?.event || data?.type;
 
-          if (evType === 'no_drivers_available' || data?.status === 'NoDriversAvailable' || data?.status === 'NO_DRIVERS') {
-            show('نعتذر منك، لم يتوفر كابتن متاح حالياً 🚖 يمكنك إعادة المحاولة', 'warning', 6000);
-            localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
-            setStage('ride_options');
-            setRideRequestId(null);
+          if (evType === 'no_drivers_available' || data?.status === 'NoDriversAvailable' || data?.status === 'NO_DRIVERS' || data?.status === 'no_drivers') {
+            handleNoDriversAvailable();
             return;
           }
 
@@ -1940,7 +1969,7 @@ export default function CustomerHomePage() {
         es.close();
       }
     };
-  }, [rideRequestId, stage, handleRideStateChange, handleDriverPositionUpdate, show]);
+  }, [rideRequestId, stage, handleRideStateChange, handleDriverPositionUpdate, show, handleNoDriversAvailable]);
 
   // اشتراك لحظي في أحداث الرحلة وموقع السائق عبر SignalR / Realtime
   useEffect(() => {
@@ -1998,7 +2027,13 @@ export default function CustomerHomePage() {
           ].includes(evStatus)
         ) {
           hasNotifiedArrivalRef.current = false;
-          localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+          try {
+            localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
+          } catch (_) {}
+          if (['nodriversavailable', 'no_drivers', 'expired', 'driver_declined', 'rejected', 'declined'].includes(evStatus)) {
+            handleNoDriversAvailable();
+            return;
+          }
           show('تم إلغاء الرحلة', 'warning');
           setStage('ride_options');
           setRideRequestId(null);
@@ -2026,7 +2061,7 @@ export default function CustomerHomePage() {
       unsubLocation();
       void realtime.leaveTrip(rideRequestId);
     };
-  }, [rideRequestId, dropoff, rideStatus, stage, assignedDriverInfo, triggerDriverRatingModal, handleDriverPositionUpdate]);
+  }, [rideRequestId, dropoff, rideStatus, stage, assignedDriverInfo, triggerDriverRatingModal, handleDriverPositionUpdate, handleNoDriversAvailable]);
 
   // تتبع موقع السائق الحي على الخريطة (احتياط نبض 15 ثانية - SSE يتكفل بالبث الفوري)
   useEffect(() => {
@@ -4789,6 +4824,60 @@ export default function CustomerHomePage() {
                   إلغاء
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة انتهاء البحث لعدم توفر كباتن */}
+      {noDriversModalOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in" dir="rtl">
+          <div className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl border text-center space-y-5 animate-scale-up ${
+            isDark ? 'bg-[#161C28] border-amber-500/30 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
+          }`}>
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 text-4xl border border-amber-500/20 shadow-inner">
+              <span>🚖</span>
+              <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-rose-500 text-white text-xs font-bold border-2 border-[#161C28]">
+                ✕
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg font-black leading-snug">
+                عذراً، لا يوجد سائقون متاحون في الوقت الحاضر
+              </h3>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                جميع الكباتن في منطقتك مشغولون حالياً. يمكنك إعادة المحاولة الآن أو الانتظار قليلاً.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setNoDriversModalOpen(false);
+                  void handleOrderTrip();
+                }}
+                disabled={isSubmittingOrder}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 px-4 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/25 transition-transform active:scale-[0.98] hover:from-amber-400 hover:to-amber-500 cursor-pointer disabled:opacity-50"
+                style={{ minHeight: '48px' }}
+              >
+                <span>🔄</span>
+                <span>إعادة المحاولة</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setNoDriversModalOpen(false)}
+                className={`flex h-12 w-full items-center justify-center rounded-2xl border px-4 text-sm font-bold transition-all active:scale-[0.98] cursor-pointer ${
+                  isDark
+                    ? 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                    : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+                style={{ minHeight: '48px' }}
+              >
+                حسناً
+              </button>
             </div>
           </div>
         </div>
