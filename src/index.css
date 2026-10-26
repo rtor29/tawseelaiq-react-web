@@ -243,7 +243,18 @@ body {
 
 .animate-drive-in,
 .animate-logo-entrance {
-  animation: driveInRight 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: driveInRight 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-drive-in,
+  .animate-logo-entrance,
+  .animate-drive-in-delayed,
+  .animate-drive-in-delayed2 {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
 }
 
 .animate-drive-in-delayed {

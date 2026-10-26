@@ -643,13 +643,13 @@ export default function LoginPage() {
           {/* خط التوهج الذهبي العلوي */}
           <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-80"></div>
 
-          {/* ترويسة الشعار المحصورة بحاوية محكمة ومقيدة بدقة */}
+          {/* ترويسة الشعار المحصورة بحاوية محكمة ومقيدة بدقة مع حركة الدخول من اليمين */}
           <div className="flex flex-col items-center text-center pt-1">
             <div className="w-full flex items-center justify-center my-3 overflow-hidden">
               <img 
                 src="/logo.png?v=40" 
                 alt="شعار توصيلة" 
-                className="h-14 sm:h-16 w-auto max-w-[160px] object-contain drop-shadow-md select-none" 
+                className="h-14 sm:h-16 w-auto max-w-[160px] object-contain drop-shadow-md select-none animate-logo-entrance motion-reduce:animate-none" 
                 style={{ maxHeight: '64px', maxWidth: '160px', width: 'auto' }}
               />
             </div>
@@ -658,7 +658,7 @@ export default function LoginPage() {
             <p className="text-xs text-slate-400 mb-2">خدمة النقل الذكية في النجف الأشرف</p>
           </div>
 
-          {/* محدد الأدوار: أنا راكب / أنا كابتن (يظهر فقط في الخطوة الأولى لإدخال الرقم) */}
+          {/* محدد الأدوار: التسجيل كراكب / التسجيل ككابتن توصيلة (يظهر فقط في الخطوة الأولى لإدخال الرقم) */}
           {step === 'phone' && (
             <div className="relative w-full p-1 bg-[#1A202C] rounded-2xl flex items-center justify-between shadow-inner gap-1">
               <button 
@@ -674,7 +674,7 @@ export default function LoginPage() {
                 }`}
               >
                 <span className="text-base">🧳</span>
-                <span>أنا راكب</span>
+                <span>التسجيل كراكب</span>
               </button>
 
               <button 
@@ -690,7 +690,7 @@ export default function LoginPage() {
                 }`}
               >
                 <span className="text-base">🚖</span>
-                <span>أنا كابتن / سائق</span>
+                <span>التسجيل ككابتن توصيلة</span>
               </button>
             </div>
           )}

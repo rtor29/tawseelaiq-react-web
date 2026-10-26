@@ -261,9 +261,8 @@ export default function DriverHomePage() {
   const shouldShowDispatchSheet = Boolean(pendingRequests && pendingRequests.length > 0 && !hasRealActiveTrip);
   const incomingRequest = shouldShowDispatchSheet ? pendingRequests[0] : null;
 
-  // معرف السائق الحالي وحالة الاستعلام الحي
+  // معرف السائق الحالي
   const currentTargetId = driverId || session?.userId || storage.getUserId() || rawPhone || storage.getPhone() || '';
-  const [pollStatus, setPollStatus] = useState<'connected' | 'polling' | 'idle' | 'error'>('idle');
 
   const [isTriggeringHorn, setIsTriggeringHorn] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -792,13 +791,11 @@ export default function DriverHomePage() {
   useEffect(() => {
     if (!currentTargetId) {
       setPendingRequests([]);
-      setPollStatus('idle');
       return;
     }
     // إذا كان الكابتن في وضع الخمول (idle)، لا نستطلع الطلبات ولا نتصل بـ SSE
     if (workStatus === 'idle') {
       setPendingRequests([]);
-      setPollStatus('idle');
       return;
     }
 
@@ -863,7 +860,6 @@ export default function DriverHomePage() {
         updatePendingRequestsSafely(Array.isArray(incoming) ? incoming : []);
       } catch (err) {
         console.warn('[Dispatch] Polling pending requests error:', err);
-        setPollStatus('error');
       }
     };
 
@@ -879,7 +875,6 @@ export default function DriverHomePage() {
 
       es.onopen = () => {
         sseConnectedRef.current = true;
-        setPollStatus('connected');
       };
 
       const handleIncomingEventId = (e: MessageEvent, data: any) => {
@@ -898,7 +893,6 @@ export default function DriverHomePage() {
       es.addEventListener('init', (e: MessageEvent) => {
         try {
           sseConnectedRef.current = true;
-          setPollStatus('connected');
           const data = JSON.parse(e.data);
           if (!handleIncomingEventId(e, data)) return;
 
@@ -1086,6 +1080,17 @@ export default function DriverHomePage() {
           pendingMarkersRef.current.delete(accId);
         }
         lastIncomingIdRef.current = null;
+
+        // إظهار نافذة الملاحة تلقائياً بعنوان «التوجه إلى موقع الراكب» ونقطة انطلاقه
+        const pLat = reqObj.pickupLat ?? reqObj.pickup_lat ?? reqObj.pickup?.lat;
+        const pLon = reqObj.pickupLon ?? reqObj.pickup_lon ?? reqObj.pickup?.lng ?? reqObj.pickup?.lon;
+        const pName = reqObj.pickupName || reqObj.pickupAddress || reqObj.pickup_title || reqObj.originAddress || 'موقع الراكب';
+        if (pLat && pLon) {
+          setNavType('pickup');
+          setNavCoordinates({ lat: Number(pLat), lng: Number(pLon) });
+          setNavTargetName(pName);
+          setIsNavModalOpen(true);
+        }
       } else if (data?.alreadyAccepted || data?.notFound) {
         show('المشوار تم قبوله من كابتن آخر أو تم إلغاؤه', 'info');
         const accId = String(acceptedReq.id || (acceptedReq as any).rideId);
@@ -1459,7 +1464,9 @@ export default function DriverHomePage() {
 
   function handleOpenNavModal(target?: 'pickup' | 'dropoff') {
     if (!activeRide) return;
-    const mode = target || (activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff');
+    const st = (activeRide.status || '').toLowerCase();
+    const isToPickup = st === 'accepted' || st === 'ontheway' || st === 'on_the_way';
+    const mode = target || (isToPickup ? 'pickup' : 'dropoff');
     setNavType(mode);
 
     if (mode === 'pickup') {
@@ -1476,7 +1483,7 @@ export default function DriverHomePage() {
     } else {
       const dLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
       const dLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
-      const dName = activeRide.dropoffName || activeRide.dropoffAddress || activeRide.dropoff_title || activeRide.destination || activeRide.destinationAddress || 'وجهة الراكب';
+      const dName = activeRide.dropoffName || activeRide.dropoffAddress || activeRide.dropoff_title || activeRide.destination || activeRide.destinationAddress || 'وجهة الرحلة النهائية';
       if (dLat && dLon) {
         setNavCoordinates({ lat: Number(dLat), lng: Number(dLon) });
         setNavTargetName(dName);
@@ -1504,10 +1511,14 @@ export default function DriverHomePage() {
         show('تم بدء الرحلة والانطلاق إلى الوجهة 🚗💨', 'success', 3000);
         setActiveRide((prev: any) => ({ ...prev, status: 'InProgress' }));
 
+        // إظهار نافذة الملاحة تلقائياً بعنوان «التوجه إلى موقع الوصول» ووجهتها النهائية
         const destLat = activeRide.dropoffLat ?? activeRide.dropoff_lat ?? activeRide.dropoff?.lat;
         const destLon = activeRide.dropoffLon ?? activeRide.dropoff_lon ?? activeRide.dropoff?.lng ?? activeRide.dropoff?.lon;
+        const destName = activeRide.dropoffName || activeRide.dropoffAddress || activeRide.dropoff_title || activeRide.destination || activeRide.destinationAddress || 'وجهة الرحلة النهائية';
         if (destLat && destLon) {
+          setNavType('dropoff');
           setNavCoordinates({ lat: Number(destLat), lng: Number(destLon) });
+          setNavTargetName(destName);
           setIsNavModalOpen(true);
         }
       } else {
@@ -1999,21 +2010,7 @@ export default function DriverHomePage() {
 
       {/* 3. المؤشرات الجانبية العائمة على الخريطة (Floating HUD Overlays) - مفصولة رأسياً لمنع أي تداخل */}
       <div className="fixed top-[calc(68px+env(safe-area-inset-top,12px))] inset-x-0 pointer-events-none z-30 px-4 max-w-lg mx-auto w-full flex justify-between items-start" dir="rtl">
-        {/* اليمين: كبسولة عدد الكباتن والوجهة */}
-        <div className="flex flex-col gap-2 pointer-events-auto">
-          <div className={`backdrop-blur-md border rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 text-xs font-bold ${
-            isDark ? 'bg-[#161c28]/90 border-[#56e5a9]/40 text-[#56e5a9]' : 'bg-white/95 border-emerald-400 text-emerald-700'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${pollStatus === 'error' ? 'bg-red-500' : 'bg-[#56e5a9]'} animate-pulse`} />
-            <span>٤ كباتن متوفرين قربك الآن ⚡</span>
-          </div>
-          <div className={`backdrop-blur-md border rounded-full px-3 py-1 shadow-md flex items-center gap-1.5 text-[11px] font-medium ${
-            isDark ? 'bg-[#242a37]/90 border-[#534434]/40 text-[#ffc174]' : 'bg-white/95 border-amber-300 text-amber-700'
-          }`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
-            <span>جامعة الكوفة</span>
-          </div>
-        </div>
+        <div />
 
         {/* اليسار: أدوات التحكم بالخريطة والطوارئ */}
         <div className="flex flex-col gap-2.5 pointer-events-auto">
@@ -2073,7 +2070,7 @@ export default function DriverHomePage() {
                 <button
                   type="button"
                   title="فتح الملاحة الخارجية"
-                  onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
+                  onClick={() => handleOpenNavModal()}
                   className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30 active:scale-95 transition cursor-pointer"
                 >
                   🧭
@@ -2136,7 +2133,7 @@ export default function DriverHomePage() {
               </button>
               <button
                 type="button"
-                onClick={() => handleOpenNavModal(activeRide.status === 'Accepted' || activeRide.status === 'OnTheWay' ? 'pickup' : 'dropoff')}
+                onClick={() => handleOpenNavModal()}
                 className="min-h-[48px] py-2 px-1 rounded-xl bg-sky-600/20 text-sky-400 border border-sky-500/30 flex flex-col items-center justify-center gap-0.5 font-bold text-[11px] hover:bg-sky-600/30 transition cursor-pointer active:scale-95"
                 title="الملاحة الخارجية والداخلية"
               >
@@ -2882,7 +2879,7 @@ export default function DriverHomePage() {
             </div>
             <div>
               <h3 className="text-base font-black text-white">
-                {navType === 'pickup' ? 'التوجه إلى موقع الراكب' : 'التوجه إلى وجهة الراكب'}
+                {navType === 'pickup' ? 'التوجه إلى موقع الراكب' : 'التوجه إلى موقع الوصول'}
               </h3>
               <p className="text-xs text-slate-400 mt-1 truncate">
                 {navTargetName || 'الموقع المحدد'}
