@@ -2678,24 +2678,8 @@ export default function DriverHomePage() {
                 onClick={() => { setSelectedMapStyle(null); setShowLayersModal(false); }}
                 className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
               >
-                <span>✨ النمط التلقائي (يتبع الوضع الليلي والنهاري)</span>
-                {!selectedMapStyle && <span className="text-[#56e5a9] font-black">✓</span>}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setSelectedMapStyle('mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db'); setShowLayersModal(false); }}
-                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
-              >
-                <span>🌙 نمط توصيلة الليلي المعتمد (Night Obsidian)</span>
-                {selectedMapStyle === 'mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db' && <span className="text-[#56e5a9] font-black">✓</span>}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setSelectedMapStyle('mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'); setShowLayersModal(false); }}
-                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
-              >
                 <span>☀️ نمط توصيلة النهاري المعتمد (Daylight Tawseela)</span>
-                {selectedMapStyle === 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om' && <span className="text-[#56e5a9] font-black">✓</span>}
+                {!selectedMapStyle && <span className="text-[#56e5a9] font-black">✓</span>}
               </button>
               <button
                 type="button"

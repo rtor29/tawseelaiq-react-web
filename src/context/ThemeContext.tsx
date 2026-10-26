@@ -3,7 +3,6 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 export type ThemeMode = 'dark' | 'light';
 
 export const MAPBOX_DAY_STYLE = 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
-export const MAPBOX_NIGHT_STYLE = 'mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db';
 
 export interface ThemeContextValue {
   theme: ThemeMode;
@@ -111,9 +110,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [theme]);
 
-  const mapStyle = useMemo(() => {
-    return theme === 'light' ? MAPBOX_DAY_STYLE : MAPBOX_NIGHT_STYLE;
-  }, [theme]);
+  // نمط الخريطة النهاري المعتمد دائماً لكافة الشاشات والأوقات
+  const mapStyle = MAPBOX_DAY_STYLE;
 
   const value = useMemo(
     () => ({
@@ -138,7 +136,7 @@ export function useTheme(): ThemeContextValue {
       theme: fallbackTheme,
       toggleTheme: () => {},
       setTheme: () => {},
-      mapStyle: fallbackTheme === 'light' ? MAPBOX_DAY_STYLE : MAPBOX_NIGHT_STYLE,
+      mapStyle: MAPBOX_DAY_STYLE,
       isDark: fallbackTheme === 'dark',
     };
   }

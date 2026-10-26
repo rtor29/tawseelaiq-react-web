@@ -9,7 +9,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { endpoints, http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
-import { config, IRAQ_DEFAULT_CENTER } from '../lib/config';
+import { config, IRAQ_DEFAULT_CENTER, MAPBOX_DAY_STYLE } from '../lib/config';
 import { getDirections, reverseGeocode, searchPlaces, applyArabicAndEnhancedLabels, type PlaceResult, type RouteResult } from '../lib/mapbox';
 import { RouteLines } from '../components/map/MapPins';
 import { sanitizeSearchQuery } from '../lib/sanitize';
@@ -570,7 +570,7 @@ export default function CreateRoutePage() {
             ref={mapRef}
             reuseMaps
             mapboxAccessToken={config.mapboxToken}
-            mapStyle={isDark ? 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om' : config.navigationStyle}
+            mapStyle={MAPBOX_DAY_STYLE}
             initialViewState={{ longitude: startPoint.lng, latitude: startPoint.lat, zoom: 13 }}
             style={{ width: '100%', height: '100%', backgroundColor: isDark ? '#080E1A' : '#E2E8F0' }}
             onClick={handleMapClick}

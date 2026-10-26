@@ -380,7 +380,7 @@ export function isStrictlyNajaf(_name: string, lat: number, lon: number): boolea
  * 2. تكبير حجم الخطوط بنسبة 25%: ['interpolate', ['linear'], ['zoom'], 10, 13, 14, 16.5, 18, 20.5]
  * 3. إضافة هالة بيضاء واضحة (White Halo): text-halo-color: '#ffffff', text-halo-width: 2
  */
-export function applyArabicAndEnhancedLabels(rawMap: any, isDark = true) {
+export function applyArabicAndEnhancedLabels(rawMap: any, _isDark = true) {
   if (!rawMap) return;
   const map = typeof rawMap.getMap === 'function' ? rawMap.getMap() : rawMap;
   if (!map) return;
@@ -452,20 +452,13 @@ export function applyArabicAndEnhancedLabels(rawMap: any, isDark = true) {
             map.setPaintProperty(layer.id, 'text-opacity', 1);
           } catch {}
 
-          // 9. هالة واضحة ومريحة لسهولة قراءة أسماء المعالم فوق خلفيات الخريطة (تباين عالي لليلي والنهاري)
+          // 9. هالة واضحة ومريحة لسهولة قراءة أسماء المعالم فوق خلفية الخريطة النهارية الموحدة
           try {
-            if (isDark) {
-              map.setPaintProperty(layer.id, 'text-color', '#FFFFFF');
-              map.setPaintProperty(layer.id, 'text-halo-color', '#090D16');
-              map.setPaintProperty(layer.id, 'text-halo-width', 2.5);
-              map.setPaintProperty(layer.id, 'text-halo-blur', 0.5);
-            } else {
-              // الوضع النهاري: نصوص داكنة صريحة #0F172A مع هالة بيضاء 2.0px لسهولة القراءة السريعة أثناء حركة المركبة
-              map.setPaintProperty(layer.id, 'text-color', '#0F172A');
-              map.setPaintProperty(layer.id, 'text-halo-color', '#FFFFFF');
-              map.setPaintProperty(layer.id, 'text-halo-width', 2.0);
-              map.setPaintProperty(layer.id, 'text-halo-blur', 0.5);
-            }
+            // نصوص داكنة صريحة #0F172A مع هالة بيضاء 2.0px لسهولة القراءة السريعة وأقصى تباين دائماً
+            map.setPaintProperty(layer.id, 'text-color', '#0F172A');
+            map.setPaintProperty(layer.id, 'text-halo-color', '#FFFFFF');
+            map.setPaintProperty(layer.id, 'text-halo-width', 2.0);
+            map.setPaintProperty(layer.id, 'text-halo-blur', 0.5);
           } catch {}
         }
       }
@@ -646,15 +639,11 @@ export function enhanceDayMapRoads(rawMap: any) {
 }
 
 /**
- * تطبيق تحسينات وتوضيح الخريطة الشاملة حسب الثيم الفعال (ليلي / نهاري)
+ * تطبيق تحسينات وتوضيح الخريطة الشاملة (نمط نهاري موحد دائم لجميع الشاشات والأوضاع)
  */
-export function applyMapEnhancements(rawMap: any, isDark = true) {
-  applyArabicAndEnhancedLabels(rawMap, isDark);
-  if (isDark) {
-    enhanceDarkMapRoads(rawMap);
-  } else {
-    enhanceDayMapRoads(rawMap);
-  }
+export function applyMapEnhancements(rawMap: any, _isDark = false) {
+  applyArabicAndEnhancedLabels(rawMap, false);
+  enhanceDayMapRoads(rawMap);
 }
 
 // ---------------------------------------------------------------------------

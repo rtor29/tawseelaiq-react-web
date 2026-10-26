@@ -8,9 +8,8 @@ export const NAJAF_CENTER = IRAQ_DEFAULT_CENTER; // للتوافق العكسي
 export const IRAQ_BBOX = { west: 38.5, south: 29.0, east: 48.8, north: 37.5 } as const;
 export const NAJAF_BBOX = IRAQ_BBOX; // للتوافق العكسي
 
-// أنماط Mapbox المعتمدة لمنصة توصيلة للوضعين النهاري والليلي
+// نمط Mapbox النهاري المعتمد لمنصة توصيلة
 export const MAPBOX_DAY_STYLE = 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
-export const MAPBOX_NIGHT_STYLE = 'mapbox://styles/almusawy/cmvhp33yb00f001s8gbjad8db';
 
 export interface AppConfig {
   appName: string;
@@ -39,8 +38,8 @@ export const config: AppConfig = {
   realtimeMode: (import.meta.env.VITE_REALTIME_MODE || 'polling') as 'polling' | 'signalr' | 'socketio',
 
   mapboxToken: import.meta.env.VITE_MAPBOX_TOKEN || '',
-  mapStyle: import.meta.env.VITE_MAP_STYLE || MAPBOX_NIGHT_STYLE,
-  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || MAPBOX_NIGHT_STYLE,
+  mapStyle: import.meta.env.VITE_MAP_STYLE || MAPBOX_DAY_STYLE,
+  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || MAPBOX_DAY_STYLE,
 
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
 
