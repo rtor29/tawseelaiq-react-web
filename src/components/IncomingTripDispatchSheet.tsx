@@ -52,15 +52,15 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
       onAcceptRef.current = onAccept;
     }, [onReject, onAccept]);
 
-    // احتساب الثواني المتبقية استناداً إلى remainingSeconds النسبي من الخادم
+    // احتساب الثواني المتبقية استناداً إلى stepTimeoutAt أو remainingSeconds من الخادم
     const computeInitialRemaining = () => {
-      if (typeof incomingRequest?.remainingSeconds === 'number') {
-        return Math.min(30, Math.max(0, incomingRequest.remainingSeconds));
-      }
       if (incomingRequest?.stepTimeoutAt) {
         const skew = incomingRequest.serverTimestamp ? (Date.now() - incomingRequest.serverTimestamp) : 0;
         const remaining = Math.max(0, Math.round((incomingRequest.stepTimeoutAt - (Date.now() - skew)) / 1000));
-        return Math.min(20, Math.max(0, remaining));
+        return remaining;
+      }
+      if (typeof incomingRequest?.remainingSeconds === 'number') {
+        return Math.max(0, incomingRequest.remainingSeconds);
       }
       return 20;
     };
