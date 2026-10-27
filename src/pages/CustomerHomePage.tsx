@@ -1898,29 +1898,40 @@ export default function CustomerHomePage() {
     }
   }, [stage, rideStatus, pickup, dropoff, show, triggerDriverRatingModal, handleNoDriversAvailable]);
 
-  // تتبع حالة الرحلة وبث الأحداث اللحظية عبر SSE مع احتياط نبض كل 20 ثانية (Tawseela IQ v72)
+  // تتبع حالة الرحلة وبث الأحداث اللحظية عبر SSE مع شبكة أمان للاستطلاع (كل 5 ثوانٍ أثناء البحث حتى لو كان SSE متصلاً)
   useEffect(() => {
     if (!rideRequestId || (stage !== 'searching' && stage !== 'driver_arriving')) return;
 
     let isSseConnected = false;
 
     const checkStatus = async () => {
-      if (document.hidden || isSseConnected) return;
+      if (document.hidden) return;
+      // أثناء مرحلة البحث: نفحص كل 5 ثوانٍ إلزامياً كشبكة أمان حتى لو كان SSE متصلاً
+      // أثناء مرحلة وصول السائق: نفحص كل 20 ثانية فقط في حال انقطاع SSE
+      if (stage !== 'searching' && isSseConnected) return;
       try {
         const { data } = await http.get<{
           success: boolean;
           request?: any;
+          ride?: any;
         }>(`/ride/status/${rideRequestId}`);
 
-        if (data.success && data.request) {
-          handleRideStateChange(data.request);
+        const reqObj = data?.request || data?.ride;
+        if (data?.success && reqObj) {
+          const st = String(reqObj.status || '').toLowerCase();
+          if (['nodriversavailable', 'no_drivers', 'no_driver_found', 'expired', 'driver_declined', 'rejected', 'declined'].includes(st)) {
+            handleNoDriversAvailable();
+            return;
+          }
+          handleRideStateChange(reqObj);
         }
       } catch (_) {}
     };
 
     void checkStatus();
-    // احتياط نبض كل 20 ثانية فقط في حال انقطاع SSE
-    const interval = setInterval(checkStatus, 20000);
+    // استطلاع دوري: كل 5 ثوانٍ أثناء البحث، وكل 20 ثانية فقط أثناء وصول السائق
+    const pollIntervalMs = stage === 'searching' ? 5000 : 20000;
+    const interval = setInterval(checkStatus, pollIntervalMs);
 
     // اتصال SSE اللحظي لتلقي تحديثات المشوار وموقع السائق فوراً
     let es: EventSource | null = null;
