@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build-staging": "bash scripts/build-staging.sh",
+    "build-production": "bash scripts/build-production.sh",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit"
   },
