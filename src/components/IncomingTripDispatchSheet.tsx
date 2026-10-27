@@ -53,15 +53,21 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
     }, [onReject, onAccept]);
 
     // احتساب الثواني المتبقية استناداً إلى stepTimeoutAt أو remainingSeconds من الخادم
+    const totalTimeoutRef = useRef<number>(20);
     const computeInitialRemaining = () => {
       if (incomingRequest?.stepTimeoutAt) {
         const skew = incomingRequest.serverTimestamp ? (Date.now() - incomingRequest.serverTimestamp) : 0;
         const remaining = Math.max(0, Math.round((incomingRequest.stepTimeoutAt - (Date.now() - skew)) / 1000));
+        const total = Math.max(20, incomingRequest.remainingSeconds || remaining);
+        totalTimeoutRef.current = total;
         return remaining;
       }
       if (typeof incomingRequest?.remainingSeconds === 'number') {
+        const total = Math.max(20, incomingRequest.remainingSeconds);
+        totalTimeoutRef.current = total;
         return Math.max(0, incomingRequest.remainingSeconds);
       }
+      totalTimeoutRef.current = 20;
       return 20;
     };
 
@@ -154,11 +160,11 @@ export const IncomingTripDispatchSheet: React.FC<IncomingTripDispatchSheetProps>
           <div className={`w-full h-2 rounded-full overflow-hidden mb-1 ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
             <div
               className="h-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-1000 ease-linear rounded-full"
-              style={{ width: `${Math.min(100, Math.max(0, (countdown / 20) * 100))}%` }}
+              style={{ width: `${Math.min(100, Math.max(0, (countdown / (totalTimeoutRef.current || 20)) * 100))}%` }}
               role="progressbar"
               aria-valuenow={countdown}
               aria-valuemin={0}
-              aria-valuemax={20}
+              aria-valuemax={totalTimeoutRef.current || 20}
             />
           </div>
 
