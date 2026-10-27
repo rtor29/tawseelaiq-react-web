@@ -2689,98 +2689,63 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* قائمة اختيار جنس الكابتن العائمة فوق الخريطة */}
+        {/* أزرار اختيار جنس السائق العائمة في أقصى اليمين (Segmented Control) */}
         {isGenderFilterEnabled && stage !== 'searching' && stage !== 'driver_arriving' && (
           <div
             id="floating-gender-filter-container"
-            className="pointer-events-none absolute top-[calc(7.25rem+env(safe-area-inset-top,1rem))] inset-x-0 z-30 flex justify-center px-4"
+            className="pointer-events-auto absolute top-[calc(7.25rem+env(safe-area-inset-top,1rem))] right-4 z-30 inline-flex items-center p-1 rounded-2xl bg-[#0f172a]/95 backdrop-blur-md border border-slate-700/60 shadow-xl"
             dir="rtl"
           >
-            <div className="relative pointer-events-auto">
-              <button
-                type="button"
-                id="gender-filter-dropdown-btn"
-                onClick={() => setIsGenderDropdownOpen(!isGenderDropdownOpen)}
-                className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold shadow-xl border backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
-                  isDark
-                    ? 'bg-[#161C28]/95 border-amber-500/40 text-amber-300 hover:bg-[#1E293B]'
-                    : 'bg-white/95 border-amber-500/40 text-amber-700 hover:bg-slate-50 shadow-md'
-                }`}
-                aria-label="تحديد جنس الكابتن"
-              >
-                <span>
-                  {genderPreference === 'female' ? '👩' : genderPreference === 'male' ? '👨' : '👥'}
-                </span>
-                <span>
-                  {genderPreference === 'female' ? 'كابتنة' : genderPreference === 'male' ? 'كابتن' : 'الكل'}
-                </span>
-                <svg
-                  className={`h-3.5 w-3.5 transition-transform duration-200 ${isGenderDropdownOpen ? 'rotate-180' : ''}`}
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
+            {/* 1. سائق (male) */}
+            <button
+              type="button"
+              id="gender-btn-male"
+              onClick={() => handleSelectGenderPreference('male')}
+              style={{
+                backgroundColor: genderPreference === 'male' ? '#2563eb' : '#1e293b',
+                color: genderPreference === 'male' ? '#ffffff' : '#94a3b8',
+                borderColor: genderPreference === 'male' ? '#3b82f6' : 'rgba(255, 255, 255, 0.08)',
+              }}
+              className="px-2.5 py-1 rounded-xl text-xs font-bold border transition-all duration-150 active:scale-95 cursor-pointer whitespace-nowrap"
+              aria-label="تحديد سائق ذكر"
+              aria-pressed={genderPreference === 'male'}
+            >
+              سائق
+            </button>
 
-              {/* عناصر القائمة المنسدلة */}
-              {isGenderDropdownOpen && (
-                <div
-                  id="gender-filter-menu"
-                  className={`absolute top-full mt-1.5 left-1/2 -translate-x-1/2 min-w-[130px] rounded-2xl py-1.5 shadow-2xl border backdrop-blur-md animate-fade-in ${
-                    isDark
-                      ? 'bg-[#161C28]/98 border-amber-500/30 text-white'
-                      : 'bg-white/98 border-slate-200 text-slate-800 shadow-lg'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSelectGenderPreference('any')}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-                      genderPreference === 'any'
-                        ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
-                        : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>👥</span>
-                      <span>الكل</span>
-                    </span>
-                    {genderPreference === 'any' && <span className="text-amber-500 text-xs">✓</span>}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectGenderPreference('male')}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-                      genderPreference === 'male'
-                        ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
-                        : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>👨</span>
-                      <span>كابتن</span>
-                    </span>
-                    {genderPreference === 'male' && <span className="text-amber-500 text-xs">✓</span>}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectGenderPreference('female')}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
-                      genderPreference === 'female'
-                        ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
-                        : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>👩</span>
-                      <span>كابتنة</span>
-                    </span>
-                    {genderPreference === 'female' && <span className="text-amber-500 text-xs">✓</span>}
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* 2. سائقة (female) */}
+            <button
+              type="button"
+              id="gender-btn-female"
+              onClick={() => handleSelectGenderPreference('female')}
+              style={{
+                backgroundColor: genderPreference === 'female' ? '#ec4899' : '#1e293b',
+                color: genderPreference === 'female' ? '#ffffff' : '#94a3b8',
+                borderColor: genderPreference === 'female' ? '#f472b6' : 'rgba(255, 255, 255, 0.08)',
+              }}
+              className="px-2.5 py-1 rounded-xl text-xs font-bold border transition-all duration-150 active:scale-95 cursor-pointer whitespace-nowrap mx-0.5"
+              aria-label="تحديد سائقة أنثى"
+              aria-pressed={genderPreference === 'female'}
+            >
+              سائقة
+            </button>
+
+            {/* 3. كلاهما (any) */}
+            <button
+              type="button"
+              id="gender-btn-any"
+              onClick={() => handleSelectGenderPreference('any')}
+              style={{
+                backgroundColor: genderPreference === 'any' ? '#475569' : '#1e293b',
+                color: genderPreference === 'any' ? '#ffffff' : '#94a3b8',
+                borderColor: genderPreference === 'any' ? '#64748b' : 'rgba(255, 255, 255, 0.08)',
+              }}
+              className="px-2.5 py-1 rounded-xl text-xs font-bold border transition-all duration-150 active:scale-95 cursor-pointer whitespace-nowrap"
+              aria-label="تحديد كلاهما"
+              aria-pressed={genderPreference === 'any'}
+            >
+              كلاهما
+            </button>
           </div>
         )}
 
