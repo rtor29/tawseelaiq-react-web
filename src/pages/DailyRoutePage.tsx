@@ -41,6 +41,7 @@ interface DriverItem {
   distanceM?: number;
   distanceBand?: string;
   isFull?: boolean;
+  gender?: string;
 }
 
 function getDriverColor(distKm: number): { bg: string; text: string; label: string } {
@@ -93,6 +94,41 @@ export default function DailyRoutePage() {
   const [isSheetMinimized, setIsSheetMinimized] = useState(false);
   const routeAutoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifiedRejectedBookingIdsRef = useRef<Set<string>>(new Set());
+
+  // فلترة الكباتن حسب الجنس (مفعلة عبر VITE_GENDER_FILTER)
+  const isGenderFilterEnabled = import.meta.env.VITE_GENDER_FILTER === 'true';
+  const [genderPreference, setGenderPreference] = useState<'any' | 'female' | 'male'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tawseela_gender_preference');
+      if (saved === 'female' || saved === 'male') return saved;
+    }
+    return 'any';
+  });
+  const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
+
+  const handleSelectGenderPreference = (pref: 'any' | 'female' | 'male') => {
+    setGenderPreference(pref);
+    try {
+      localStorage.setItem('tawseela_gender_preference', pref);
+    } catch (_) {}
+    setIsGenderDropdownOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isGenderDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const container = document.getElementById('daily-route-gender-filter-container');
+      if (container && !container.contains(e.target as Node)) {
+        setIsGenderDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isGenderDropdownOpen]);
 
   // نافذة طلب إلغاء الاشتراك للراكب
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -403,14 +439,31 @@ export default function DailyRoutePage() {
   useEffect(() => {
     let isCancelled = false;
     const fetchCommuteDrivers = () => {
+      const queryParams = new URLSearchParams({
+        lat: String(userLoc.lat),
+        lon: String(userLoc.lng),
+        tripType: 'commute',
+      });
+      if (isGenderFilterEnabled && genderPreference !== 'any') {
+        queryParams.set('genderPreference', genderPreference);
+      }
       http
-        .get<any>(`/drivers/nearby?lat=${userLoc.lat}&lon=${userLoc.lng}&tripType=commute`)
+        .get<any>(`/drivers/nearby?${queryParams.toString()}`)
         .then((res) => {
           if (isCancelled) return;
           const raw = res.data;
-          const list: any[] = Array.isArray(raw)
+          let list: any[] = Array.isArray(raw)
             ? raw
             : (Array.isArray(raw?.drivers) ? raw.drivers : (Array.isArray(raw?.data) ? raw.data : []));
+
+          if (isGenderFilterEnabled && genderPreference !== 'any') {
+            list = list.filter((d: any) => {
+              const g = String(d.gender || '').toLowerCase().trim();
+              if (genderPreference === 'female') return g === 'female';
+              if (genderPreference === 'male') return g === 'male';
+              return true;
+            });
+          }
 
           const mapped: DriverItem[] = list.map((d: any, idx: number) => {
             const dLat = Number(d.fixed_lat ?? d.lat ?? d.latitude);
@@ -422,6 +475,7 @@ export default function DailyRoutePage() {
               id: d.driverId || idx + 1,
               driverId: String(d.driverId || `d-${idx}`),
               name: d.firstName || d.driverName || d.fullName || 'كابتن توصيله',
+              gender: d.gender || undefined,
               lat: isNaN(dLat) ? userLoc.lat : dLat,
               lng: isNaN(dLng) ? userLoc.lng : dLng,
               from: rStart,
@@ -461,7 +515,7 @@ export default function DailyRoutePage() {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [userLoc]);
+  }, [userLoc, genderPreference, isGenderFilterEnabled]);
 
   function handleMapClick(e: MapMouseEvent) {
     const newLoc = { lat: e.lngLat.lat, lng: e.lngLat.lng };
@@ -768,6 +822,99 @@ export default function DailyRoutePage() {
           </div>
         )}
       </div>
+
+      {/* قائمة اختيار جنس الكابتن العائمة */}
+      {isGenderFilterEnabled && (
+        <div
+          id="daily-route-gender-filter-container"
+          className="pointer-events-none absolute top-[calc(7.85rem+env(safe-area-inset-top,0.75rem))] inset-x-0 z-20 flex justify-center px-4"
+          dir="rtl"
+        >
+          <div className="relative pointer-events-auto">
+            <button
+              type="button"
+              id="daily-route-gender-btn"
+              onClick={() => setIsGenderDropdownOpen(!isGenderDropdownOpen)}
+              className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold shadow-xl border backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
+                isDark
+                  ? 'bg-[#161C28]/95 border-amber-500/40 text-amber-300 hover:bg-[#1E293B]'
+                  : 'bg-white/95 border-amber-500/40 text-amber-700 hover:bg-slate-50 shadow-md'
+              }`}
+              aria-label="تحديد جنس الكابتن"
+            >
+              <span>
+                {genderPreference === 'female' ? '👩' : genderPreference === 'male' ? '👨' : '👥'}
+              </span>
+              <span>
+                {genderPreference === 'female' ? 'كابتنة' : genderPreference === 'male' ? 'كابتن' : 'الكل'}
+              </span>
+              <svg
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${isGenderDropdownOpen ? 'rotate-180' : ''}`}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+
+            {isGenderDropdownOpen && (
+              <div
+                className={`absolute top-full mt-1.5 left-1/2 -translate-x-1/2 min-w-[130px] rounded-2xl py-1.5 shadow-2xl border backdrop-blur-md animate-fade-in ${
+                  isDark
+                    ? 'bg-[#161C28]/98 border-amber-500/30 text-white'
+                    : 'bg-white/98 border-slate-200 text-slate-800 shadow-lg'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSelectGenderPreference('any')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                    genderPreference === 'any'
+                      ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
+                      : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>👥</span>
+                    <span>الكل</span>
+                  </span>
+                  {genderPreference === 'any' && <span className="text-amber-500 text-xs">✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectGenderPreference('male')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                    genderPreference === 'male'
+                      ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
+                      : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>👨</span>
+                    <span>كابتن</span>
+                  </span>
+                  {genderPreference === 'male' && <span className="text-amber-500 text-xs">✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectGenderPreference('female')}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                    genderPreference === 'female'
+                      ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
+                      : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>👩</span>
+                    <span>كابتنة</span>
+                  </span>
+                  {genderPreference === 'female' && <span className="text-amber-500 text-xs">✓</span>}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* الخريطة التفاعلية بخلفية ثابتة كاملة الشاشة مثل واجهة السائق */}
       <div className="absolute inset-0 w-full h-full z-0 touch-none" style={{ touchAction: 'none' }}>

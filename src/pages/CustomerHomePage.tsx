@@ -251,6 +251,27 @@ export default function CustomerHomePage() {
   const [cancelFeeAmount, setCancelFeeAmount] = useState(1500);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [noDriversModalOpen, setNoDriversModalOpen] = useState(false);
+  const [noDriversCustomMessage, setNoDriversCustomMessage] = useState<string | null>(null);
+  const [noDriversGenderPref, setNoDriversGenderPref] = useState<'any' | 'female' | 'male'>('any');
+
+  // فلترة الكباتن حسب الجنس (مفعلة عبر VITE_GENDER_FILTER)
+  const isGenderFilterEnabled = import.meta.env.VITE_GENDER_FILTER === 'true';
+  const [genderPreference, setGenderPreference] = useState<'any' | 'female' | 'male'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tawseela_gender_preference');
+      if (saved === 'female' || saved === 'male') return saved;
+    }
+    return 'any';
+  });
+  const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
+
+  const handleSelectGenderPreference = (pref: 'any' | 'female' | 'male') => {
+    setGenderPreference(pref);
+    try {
+      localStorage.setItem('tawseela_gender_preference', pref);
+    } catch (_) {}
+    setIsGenderDropdownOpen(false);
+  };
 
   // المدينة المحددة
   const [selectedCity, setSelectedCity] = useState('المدينة الحالية');
@@ -286,6 +307,23 @@ export default function CustomerHomePage() {
   const initialDurationSecondsRef = useRef<number>(0);
   const initialDistanceMetersRef = useRef<number>(0);
   const lastKnownDriverPosRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  // إغلاق القائمة المنسدلة لجنس الكابتن عند النقر خارجها
+  useEffect(() => {
+    if (!isGenderDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const container = document.getElementById('floating-gender-filter-container');
+      if (container && !container.contains(e.target as Node)) {
+        setIsGenderDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isGenderDropdownOpen]);
 
   // حالة البحث النصي للأماكن
   const [searchQuery, setSearchQuery] = useState('');
@@ -466,6 +504,7 @@ export default function CustomerHomePage() {
             tripType: 'taxi',
             vehicleType: selectedTierId,
             rangeKm: 25,
+            ...(isGenderFilterEnabled && genderPreference !== 'any' ? { genderPreference } : {}),
           },
         });
         if (!isCancelled) {
@@ -482,7 +521,7 @@ export default function CustomerHomePage() {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [pickup.lat, pickup.lng, selectedTierId]);
+  }, [pickup.lat, pickup.lng, selectedTierId, genderPreference, isGenderFilterEnabled]);
 
   // جلب سائقي الخط الدائم من المعالج المتزامن (PostgreSQL + Redis) عند تفعيل زر الخطوط الدائمية
   useEffect(() => {
@@ -498,13 +537,22 @@ export default function CustomerHomePage() {
             lat: pickup.lat,
             lon: pickup.lng,
             tripType: 'commute',
+            ...(isGenderFilterEnabled && genderPreference !== 'any' ? { genderPreference } : {}),
           },
         });
         if (!isCancelled) {
           const raw = data;
-          const list: any[] = Array.isArray(raw)
+          let list: any[] = Array.isArray(raw)
             ? raw
             : (Array.isArray(raw?.drivers) ? raw.drivers : (Array.isArray(raw?.data) ? raw.data : []));
+          if (isGenderFilterEnabled && genderPreference !== 'any') {
+            list = list.filter((d: any) => {
+              const g = String(d.gender || '').toLowerCase().trim();
+              if (genderPreference === 'female') return g === 'female';
+              if (genderPreference === 'male') return g === 'male';
+              return true;
+            });
+          }
           setCommuteDrivers(list);
         }
       } catch (_) {
@@ -517,7 +565,7 @@ export default function CustomerHomePage() {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, [pickup.lat, pickup.lng, showCommuteRoutes]);
+  }, [pickup.lat, pickup.lng, showCommuteRoutes, genderPreference, isGenderFilterEnabled]);
 
   // إعادة ضبط مسار الخط الدائمي عند تغيير أو إغلاق الكابتن
   useEffect(() => {
@@ -1249,7 +1297,7 @@ export default function CustomerHomePage() {
   const calculatedPrice = getTierPrice(currentTier);
 
   // إنهاء بحث الراكب وتنظيف الحالة وإظهار نافذة عدم توفر كباتن
-  const handleNoDriversAvailable = useCallback((_customMsg?: string) => {
+  const handleNoDriversAvailable = useCallback((customMsg?: string, reqGender?: 'any' | 'female' | 'male') => {
     hasNotifiedArrivalRef.current = false;
     try {
       localStorage.removeItem('TAWSEELA_ACTIVE_TAXI_RIDE');
@@ -1260,13 +1308,18 @@ export default function CustomerHomePage() {
     setAssignedDriverInfo(null);
     setLiveDriverPosition(null);
     setRouteCoordinates(null);
+    setNoDriversCustomMessage(customMsg || null);
+    setNoDriversGenderPref(reqGender || genderPreference || 'any');
     setNoDriversModalOpen(true);
-  }, []);
+  }, [genderPreference]);
 
   // طلب التكسي النهائي — إرسال حقيقي للخادم مع Idempotency-Key
-  async function handleOrderTrip() {
+  async function handleOrderTrip(overrideGender?: 'any' | 'female' | 'male' | unknown) {
     if (isSubmittingOrder) return;
     setIsSubmittingOrder(true);
+    const effGender = (typeof overrideGender === 'string' && (overrideGender === 'male' || overrideGender === 'female' || overrideGender === 'any'))
+      ? overrideGender
+      : (isGenderFilterEnabled ? genderPreference : 'any');
     try {
       const dist = distanceKm(pickup, dropoff);
       const userId = session?.userId || storage.getUserId() || 'cust-' + Date.now();
@@ -1305,6 +1358,7 @@ export default function CustomerHomePage() {
         expectedWaitMinutes: isRoundTrip ? roundTripWaitMinutes : 0,
         returnDestination: isRoundTrip ? (returnDestinationAddress.trim() || pickupName) : undefined,
         rangeKm: 25,
+        ...(isGenderFilterEnabled ? { genderPreference: effGender } : {}),
       }, {
         headers: { 'Idempotency-Key': idempotencyKey }
       });
@@ -1339,8 +1393,8 @@ export default function CustomerHomePage() {
       }
     } catch (err: any) {
       const errData = err?.response?.data;
-      if (errData?.noDriversInTier || errData?.noDriversInRadius) {
-        handleNoDriversAvailable(errData.error);
+      if (errData?.noDriversInTier || errData?.noDriversInRadius || errData?.noDriversInGender) {
+        handleNoDriversAvailable(errData.error, errData.genderPreference || effGender);
       } else if (errData?.error) {
         show(errData.error, err?.response?.status === 400 && errData.activeRideExists ? 'warning' : 'error');
       } else {
@@ -2635,9 +2689,104 @@ export default function CustomerHomePage() {
           </div>
         )}
 
+        {/* قائمة اختيار جنس الكابتن العائمة فوق الخريطة */}
+        {isGenderFilterEnabled && stage !== 'searching' && stage !== 'driver_arriving' && (
+          <div
+            id="floating-gender-filter-container"
+            className="pointer-events-none absolute top-[calc(7.25rem+env(safe-area-inset-top,1rem))] inset-x-0 z-30 flex justify-center px-4"
+            dir="rtl"
+          >
+            <div className="relative pointer-events-auto">
+              <button
+                type="button"
+                id="gender-filter-dropdown-btn"
+                onClick={() => setIsGenderDropdownOpen(!isGenderDropdownOpen)}
+                className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold shadow-xl border backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
+                  isDark
+                    ? 'bg-[#161C28]/95 border-amber-500/40 text-amber-300 hover:bg-[#1E293B]'
+                    : 'bg-white/95 border-amber-500/40 text-amber-700 hover:bg-slate-50 shadow-md'
+                }`}
+                aria-label="تحديد جنس الكابتن"
+              >
+                <span>
+                  {genderPreference === 'female' ? '👩' : genderPreference === 'male' ? '👨' : '👥'}
+                </span>
+                <span>
+                  {genderPreference === 'female' ? 'كابتنة' : genderPreference === 'male' ? 'كابتن' : 'الكل'}
+                </span>
+                <svg
+                  className={`h-3.5 w-3.5 transition-transform duration-200 ${isGenderDropdownOpen ? 'rotate-180' : ''}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+
+              {/* عناصر القائمة المنسدلة */}
+              {isGenderDropdownOpen && (
+                <div
+                  id="gender-filter-menu"
+                  className={`absolute top-full mt-1.5 left-1/2 -translate-x-1/2 min-w-[130px] rounded-2xl py-1.5 shadow-2xl border backdrop-blur-md animate-fade-in ${
+                    isDark
+                      ? 'bg-[#161C28]/98 border-amber-500/30 text-white'
+                      : 'bg-white/98 border-slate-200 text-slate-800 shadow-lg'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelectGenderPreference('any')}
+                    className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                      genderPreference === 'any'
+                        ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
+                        : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>👥</span>
+                      <span>الكل</span>
+                    </span>
+                    {genderPreference === 'any' && <span className="text-amber-500 text-xs">✓</span>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectGenderPreference('male')}
+                    className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                      genderPreference === 'male'
+                        ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
+                        : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>👨</span>
+                      <span>كابتن</span>
+                    </span>
+                    {genderPreference === 'male' && <span className="text-amber-500 text-xs">✓</span>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectGenderPreference('female')}
+                    className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-bold transition-colors cursor-pointer ${
+                      genderPreference === 'female'
+                        ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-50 text-amber-700'
+                        : isDark ? 'hover:bg-slate-800/60' : 'hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>👩</span>
+                      <span>كابتنة</span>
+                    </span>
+                    {genderPreference === 'female' && <span className="text-amber-500 text-xs">✓</span>}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* تلميح بصري فوق الخريطة عند تعذر تحديد موقع GPS */}
         {showMapHint && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(7.85rem+env(safe-area-inset-top,1rem))] inset-x-0 z-20 flex justify-center px-4 animate-fade-in">
+          <div className={`pointer-events-auto absolute ${isGenderFilterEnabled ? 'top-[calc(10.25rem+env(safe-area-inset-top,1rem))]' : 'top-[calc(7.85rem+env(safe-area-inset-top,1rem))]'} inset-x-0 z-20 flex justify-center px-4 animate-fade-in`}>
             <div className={`flex items-center gap-2 rounded-full backdrop-blur-md px-4 py-2 text-[12.5px] font-bold shadow-xl border ${
               isDark ? 'bg-[#161C28]/95 border-amber-500/30 text-amber-400' : 'bg-white/95 border-amber-400/50 text-amber-700 shadow-md'
             }`}>
@@ -4844,14 +4993,37 @@ export default function CustomerHomePage() {
 
             <div className="space-y-2">
               <h3 className="text-lg font-black leading-snug">
-                عذراً، لا يوجد سائقون متاحون في الوقت الحاضر
+                {noDriversCustomMessage || 'عذراً، لا يوجد سائقون متاحون في الوقت الحاضر'}
               </h3>
               <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                جميع الكباتن في منطقتك مشغولون حالياً. يمكنك إعادة المحاولة الآن أو الانتظار قليلاً.
+                {noDriversCustomMessage
+                  ? (noDriversGenderPref === 'female' ? 'يمكنك البحث بين جميع الكباتن المتاحين أو إعادة المحاولة.' : 'يمكنك إعادة المحاولة الآن أو الانتظار قليلاً.')
+                  : 'جميع الكباتن في منطقتك مشغولون حالياً. يمكنك إعادة المحاولة الآن أو الانتظار قليلاً.'}
               </p>
             </div>
 
             <div className="flex flex-col gap-2.5 pt-2">
+              {isGenderFilterEnabled && noDriversGenderPref !== 'any' && (
+                <button
+                  type="button"
+                  id="btn-search-all-genders"
+                  onClick={() => {
+                    setNoDriversModalOpen(false);
+                    setGenderPreference('any');
+                    try {
+                      localStorage.setItem('tawseela_gender_preference', 'any');
+                    } catch (_) {}
+                    void handleOrderTrip('any');
+                  }}
+                  disabled={isSubmittingOrder}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-400 px-4 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/25 transition-transform active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                  style={{ minHeight: '48px' }}
+                >
+                  <span>👥</span>
+                  <span>ابحث بين الجميع</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
