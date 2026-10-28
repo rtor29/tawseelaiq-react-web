@@ -33,6 +33,7 @@ rm -rf "${OUT_DIR}"
 
 # 2. التأكد التام من عدم تفعيل أي مفاتيح staging
 unset VITE_GENDER_FILTER
+unset VITE_UNIFIED_HOME
 export NODE_ENV="production"
 
 # 3. فحص الأنواع وبناء الحزم إلى مجلد dist المستقل

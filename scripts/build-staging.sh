@@ -31,8 +31,9 @@ echo "======================================================"
 # 1. تنظيف مجلد البناء المستقل
 rm -rf "${OUT_DIR}"
 
-# 2. تعيين متغيرات البيئة الخاصة بـ Staging وتفعيل فلتر الجنس
+# 2. تعيين متغيرات البيئة الخاصة بـ Staging وتفعيل فلتر الجنس والصفحة الموحدة
 export VITE_GENDER_FILTER="true"
+export VITE_UNIFIED_HOME="true"
 export NODE_ENV="production"
 
 # 3. فحص الأنواع وبناء الحزم إلى مجلد dist-staging المستقل

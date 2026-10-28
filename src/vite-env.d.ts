@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_NAVIGATION_STYLE: string;
   readonly VITE_GOOGLE_CLIENT_ID: string;
   readonly VITE_DEV_BACKEND_URL: string;
+  readonly VITE_GENDER_FILTER?: string;
+  readonly VITE_UNIFIED_HOME?: string;
 }
 
 interface ImportMeta {
