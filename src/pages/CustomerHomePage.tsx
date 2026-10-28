@@ -45,6 +45,7 @@ import { RouteLines, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin,
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { UnifiedRideTypePanel, type UnifiedRideType } from '../components/UnifiedRideTypePanel';
+import { UnifiedOnboardingTour } from '../components/UnifiedOnboardingTour';
 import { CommuteBookingCard } from '../components/commute/CommuteBookingCard';
 import { CommuteCancelModal } from '../components/commute/CommuteCancelModal';
 
@@ -268,12 +269,35 @@ export default function CustomerHomePage() {
   });
   const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
 
+  // حالة الجولة التعريفية الإلزامية (VITE_UNIFIED_HOME)
+  const [isTourActive, setIsTourActive] = useState<boolean>(false);
+  const [tourStep, setTourStep] = useState<1 | 2>(1);
+  const [isTourExiting, setIsTourExiting] = useState<boolean>(false);
+
+  const finishTour = useCallback(() => {
+    setIsTourExiting(true);
+    try {
+      localStorage.setItem('tawseela_onboarding_unified_v1', 'true');
+    } catch (_) {}
+    setTimeout(() => {
+      setIsTourActive(false);
+      setIsTourExiting(false);
+    }, 250);
+  }, []);
+
   const handleSelectGenderPreference = (pref: 'any' | 'female' | 'male') => {
     setGenderPreference(pref);
     try {
       localStorage.setItem('tawseela_gender_preference', pref);
     } catch (_) {}
     setIsGenderDropdownOpen(false);
+
+    // إنهاء الجولة عند اختيار الكابتن في الخطوة 2
+    if (isTourActive && tourStep === 2) {
+      setTimeout(() => {
+        finishTour();
+      }, 300);
+    }
   };
 
   // الصفحة الموحدة: VITE_UNIFIED_HOME
@@ -379,6 +403,19 @@ export default function CustomerHomePage() {
       }
       window.history.replaceState({}, '', url.toString());
     } catch (_) {}
+
+    // الانتقال للخطوة 2 بالجولة بعد 300ms أو إنهاؤها إن كان فلتر الجنس معطلاً
+    if (isTourActive && tourStep === 1) {
+      if (isGenderFilterEnabled) {
+        setTimeout(() => {
+          setTourStep(2);
+        }, 300);
+      } else {
+        setTimeout(() => {
+          finishTour();
+        }, 300);
+      }
+    }
   };
 
   async function handleBookCommuteSeat() {
@@ -2428,6 +2465,40 @@ export default function CustomerHomePage() {
     routeLines.push({ id: 'commute-route-line', coordinates: commuteRouteCoordinates, color: '#F59E0B' });
   }
 
+  // بدء الجولة الإلزامية تلقائياً عند أول دخول نظيف على الصفحة الموحدة
+  useEffect(() => {
+    if (!isUnifiedHome) return;
+
+    const timer = setTimeout(() => {
+      const sp = new URLSearchParams(window.location.search);
+      const forceTour = sp.get('tour') === '1';
+      const hasSeenTour = localStorage.getItem('tawseela_onboarding_unified_v1') === 'true';
+
+      if (hasSeenTour && !forceTour) return;
+
+      // لا تظهر إن كان هناك بحث أو سائق في الطريق أو رحلة جارية أو حجز نشط
+      const hasActiveRide =
+        stage === 'searching' ||
+        stage === 'driver_arriving' ||
+        Boolean(rideRequestId) ||
+        isLiveTrackingDriver;
+      const hasActiveBooking = customerBookings.some((b: any) =>
+        ['confirmed', 'active', 'pending'].includes(String(b.status || '').toLowerCase())
+      );
+
+      if (hasActiveRide || hasActiveBooking) {
+        return;
+      }
+
+      // فتح اللوحة إن كانت مطوية
+      setIsRideTypePanelOpen(true);
+      setTourStep(1);
+      setIsTourActive(true);
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [isUnifiedHome, stage, rideRequestId, isLiveTrackingDriver, customerBookings]);
+
   return (
     <div 
       className={`relative min-h-[100dvh] h-[100dvh] w-full overflow-hidden overscroll-none select-none font-cairo flex flex-col transition-colors duration-200 ${
@@ -2540,13 +2611,18 @@ export default function CustomerHomePage() {
             <div className="pointer-events-auto flex items-center mx-1">
               <UnifiedRideTypePanel
                 isOpen={isRideTypePanelOpen}
-                onToggleOpen={() => setIsRideTypePanelOpen(prev => !prev)}
+                onToggleOpen={() => {
+                  if (isTourActive) return;
+                  setIsRideTypePanelOpen(prev => !prev);
+                }}
                 selectedType={unifiedRideType}
                 onSelectType={handleSelectUnifiedRideType}
                 genderPreference={genderPreference}
                 onSelectGender={handleSelectGenderPreference}
                 isGenderFilterEnabled={isGenderFilterEnabled}
                 isDark={isDark}
+                isTourActive={isTourActive}
+                tourStep={tourStep}
               />
             </div>
           ) : null}
@@ -5327,6 +5403,17 @@ export default function CustomerHomePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* الجولة الإلزامية التفاعلية لأول دخول (VITE_UNIFIED_HOME) */}
+      {isUnifiedHome && isTourActive && (
+        <UnifiedOnboardingTour
+          isActive={isTourActive}
+          step={tourStep}
+          isGenderFilterEnabled={isGenderFilterEnabled}
+          isDark={isDark}
+          isExiting={isTourExiting}
+        />
       )}
 
     </div>

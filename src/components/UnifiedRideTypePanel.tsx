@@ -13,6 +13,8 @@ export interface UnifiedRideTypePanelProps {
   isGenderFilterEnabled: boolean;
   isDark: boolean;
   className?: string;
+  isTourActive?: boolean;
+  tourStep?: 1 | 2 | null;
 }
 
 export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
@@ -25,14 +27,18 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
   isGenderFilterEnabled,
   isDark,
   className = '',
+  isTourActive = false,
+  tourStep = null,
 }) => {
   const touchStartYRef = useRef<number | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isTourActive) return;
     touchStartYRef.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (isTourActive) return;
     if (touchStartYRef.current === null) return;
     const touchEndY = e.changedTouches[0].clientY;
     const deltaY = touchEndY - touchStartYRef.current;
@@ -60,12 +66,13 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
       <button
         type="button"
         id="unified-panel-header-btn"
-        onClick={onToggleOpen}
+        onClick={isTourActive ? undefined : onToggleOpen}
+        disabled={isTourActive}
         className={`min-h-[44px] h-11 px-3 sm:px-3.5 rounded-full backdrop-blur-xl border flex items-center gap-2 font-cairo font-bold text-xs transition-all duration-200 active:scale-95 cursor-pointer shadow-lg select-none ${
           isDark
             ? 'bg-[#161C28]/95 border-amber-500/30 text-white hover:border-amber-400/60 shadow-[0_4px_16px_rgba(0,0,0,0.4)]'
             : 'bg-white/95 border-slate-200 text-slate-800 hover:border-amber-500/50 shadow-md'
-        }`}
+        } ${isTourActive ? 'cursor-default pointer-events-none' : ''}`}
         aria-expanded={isOpen}
         aria-label="نوع المشوار والخيارات"
       >
@@ -106,7 +113,11 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
           id="unified-panel-open-card"
           style={{ top: 'calc(4.25rem + env(safe-area-inset-top, 1rem))' }}
           className={`fixed inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-96 rounded-2xl border p-3.5 shadow-2xl backdrop-blur-2xl transition-all duration-200 z-50 animate-fade-in ${
-            isDark
+            isTourActive
+              ? isDark
+                ? 'bg-[#161C28]/98 border-2 border-amber-500 text-white shadow-[0_0_24px_rgba(245,158,11,0.35)]'
+                : 'bg-white/98 border-2 border-amber-500 text-slate-900 shadow-[0_0_24px_rgba(245,158,11,0.3)]'
+              : isDark
               ? 'bg-[#161C28]/98 border-amber-500/40 text-white shadow-[0_12px_36px_rgba(0,0,0,0.85)]'
               : 'bg-white/98 border-slate-200 text-slate-900 shadow-2xl'
           }`}
@@ -121,7 +132,11 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
           {/* خيارا نوع المشوار: «مشاوير قصيرة» و«حجز خطوط دائمية» */}
           <div
             id="tour-step-ride-types"
-            className="flex flex-col gap-1.5 w-full"
+            className={`flex flex-col gap-1.5 w-full transition-opacity duration-150 ${
+              isTourActive && tourStep === 2
+                ? 'pointer-events-none opacity-40 select-none'
+                : 'pointer-events-auto opacity-100'
+            }`}
             role="group"
             aria-label="تحديد نوع المشوار"
           >
@@ -177,7 +192,11 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
 
               <div
                 id="tour-step-gender-row"
-                className="w-full"
+                className={`w-full transition-opacity duration-150 ${
+                  isTourActive && tourStep === 1
+                    ? 'pointer-events-none opacity-40 select-none'
+                    : 'pointer-events-auto opacity-100'
+                }`}
                 role="group"
                 aria-label="تفضيل كابتن التوصيلة"
               >
