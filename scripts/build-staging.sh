@@ -31,9 +31,10 @@ echo "======================================================"
 # 1. تنظيف مجلد البناء المستقل
 rm -rf "${OUT_DIR}"
 
-# 2. تعيين متغيرات البيئة الخاصة بـ Staging وتفعيل فلتر الجنس والصفحة الموحدة
+# 2. تعيين متغيرات البيئة الخاصة بـ Staging وتفعيل فلتر الجنس والصفحة الموحدة ومحرك الخرائط maplibre
 export VITE_GENDER_FILTER="true"
 export VITE_UNIFIED_HOME="true"
+export VITE_MAP_ENGINE="maplibre"
 export NODE_ENV="production"
 
 # 3. فحص الأنواع وبناء الحزم إلى مجلد dist-staging المستقل

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { MAPBOX_DAY_STYLE, DEFAULT_DAY_STYLE } from '../lib/config';
 
 export type ThemeMode = 'dark' | 'light';
 
-export const MAPBOX_DAY_STYLE = 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
+export { MAPBOX_DAY_STYLE };
 
 export interface ThemeContextValue {
   theme: ThemeMode;
@@ -111,7 +112,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [theme]);
 
   // نمط الخريطة النهاري المعتمد دائماً لكافة الشاشات والأوقات
-  const mapStyle = MAPBOX_DAY_STYLE;
+  const mapStyle = import.meta.env.VITE_MAP_STYLE || DEFAULT_DAY_STYLE;
 
   const value = useMemo(
     () => ({
@@ -136,7 +137,7 @@ export function useTheme(): ThemeContextValue {
       theme: fallbackTheme,
       toggleTheme: () => {},
       setTheme: () => {},
-      mapStyle: MAPBOX_DAY_STYLE,
+      mapStyle: import.meta.env.VITE_MAP_STYLE || DEFAULT_DAY_STYLE,
       isDark: fallbackTheme === 'dark',
     };
   }

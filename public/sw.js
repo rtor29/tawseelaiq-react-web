@@ -55,13 +55,14 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // 1. استعلامات الخادم المباشرة والتتبع الحي وماب بوكس: شبكة فقط دائماً دون كاش
+  // 1. استعلامات الخادم المباشرة والتتبع الحي وماب بوكس وبلاطات OpenFreeMap: شبكة فقط دائماً دون كاش
   if (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/hubs/') ||
     url.pathname.startsWith('/socket.io/') ||
     url.pathname.startsWith('/dashboard/') ||
-    url.hostname.includes('mapbox.com')
+    url.hostname.includes('mapbox.com') ||
+    url.hostname.includes('openfreemap.org')
   ) {
     return;
   }

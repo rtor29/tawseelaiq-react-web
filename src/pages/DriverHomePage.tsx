@@ -1829,7 +1829,7 @@ export default function DriverHomePage() {
           ref={mapRef}
           reuseMaps
           mapboxAccessToken={config.mapboxToken}
-          mapStyle={selectedMapStyle || mapStyle || 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om'}
+          mapStyle={selectedMapStyle || mapStyle}
           initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
           dragPan={true}
           cooperativeGestures={false}

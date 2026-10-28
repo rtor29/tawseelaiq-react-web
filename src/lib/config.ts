@@ -8,8 +8,20 @@ export const NAJAF_CENTER = IRAQ_DEFAULT_CENTER; // للتوافق العكسي
 export const IRAQ_BBOX = { west: 38.5, south: 29.0, east: 48.8, north: 37.5 } as const;
 export const NAJAF_BBOX = IRAQ_BBOX; // للتوافق العكسي
 
+// محرك الخريطة المعتمد: mapbox (الافتراضي) أو maplibre
+export const MAP_ENGINE = (import.meta.env.VITE_MAP_ENGINE || 'mapbox') as 'mapbox' | 'maplibre';
+export const IS_MAPLIBRE = MAP_ENGINE === 'maplibre';
+
+// أنماط OpenFreeMap النهارية (مفتوحة ومجانية)
+export const OPENFREEMAP_LIBERTY_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+export const OPENFREEMAP_BRIGHT_STYLE = 'https://tiles.openfreemap.org/styles/bright';
+export const OPENFREEMAP_POSITRON_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+
 // نمط Mapbox النهاري المعتمد لمنصة توصيلة
 export const MAPBOX_DAY_STYLE = 'mapbox://styles/almusawy/cmvdwkv6q003801s82f9t02om';
+
+// النمط النهاري الافتراضي بحسب محرك الخريطة
+export const DEFAULT_DAY_STYLE = IS_MAPLIBRE ? OPENFREEMAP_LIBERTY_STYLE : MAPBOX_DAY_STYLE;
 
 export interface AppConfig {
   appName: string;
@@ -38,8 +50,8 @@ export const config: AppConfig = {
   realtimeMode: (import.meta.env.VITE_REALTIME_MODE || 'polling') as 'polling' | 'signalr' | 'socketio',
 
   mapboxToken: import.meta.env.VITE_MAPBOX_TOKEN || '',
-  mapStyle: import.meta.env.VITE_MAP_STYLE || MAPBOX_DAY_STYLE,
-  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || MAPBOX_DAY_STYLE,
+  mapStyle: import.meta.env.VITE_MAP_STYLE || DEFAULT_DAY_STYLE,
+  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || DEFAULT_DAY_STYLE,
 
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
 
