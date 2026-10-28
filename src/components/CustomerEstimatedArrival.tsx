@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { http } from '../lib/api';
+import { storage } from '../lib/storage';
 import { calculateEtaMinutes, formatEtaRange } from '../lib/etaCalculator';
 
 export interface CustomerEstimatedArrivalProps {
@@ -22,6 +23,14 @@ export const CustomerEstimatedArrival: React.FC<CustomerEstimatedArrivalProps> =
     isFetchingRef.current = true;
 
     try {
+      // 0. فحص تسجيل دخول المستخدم: إن لم يكن مسجلاً، يختفي سطر الوقت التقديري بصمت
+      const token = storage.getToken();
+      if (!token) {
+        setEtaState({ status: 'hidden' });
+        isFetchingRef.current = false;
+        return;
+      }
+
       // 1. فحص إذن الموقع بصمت تام
       if (typeof navigator === 'undefined' || !navigator.permissions || !navigator.permissions.query) {
         setEtaState({ status: 'hidden' });

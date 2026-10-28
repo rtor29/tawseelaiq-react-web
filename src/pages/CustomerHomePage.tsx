@@ -707,7 +707,15 @@ export default function CustomerHomePage() {
     let isCancelled = false;
     async function checkNearbyDrivers() {
       try {
+        const token = storage.getToken();
+        if (!token) {
+          if (!isCancelled) setNearbyDriversCount(0);
+          return;
+        }
         const { data } = await http.get<any>('/drivers/nearby', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           params: {
             lat: pickup.lat,
             lon: pickup.lng,
@@ -742,7 +750,15 @@ export default function CustomerHomePage() {
     let isCancelled = false;
     async function fetchCommuteDrivers() {
       try {
+        const token = storage.getToken();
+        if (!token) {
+          if (!isCancelled) setCommuteDrivers([]);
+          return;
+        }
         const { data } = await http.get<any>('/drivers/nearby', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           params: {
             lat: pickup.lat,
             lon: pickup.lng,

@@ -56,7 +56,6 @@ export const CommuteBookingCard: React.FC<CommuteBookingCardProps> = ({
 }) => {
   const driverId = String(driver.driverId || driver.id || '');
   const driverName = driver.name || driver.fullName || 'كابتن الخط الدائمي';
-  const driverPhone = driver.phone || driver.phoneNumber || '';
   const totalSeats = driver.seats || 4;
   const takenSeats = driver.takenSeats || 0;
   const remainingSeats = Math.max(0, totalSeats - takenSeats);
@@ -66,11 +65,7 @@ export const CommuteBookingCard: React.FC<CommuteBookingCardProps> = ({
   // البحث عن أي حجز للراكب مع هذا السائق
   const matchingBooking = customerBookings.find((b: any) => {
     const bDrvId = String(b.driverId || b.driver_id || '');
-    const bDrvPhone = String(b.driverPhone || b.driver_phone || '');
-    return (
-      (driverId && bDrvId && bDrvId === driverId) ||
-      (driverPhone && bDrvPhone && bDrvPhone === driverPhone)
-    );
+    return Boolean(driverId && bDrvId && bDrvId === driverId);
   });
 
   const bookingStatus = (matchingBooking?.status || matchingBooking?.booking_status || '').toLowerCase();
@@ -80,6 +75,11 @@ export const CommuteBookingCard: React.FC<CommuteBookingCardProps> = ({
     bookingStatus === 'accepted' ||
     bookingStatus === 'active' ||
     bookingStatus === 'مؤكد';
+
+  // لا يصل هاتف الكابتن للراكب إلا بعد تأكيد الحجز (Confirmed / Accepted)
+  const driverPhone = isAlreadySubscribed
+    ? (matchingBooking?.driverPhone || driver.phone || driver.phoneNumber || '')
+    : '';
 
   // فحص وجود أي اشتراك خط دائمي نشط لدى سائق آخر
   const hasAnyActiveCommute = customerBookings.some((b: any) => {
@@ -272,43 +272,47 @@ export const CommuteBookingCard: React.FC<CommuteBookingCardProps> = ({
           </button>
         )}
 
-        {/* أزرار الاتصال والواتساب مع الكابتن */}
-        <div className="flex items-center gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              if (driverPhone) window.open(`tel:${driverPhone}`);
-              else showToast('رقم هاتف السائق غير متوفر', 'info');
-            }}
-            className={`flex-1 flex min-h-[44px] h-11 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold cursor-pointer transition active:scale-95 ${
-              isDark ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-            </svg>
-            <span>اتصال</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (driverPhone) {
-                const text = encodeURIComponent(`مرحباً كابتن ${driverName}، أود الاستفسار عن الخط الدائمي.`);
-                window.open(`https://wa.me/${driverPhone}?text=${text}`, '_blank');
-              } else {
-                showToast('رقم هاتف السائق غير متوفر', 'info');
-              }
-            }}
-            className={`flex-1 flex min-h-[44px] h-11 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold cursor-pointer transition active:scale-95 ${
-              isDark ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
-            }`}
-          >
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            <span>واتساب</span>
-          </button>
-        </div>
+        {/* أزرار الاتصال والواتساب مع الكابتن — تظهر حصراً بعد قبول الكابتن وتأكيد الحجز */}
+        {isAlreadySubscribed && driverPhone ? (
+          <div className="flex items-center gap-2 pt-1" id="commute-driver-contact-buttons">
+            <button
+              type="button"
+              id="commute-call-button"
+              onClick={() => {
+                if (driverPhone) window.open(`tel:${driverPhone}`);
+                else showToast('رقم هاتف السائق غير متوفر', 'info');
+              }}
+              className={`flex-1 flex min-h-[44px] h-11 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold cursor-pointer transition active:scale-95 ${
+                isDark ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+              }`}
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.95 12a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 4 1.37h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+              <span>اتصال</span>
+            </button>
+            <button
+              type="button"
+              id="commute-whatsapp-button"
+              onClick={() => {
+                if (driverPhone) {
+                  const text = encodeURIComponent(`مرحباً كابتن ${driverName}، أود الاستفسار عن الخط الدائمي.`);
+                  window.open(`https://wa.me/${driverPhone}?text=${text}`, '_blank');
+                } else {
+                  showToast('رقم هاتف السائق غير متوفر', 'info');
+                }
+              }}
+              className={`flex-1 flex min-h-[44px] h-11 items-center justify-center gap-1.5 rounded-xl border text-[13px] font-bold cursor-pointer transition active:scale-95 ${
+                isDark ? 'border-white/20 text-white hover:bg-white/10' : 'border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+              }`}
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              <span>واتساب</span>
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
