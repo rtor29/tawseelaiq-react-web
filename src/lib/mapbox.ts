@@ -2,7 +2,7 @@
 // التوكن يُقرأ من متغير البيئة VITE_MAPBOX_TOKEN فقط
 
 import { http, externalGet } from './api';
-import { config } from './config';
+import { config, IS_MAPLIBRE } from './config';
 import type { LngLat } from '../types';
 
 export interface RouteResult {
@@ -403,13 +403,15 @@ export function applyArabicAndEnhancedLabels(rawMap: any, _isDark = true) {
             ]);
           } catch {}
 
-          // 2. تعيين خط الخريطة (Font: Arial Unicode MS Regular)
-          try {
-            map.setLayoutProperty(layer.id, 'text-font', ['Arial Unicode MS Regular', 'Arial Unicode MS Bold']);
-          } catch {
+          // 2. تعيين خط الخريطة (Font: Arial Unicode MS Regular لماب بوكس فقط؛ بينما MapLibre/OpenFreeMap يعتمد خطوط نمطه الأصلية Noto Sans)
+          if (!IS_MAPLIBRE) {
             try {
-              map.setLayoutProperty(layer.id, 'text-font', ['Arial Unicode MS Regular']);
-            } catch {}
+              map.setLayoutProperty(layer.id, 'text-font', ['Arial Unicode MS Regular', 'Arial Unicode MS Bold']);
+            } catch {
+              try {
+                map.setLayoutProperty(layer.id, 'text-font', ['Arial Unicode MS Regular']);
+              } catch {}
+            }
           }
 
           // 3. تباعد الأحرف (Letter spacing: 0.01 em)

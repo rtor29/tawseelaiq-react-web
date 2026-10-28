@@ -4,7 +4,7 @@
 // - استراتيجية Network-First مع السقوط على الكاش للتنقل عند انقطاع أو ضعف الاتصال
 // - استثناء استعلامات الـ API و Mapbox الحية من الكاش للحفاظ على دقة التتبع اللحظي
 
-const CACHE_NAME = 'tawseela-static-v125';
+const CACHE_NAME = 'tawseela-static-v126';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -55,14 +55,17 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // 1. استعلامات الخادم المباشرة والتتبع الحي وماب بوكس وبلاطات OpenFreeMap: شبكة فقط دائماً دون كاش
+  // 0. النطاقات الخارجية بالكامل (Mapbox, OpenFreeMap, وغيرها) تذهب للشبكة مباشرة دون أي تدخل أو كاش عدا خطوط Google
+  if (url.origin !== self.location.origin && url.hostname !== 'fonts.googleapis.com' && url.hostname !== 'fonts.gstatic.com') {
+    return;
+  }
+
+  // 1. استعلامات الخادم المباشرة والتتبع الحي ولوحة التحكم: شبكة فقط دائماً دون كاش
   if (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/hubs/') ||
     url.pathname.startsWith('/socket.io/') ||
-    url.pathname.startsWith('/dashboard/') ||
-    url.hostname.includes('mapbox.com') ||
-    url.hostname.includes('openfreemap.org')
+    url.pathname.startsWith('/dashboard/')
   ) {
     return;
   }
