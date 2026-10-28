@@ -50,8 +50,12 @@ export const config: AppConfig = {
   realtimeMode: (import.meta.env.VITE_REALTIME_MODE || 'polling') as 'polling' | 'signalr' | 'socketio',
 
   mapboxToken: import.meta.env.VITE_MAPBOX_TOKEN || '',
-  mapStyle: import.meta.env.VITE_MAP_STYLE || DEFAULT_DAY_STYLE,
-  navigationStyle: import.meta.env.VITE_NAVIGATION_STYLE || DEFAULT_DAY_STYLE,
+  mapStyle: IS_MAPLIBRE
+    ? (import.meta.env.VITE_MAPLIBRE_STYLE || DEFAULT_DAY_STYLE)
+    : (import.meta.env.VITE_MAP_STYLE || DEFAULT_DAY_STYLE),
+  navigationStyle: IS_MAPLIBRE
+    ? (import.meta.env.VITE_MAPLIBRE_STYLE || DEFAULT_DAY_STYLE)
+    : (import.meta.env.VITE_NAVIGATION_STYLE || DEFAULT_DAY_STYLE),
 
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
 

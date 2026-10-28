@@ -35,6 +35,8 @@ rm -rf "${OUT_DIR}"
 export VITE_GENDER_FILTER="true"
 export VITE_UNIFIED_HOME="true"
 export VITE_MAP_ENGINE="maplibre"
+export VITE_MAP_STYLE="https://tiles.openfreemap.org/styles/liberty"
+export VITE_NAVIGATION_STYLE="https://tiles.openfreemap.org/styles/liberty"
 export NODE_ENV="production"
 
 # 3. فحص الأنواع وبناء الحزم إلى مجلد dist-staging المستقل
