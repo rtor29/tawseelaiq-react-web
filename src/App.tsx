@@ -2,7 +2,7 @@
 // تم تطبيق التحميل الكسول (Lazy Loading) لجميع الصفحات لتقليص الحجم وتحقيق أقصى سرعة استجابة
 
 import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useSession, authStore } from './lib/auth';
 import { storage } from './lib/storage';
 import { consumeLoginTokenFromUrl } from './lib/googleAuth';
@@ -37,6 +37,22 @@ function PageLoader() {
       </div>
     </div>
   );
+}
+
+function DailyRouteWrapper() {
+  const isUnified = import.meta.env.VITE_UNIFIED_HOME === 'true';
+  const location = useLocation();
+
+  if (isUnified) {
+    const params = new URLSearchParams(location.search);
+    if (!params.has('type')) {
+      params.set('type', 'commute');
+    }
+    const searchStr = params.toString() ? `?${params.toString()}` : '';
+    return <Navigate to={`/taxi${searchStr}`} replace />;
+  }
+
+  return <DailyRoutePage />;
 }
 
 // حارس المسارات المحمي: قراءة متزامنة فورية للجلسة لمنع التحويل القسري للداش بورد عند الـ Refresh
@@ -179,7 +195,7 @@ export default function App() {
               path="/daily"
               element={
                 <ProtectedRoute allowedRoles={['customer', 'driver']}>
-                  <DailyRoutePage />
+                  <DailyRouteWrapper />
                 </ProtectedRoute>
               }
             />
