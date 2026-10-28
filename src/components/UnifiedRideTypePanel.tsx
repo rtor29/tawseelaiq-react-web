@@ -104,7 +104,8 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
       {isOpen && (
         <div
           id="unified-panel-open-card"
-          className={`fixed top-[calc(4.25rem+env(safe-area-inset-top,1rem))] inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-96 rounded-2xl border p-3.5 shadow-2xl backdrop-blur-2xl transition-all duration-200 z-50 animate-fade-in ${
+          style={{ top: 'calc(4.25rem + env(safe-area-inset-top, 1rem))' }}
+          className={`fixed inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-96 rounded-2xl border p-3.5 shadow-2xl backdrop-blur-2xl transition-all duration-200 z-50 animate-fade-in ${
             isDark
               ? 'bg-[#161C28]/98 border-amber-500/40 text-white shadow-[0_12px_36px_rgba(0,0,0,0.85)]'
               : 'bg-white/98 border-slate-200 text-slate-900 shadow-2xl'

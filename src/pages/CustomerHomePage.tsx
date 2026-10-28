@@ -2911,11 +2911,15 @@ export default function CustomerHomePage() {
         })()}
 
         {stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className={`pointer-events-auto absolute ${
-            isUnifiedHome && isRideTypePanelOpen
-              ? 'top-[calc(18.5rem+env(safe-area-inset-top,1rem))]'
-              : 'top-[calc(4.75rem+env(safe-area-inset-top,1rem))]'
-          } left-4 z-20 flex items-center gap-2 transition-all duration-200`}>
+          <div
+            id="emergency-sos-container"
+            style={{
+              top: isUnifiedHome && isRideTypePanelOpen
+                ? 'calc(18.5rem + env(safe-area-inset-top, 1rem))'
+                : 'calc(4.75rem + env(safe-area-inset-top, 1rem))',
+            }}
+            className="pointer-events-auto absolute left-4 z-20 flex items-center gap-2 transition-all duration-200"
+          >
             <button
               type="button"
               id="emergency-sos-btn"
