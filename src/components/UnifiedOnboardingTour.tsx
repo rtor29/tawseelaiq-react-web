@@ -131,11 +131,12 @@ export const UnifiedOnboardingTour: React.FC<UnifiedOnboardingTourProps> = ({
         dir="rtl"
         style={{
           bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0.5rem))',
+          backgroundColor: isDark ? 'rgba(22, 28, 40, 0.98)' : 'rgba(255, 255, 255, 0.98)',
         }}
         className={`fixed inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-96 rounded-2xl border border-amber-500/30 p-4 shadow-2xl backdrop-blur-2xl z-50 transition-all duration-200 select-none ${
           isDark
-            ? 'bg-[#161C28]/98 text-white shadow-[0_12px_36px_rgba(0,0,0,0.85)]'
-            : 'bg-white/98 text-slate-900 shadow-2xl'
+            ? 'text-white shadow-[0_12px_36px_rgba(0,0,0,0.85)]'
+            : 'text-slate-900 shadow-2xl'
         } ${isExiting ? 'opacity-0 translate-y-2 pointer-events-none' : 'opacity-100 translate-y-0'}`}
       >
         {/* رأس البطاقة: دائرة الخطوة والعنوان */}

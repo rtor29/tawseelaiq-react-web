@@ -115,11 +115,11 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
           className={`fixed inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-96 rounded-2xl border p-3.5 shadow-2xl backdrop-blur-2xl transition-all duration-200 z-50 animate-fade-in ${
             isTourActive
               ? isDark
-                ? 'bg-[#161C28]/98 border-2 border-amber-500 text-white shadow-[0_0_24px_rgba(245,158,11,0.35)]'
-                : 'bg-white/98 border-2 border-amber-500 text-slate-900 shadow-[0_0_24px_rgba(245,158,11,0.3)]'
+                ? 'bg-[#161C28]/95 border-2 border-amber-500 text-white shadow-[0_0_24px_rgba(245,158,11,0.35)]'
+                : 'bg-white/95 border-2 border-amber-500 text-slate-900 shadow-[0_0_24px_rgba(245,158,11,0.3)]'
               : isDark
-              ? 'bg-[#161C28]/98 border-amber-500/40 text-white shadow-[0_12px_36px_rgba(0,0,0,0.85)]'
-              : 'bg-white/98 border-slate-200 text-slate-900 shadow-2xl'
+              ? 'bg-[#161C28]/95 border-amber-500/40 text-white shadow-[0_12px_36px_rgba(0,0,0,0.85)]'
+              : 'bg-white/95 border-slate-200 text-slate-900 shadow-2xl'
           }`}
           role="dialog"
           aria-label="خيارات نوع المشوار وفلتر الجنس"

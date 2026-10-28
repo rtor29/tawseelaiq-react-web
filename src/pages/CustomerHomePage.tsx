@@ -2481,7 +2481,8 @@ export default function CustomerHomePage() {
         stage === 'searching' ||
         stage === 'driver_arriving' ||
         Boolean(rideRequestId) ||
-        isLiveTrackingDriver;
+        isLiveTrackingDriver ||
+        Boolean(localStorage.getItem('TAWSEELA_ACTIVE_TAXI_RIDE'));
       const hasActiveBooking = customerBookings.some((b: any) =>
         ['confirmed', 'active', 'pending'].includes(String(b.status || '').toLowerCase())
       );
