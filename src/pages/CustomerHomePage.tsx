@@ -2915,7 +2915,7 @@ export default function CustomerHomePage() {
             id="emergency-sos-container"
             style={{
               top: isUnifiedHome && isRideTypePanelOpen
-                ? 'calc(18.5rem + env(safe-area-inset-top, 1rem))'
+                ? 'calc(21.5rem + env(safe-area-inset-top, 1rem))'
                 : 'calc(4.75rem + env(safe-area-inset-top, 1rem))',
             }}
             className="pointer-events-auto absolute left-4 z-20 flex items-center gap-2 transition-all duration-200"
