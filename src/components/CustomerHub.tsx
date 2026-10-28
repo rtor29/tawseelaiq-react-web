@@ -16,6 +16,7 @@ import { playCarHornBeep } from '../lib/sound';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import TermsPrivacyModal from './TermsPrivacyModal';
+import { CustomerEstimatedArrival } from './CustomerEstimatedArrival';
 
 interface CustomerHubProps {
   onSelectService?: (type: 'taxi' | 'permanent') => void;
@@ -28,6 +29,7 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
   const navigate = useNavigate();
   const session = useSession();
   const { isDark } = useTheme();
+  const isUnifiedHome = import.meta.env.VITE_UNIFIED_HOME === 'true';
 
   const [activeTab, setActiveTab] = useState<'home' | 'trips' | 'notifications' | 'safety' | 'profile'>('home');
   const [announcementText, setAnnouncementText] = useState<string>(DEFAULT_ANNOUNCEMENT);
@@ -296,111 +298,158 @@ export const CustomerHub: React.FC<CustomerHubProps> = ({ onSelectService }) => 
               </div>
 
               <div className="grid grid-cols-1 gap-3.5">
-                {/* بطاقة حجز خط دائمي مع شعار توصيلة المفرغ */}
-                <div 
-                  onClick={handleOpenMonthlyBooking}
-                  className={`group relative rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border ${
-                    isDark
-                      ? 'bg-[#161C28] border-slate-700/40 hover:border-emerald-500/30'
-                      : 'bg-white border-slate-200 hover:border-emerald-500/40 shadow-sm'
-                  }`}
-                >
-                  <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
-                  <div className="flex items-start justify-between gap-2 z-10">
-                    <div className="flex flex-col text-right">
-                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-semibold w-fit mb-1.5">
-                        <span>التزام يومي 📅</span>
-                      </div>
-                      <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>حجز خط دائمي</h3>
-                      <p className={`text-xs mt-0.5 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>خدمة اشتراكات شهرية للطلبة والموظفين مع كباتن معتمدين</p>
-                    </div>
-                    <div className={`w-16 h-16 rounded-xl p-2 shadow-inner flex items-center justify-center shrink-0 border ${
-                      isDark ? 'bg-[#080E1A]/90 border-slate-700/50' : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <img 
-                        alt="شعار توصيلة" 
-                        className="w-full h-full object-contain drop-shadow" 
-                        src="/logo.png?v=40" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-1.5 z-10">
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🎓 خطوط جامعات</span>
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>💼 موظفين</span>
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🏛️ دوائر حكومية</span>
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🎒 مدارس</span>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1 z-10">
-                    <div className="flex flex-col text-right">
-                      <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>تسعيرة ثابتة معتمدة</span>
-                      <span className="text-sm text-amber-500 dark:text-amber-400 font-bold">وفر حتى 35% شهرياً</span>
-                    </div>
-                    <button 
-                      className={`min-h-[48px] px-4 py-2 rounded-xl text-sm font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer border ${
-                        isDark
-                          ? 'bg-[#242A37] hover:bg-slate-700 active:scale-[0.98] text-amber-400 border-slate-700/50'
-                          : 'bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-amber-600 border-slate-200'
-                      }`} 
-                      type="button"
-                    >
-                      <span>طلب اشتراك</span>
-                      <span>📅</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* بطاقة تكسي فوري مع شعار توصيلة المفرغ */}
-                <div 
-                  onClick={handleOpenInstantBooking}
-                  className={`group relative rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border ${
-                    isDark
-                      ? 'bg-[#1A202C] border-amber-500/25 hover:border-amber-400/50'
-                      : 'bg-white border-amber-500/30 hover:border-amber-400 shadow-sm'
-                  }`}
-                >
-                  <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
-                  <div className="flex items-start justify-between gap-2 z-10">
-                    <div className="flex flex-col text-right">
-                      <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-semibold w-fit mb-1.5">
-                        <span>سريع وآمن ⚡</span>
-                      </div>
-                      <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>تكسي</h3>
-                      <p className={`text-xs mt-0.5 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>كابتن معتمد يصلك لباب بيتك بأقل وقت ممكن</p>
-                    </div>
-                    <div className={`w-16 h-16 rounded-xl p-2 shadow-inner flex items-center justify-center shrink-0 border ${
-                      isDark ? 'bg-[#080E1A]/90 border-slate-700/50' : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <img 
-                        alt="شعار توصيلة" 
-                        className="w-full h-full object-contain drop-shadow" 
-                        src="/logo.png?v=40" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1 z-10">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`flex items-center justify-center w-7 h-7 rounded-full text-emerald-500 ${
-                        isDark ? 'bg-[#242A37]' : 'bg-slate-100'
-                      }`}>
-                        📍
-                      </span>
+                {isUnifiedHome ? (
+                  /* بطاقة الصفحة الموحدة: مشاوير قصيرة وحجز خطوط دائمية */
+                  <div
+                    id="unified-home-card"
+                    onClick={handleOpenInstantBooking}
+                    className={`group relative rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border ${
+                      isDark
+                        ? 'bg-[#1A202C] border-amber-500/30 hover:border-amber-400/50'
+                        : 'bg-white border-amber-500/30 hover:border-amber-400 shadow-sm'
+                    }`}
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    <div className="flex items-start justify-between gap-2 z-10">
                       <div className="flex flex-col text-right">
-                        <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الوصول التقديري</span>
-                        <span className="text-xs text-emerald-500 dark:text-emerald-400 font-bold">3 - 5 دقائق فقط</span>
+                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-semibold w-fit mb-1.5">
+                          <span>⚡ سريع وآمن</span>
+                        </div>
+                        <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>مشاوير قصيرة وحجز خطوط دائمية</h3>
+                        <p className={`text-xs mt-0.5 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>كابتن معتمد يصلك لباب بيتك بأقل وقت ممكن</p>
+                      </div>
+                      <div className={`w-16 h-16 rounded-xl p-2 shadow-inner flex items-center justify-center shrink-0 border ${
+                        isDark ? 'bg-[#080E1A]/90 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                        <img 
+                          alt="شعار توصيلة" 
+                          className="w-full h-full object-contain drop-shadow" 
+                          src="/logo.png?v=40" 
+                        />
                       </div>
                     </div>
-                    <button 
-                      className="min-h-[48px] px-5 py-2 rounded-xl bg-gradient-to-l from-amber-400 via-amber-500 to-amber-600 hover:opacity-95 active:scale-[0.98] text-slate-950 text-sm font-bold shadow-lg shadow-amber-500/20 flex items-center gap-1.5 transition-all cursor-pointer" 
-                      type="button"
-                    >
-                      <span>احجز الآن</span>
-                      <span>←</span>
-                    </button>
+
+                    <div className="flex items-center justify-between pt-1 z-10">
+                      <CustomerEstimatedArrival isDark={isDark} />
+                      <button 
+                        id="unified-book-now-btn"
+                        className="min-h-[48px] px-5 py-2 rounded-xl bg-gradient-to-l from-amber-400 via-amber-500 to-amber-600 hover:opacity-95 active:scale-[0.98] text-slate-950 text-sm font-bold shadow-lg shadow-amber-500/20 flex items-center gap-1.5 transition-all cursor-pointer mr-auto" 
+                        type="button"
+                      >
+                        <span>احجز الآن</span>
+                        <span>←</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* بطاقة حجز خط دائمي مع شعار توصيلة المفرغ */}
+                    <div 
+                      onClick={handleOpenMonthlyBooking}
+                      className={`group relative rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border ${
+                        isDark
+                          ? 'bg-[#161C28] border-slate-700/40 hover:border-emerald-500/30'
+                          : 'bg-white border-slate-200 hover:border-emerald-500/40 shadow-sm'
+                      }`}
+                    >
+                      <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                      <div className="flex items-start justify-between gap-2 z-10">
+                        <div className="flex flex-col text-right">
+                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-semibold w-fit mb-1.5">
+                            <span>التزام يومي 📅</span>
+                          </div>
+                          <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>حجز خط دائمي</h3>
+                          <p className={`text-xs mt-0.5 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>خدمة اشتراكات شهرية للطلبة والموظفين مع كباتن معتمدين</p>
+                        </div>
+                        <div className={`w-16 h-16 rounded-xl p-2 shadow-inner flex items-center justify-center shrink-0 border ${
+                          isDark ? 'bg-[#080E1A]/90 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <img 
+                            alt="شعار توصيلة" 
+                            className="w-full h-full object-contain drop-shadow" 
+                            src="/logo.png?v=40" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 z-10">
+                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🎓 خطوط جامعات</span>
+                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>💼 موظفين</span>
+                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🏛️ دوائر حكومية</span>
+                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${isDark ? 'bg-[#242A37] text-slate-200' : 'bg-slate-100 text-slate-700'}`}>🎒 مدارس</span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 z-10">
+                        <div className="flex flex-col text-right">
+                          <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>تسعيرة ثابتة معتمدة</span>
+                          <span className="text-sm text-amber-500 dark:text-amber-400 font-bold">وفر حتى 35% شهرياً</span>
+                        </div>
+                        <button 
+                          className={`min-h-[48px] px-4 py-2 rounded-xl text-sm font-bold shadow-md flex items-center gap-1.5 transition-all cursor-pointer border ${
+                            isDark
+                              ? 'bg-[#242A37] hover:bg-slate-700 active:scale-[0.98] text-amber-400 border-slate-700/50'
+                              : 'bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-amber-600 border-slate-200'
+                          }`} 
+                          type="button"
+                        >
+                          <span>طلب اشتراك</span>
+                          <span>📅</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* بطاقة تكسي فوري مع شعار توصيلة المفرغ */}
+                    <div 
+                      onClick={handleOpenInstantBooking}
+                      className={`group relative rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col gap-3.5 cursor-pointer border ${
+                        isDark
+                          ? 'bg-[#1A202C] border-amber-500/25 hover:border-amber-400/50'
+                          : 'bg-white border-amber-500/30 hover:border-amber-400 shadow-sm'
+                      }`}
+                    >
+                      <div className="absolute top-0 right-0 w-28 h-28 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                      <div className="flex items-start justify-between gap-2 z-10">
+                        <div className="flex flex-col text-right">
+                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-semibold w-fit mb-1.5">
+                            <span>سريع وآمن ⚡</span>
+                          </div>
+                          <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>تكسي</h3>
+                          <p className={`text-xs mt-0.5 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>كابتن معتمد يصلك لباب بيتك بأقل وقت ممكن</p>
+                        </div>
+                        <div className={`w-16 h-16 rounded-xl p-2 shadow-inner flex items-center justify-center shrink-0 border ${
+                          isDark ? 'bg-[#080E1A]/90 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <img 
+                            alt="شعار توصيلة" 
+                            className="w-full h-full object-contain drop-shadow" 
+                            src="/logo.png?v=40" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 z-10">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`flex items-center justify-center w-7 h-7 rounded-full text-emerald-500 ${
+                            isDark ? 'bg-[#242A37]' : 'bg-slate-100'
+                          }`}>
+                            📍
+                          </span>
+                          <div className="flex flex-col text-right">
+                            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الوصول التقديري</span>
+                            <span className="text-xs text-emerald-500 dark:text-emerald-400 font-bold">3 - 5 دقائق فقط</span>
+                          </div>
+                        </div>
+                        <button 
+                          className="min-h-[48px] px-5 py-2 rounded-xl bg-gradient-to-l from-amber-400 via-amber-500 to-amber-600 hover:opacity-95 active:scale-[0.98] text-slate-950 text-sm font-bold shadow-lg shadow-amber-500/20 flex items-center gap-1.5 transition-all cursor-pointer" 
+                          type="button"
+                        >
+                          <span>احجز الآن</span>
+                          <span>←</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </section>
 
