@@ -31,9 +31,9 @@ echo "======================================================"
 # 1. تنظيف مجلد البناء المستقل
 rm -rf "${OUT_DIR}"
 
-# 2. التأكد التام من عدم تفعيل أي مفاتيح staging
-unset VITE_GENDER_FILTER
-unset VITE_UNIFIED_HOME
+# 2. تفعيل مفاتيح فلتر الجنس والصفحة الموحدة لبيئة الإنتاج
+export VITE_GENDER_FILTER="true"
+export VITE_UNIFIED_HOME="true"
 export NODE_ENV="production"
 
 # 3. فحص الأنواع وبناء الحزم إلى مجلد dist المستقل
@@ -41,18 +41,24 @@ echo ">>> [1/3] فحص الأنواع وبناء حزم الإنتاج..."
 npx tsc -b
 npx vite build --outDir "${OUT_DIR}"
 
-# 4. التحقق الصارم من مخرجات البناء وعدم تسرب gender-btn-female
+# 4. التحقق الصارم من مخرجات البناء ووجود gender-btn-female ومعرف اللوحة الموحدة
 echo ">>> [2/3] فحص سلامة أصول الإنتاج المنشأة..."
 if [ ! -f "${OUT_DIR}/index.html" ]; then
     echo "❌ خطأ فادح: ملف index.html غير موجود في ${OUT_DIR}!"
     exit 1
 fi
 
-if grep -rq "gender-btn-female" "${OUT_DIR}/assets/"; then
-    echo "❌ خطأ فادح: تم رصد gender-btn-female في بناء الإنتاج! إيقاف النشر."
+if ! grep -rq "gender-btn-female" "${OUT_DIR}/assets/"; then
+    echo "❌ خطأ فادح: لم يتم العثور على gender-btn-female داخل ${OUT_DIR}/assets/!"
     exit 1
 fi
-echo "✓ تم التحقق: بناء الإنتاج سليم وخالٍ من ميزات Staging التجريبية."
+echo "✓ تم التحقق: gender-btn-female متوفر في بناء الإنتاج."
+
+if ! grep -rq "unified-panel-open-card" "${OUT_DIR}/assets/"; then
+    echo "❌ خطأ فادح: لم يتم العثور على معرّف اللوحة الموحدة (unified-panel-open-card) داخل ${OUT_DIR}/assets/!"
+    exit 1
+fi
+echo "✓ تم التحقق: معرّف اللوحة الموحدة (unified-panel-open-card) متوفر في بناء الإنتاج."
 
 # 5. النشر الحصري إلى /var/www/tawseela-web
 echo ">>> [3/3] نشر أصول ${OUT_DIR} إلى ${TARGET_DIR}..."
