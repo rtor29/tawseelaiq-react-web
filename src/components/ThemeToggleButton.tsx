@@ -2,11 +2,13 @@ import React from 'react';
 import { useTheme } from '../context/ThemeContext';
 
 interface ThemeToggleButtonProps {
+  id?: string;
   className?: string;
   showLabel?: boolean;
 }
 
 export const ThemeToggleButton: React.FC<ThemeToggleButtonProps> = ({
+  id = 'theme-toggle-btn',
   className = '',
   showLabel = false,
 }) => {
@@ -15,6 +17,7 @@ export const ThemeToggleButton: React.FC<ThemeToggleButtonProps> = ({
   return (
     <button
       type="button"
+      id={id}
       onClick={toggleTheme}
       aria-label={isDark ? 'التبديل إلى الوضع النهاري' : 'التبديل إلى الوضع الليلي'}
       title={isDark ? 'التبديل إلى الوضع النهاري (☀️)' : 'التبديل إلى الوضع الليلي (🌙)'}

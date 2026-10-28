@@ -6,7 +6,7 @@
 // 5. نافذة اختيار المدينة ودرج الزبون الكامل (حول توصيلة)
 
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Map as MapGL, Marker, type MapMouseEvent, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { http } from '../lib/api';
@@ -44,6 +44,9 @@ import { VehicleMarker } from '../components/map/VehicleMarker';
 import { RouteLines, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin, type RouteLineData } from '../components/map/MapPins';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { UnifiedRideTypePanel, type UnifiedRideType } from '../components/UnifiedRideTypePanel';
+import { CommuteBookingCard } from '../components/commute/CommuteBookingCard';
+import { CommuteCancelModal } from '../components/commute/CommuteCancelModal';
 
 // التحميل الكسول لنافذة الدردشة لتقليل الحزمة الأولية
 const ChatModal = lazy(() => import('../components/ChatModal'));
@@ -272,6 +275,213 @@ export default function CustomerHomePage() {
     } catch (_) {}
     setIsGenderDropdownOpen(false);
   };
+
+  // الصفحة الموحدة: VITE_UNIFIED_HOME
+  const isUnifiedHome = import.meta.env.VITE_UNIFIED_HOME === 'true';
+  const location = useLocation();
+  const [unifiedRideType, setUnifiedRideType] = useState<UnifiedRideType>(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const urlType = sp.get('type') || sp.get('tripType');
+      if (urlType === 'commute' || urlType === 'daily') return 'commute';
+      if (urlType === 'short' || urlType === 'taxi') return 'short';
+      const saved = localStorage.getItem('tawseela_unified_selected_type');
+      if (saved === 'commute') return 'commute';
+    }
+    return 'short';
+  });
+  const [isRideTypePanelOpen, setIsRideTypePanelOpen] = useState(true);
+
+  // حالة حجوزات الراكب للخط الدائمي في الصفحة الموحدة
+  const [customerBookings, setCustomerBookings] = useState<any[]>([]);
+  const [isBookingSeat, setIsBookingSeat] = useState(false);
+  const [isCommuteCancelModalOpen, setIsCommuteCancelModalOpen] = useState(false);
+  const [isSubmittingCommuteCancel, setIsSubmittingCommuteCancel] = useState(false);
+
+  // مزامنة حالة مسارات الخط الدائمي مع النوع المختار في الصفحة الموحدة
+  useEffect(() => {
+    if (isUnifiedHome) {
+      if (unifiedRideType === 'commute') {
+        setShowCommuteRoutes(true);
+      } else {
+        setShowCommuteRoutes(false);
+        setSelectedCommuteDriver(null);
+        setShowCommuteRoute(false);
+        setCommuteRouteCoordinates(null);
+      }
+    }
+  }, [isUnifiedHome, unifiedRideType]);
+
+  // مراقبة الانتقال التلقائي مع كابتن محدد من المسارات الخارجية
+  useEffect(() => {
+    if (!isUnifiedHome) return;
+    const navState = location.state as any;
+    const targetDriverId = navState?.selectedDriverId || navState?.autoSelectDriverId;
+    if (targetDriverId && commuteDrivers.length > 0 && !selectedCommuteDriver) {
+      const found = commuteDrivers.find(
+        (d: any) => String(d.driverId || d.id) === String(targetDriverId)
+      );
+      if (found) {
+        setSelectedCommuteDriver(found);
+        setUnifiedRideType('commute');
+        setShowCommuteRoutes(true);
+      }
+    }
+  }, [isUnifiedHome, location.state, commuteDrivers, selectedCommuteDriver]);
+
+  // جلب حجوزات الراكب الدائمية عبر Polling و Realtime
+  useEffect(() => {
+    if (!isUnifiedHome) return;
+    const session = authStore.getSession();
+    const customerId = session?.userId || storage.getUserId();
+    const phone = storage.getPhone();
+    const target = customerId || phone;
+    if (!target) return;
+
+    let mounted = true;
+    const fetchBookings = () => {
+      http
+        .get<{ success?: boolean; bookings?: any[] }>(`/customer/${encodeURIComponent(target)}/bookings`)
+        .then((res) => {
+          if (!mounted) return;
+          const bookings = res.data?.bookings || (Array.isArray(res.data) ? res.data : []);
+          setCustomerBookings(bookings);
+        })
+        .catch(() => {});
+    };
+
+    fetchBookings();
+    const pollInterval = setInterval(fetchBookings, 4000);
+
+    const unsubStatus = realtime.onTripStatus((e) => {
+      const status = String(e.status || '').toLowerCase();
+      if (['rejected', 'declined', 'cancelled_by_driver', 'accepted', 'confirmed'].includes(status)) {
+        fetchBookings();
+      }
+    });
+
+    return () => {
+      mounted = false;
+      clearInterval(pollInterval);
+      unsubStatus();
+    };
+  }, [isUnifiedHome]);
+
+  const handleSelectUnifiedRideType = (type: UnifiedRideType) => {
+    setUnifiedRideType(type);
+    try {
+      localStorage.setItem('tawseela_unified_selected_type', type);
+      const url = new URL(window.location.href);
+      if (type === 'commute') {
+        url.searchParams.set('type', 'commute');
+      } else {
+        url.searchParams.set('type', 'taxi');
+      }
+      window.history.replaceState({}, '', url.toString());
+    } catch (_) {}
+  };
+
+  async function handleBookCommuteSeat() {
+    if (!selectedCommuteDriver || isBookingSeat) return;
+    const d = selectedCommuteDriver;
+    const total = d.seats || 4;
+    const taken = d.takenSeats || 0;
+    if (d.isFull || total - taken <= 0) {
+      show('الكابتن مكتمل - لا تتوفر مقاعد شاغرة حالياً 🚫', 'warning');
+      return;
+    }
+    setIsBookingSeat(true);
+    try {
+      const session = authStore.getSession();
+      const customerId = session?.userId || storage.getUserId() || 'cust-' + Date.now();
+      const customerName = session?.fullName || storage.getFullName() || 'راكب توصيلة';
+      const customerPhone = storage.getPhone() || '';
+
+      const { data } = await http.post<{ success: boolean; message?: string; error?: string; booking?: any }>('/bookings', {
+        driverId: String(d.driverId || d.id),
+        driverName: d.name || d.fullName || 'كابتن الخط',
+        driverPhone: d.phone || d.phoneNumber || '',
+        customerId,
+        customerName,
+        customerPhone,
+        pickupLocation: d.from || d.routeStartName || 'موقع الراكب',
+        dropoffLocation: d.to || d.routeEndName || 'الوجهة',
+        pickupLat: pickup.lat,
+        pickupLon: pickup.lng,
+        seats: 1,
+        seatsBooked: 1,
+      });
+
+      if (data?.success) {
+        show('تم إرسال طلب حجز المقعد للكابتن بنجاح! 🚖 طلبك قيد انتظار موافقة الكابتن.', 'success', 6000);
+        const dId = String(d.driverId || d.id);
+        const newBooking = {
+          id: data.booking?.id || 'bk-' + Date.now(),
+          bookingId: data.booking?.id || 'bk-' + Date.now(),
+          driverId: dId,
+          driverPhone: d.phone || d.phoneNumber || '',
+          customerName,
+          customerPhone,
+          status: 'Pending',
+          pickupLocation: d.from || d.routeStartName || 'موقع الراكب',
+          dropoffLocation: d.to || d.routeEndName || 'الوجهة',
+          createdAt: new Date().toISOString(),
+        };
+        setCustomerBookings((prev) => [newBooking, ...prev]);
+      } else {
+        show(data?.error || 'تعذر إرسال طلب الحجز', 'error');
+      }
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        show(
+          err?.response?.data?.error || 'أنت مشترك بالفعل في هذا الخط، لا يمكنك تكرار الحجز.',
+          'warning',
+          6000
+        );
+      } else {
+        show(err?.response?.data?.error || 'حدث خطأ في الاتصال أثناء إرسال طلب الحجز', 'error');
+      }
+    } finally {
+      setIsBookingSeat(false);
+    }
+  }
+
+  async function handleSubmitCommuteCancel(reason: string, details: string) {
+    if (!selectedCommuteDriver) return;
+    setIsSubmittingCommuteCancel(true);
+    try {
+      const session = authStore.getSession();
+      const customerId = session?.userId || storage.getUserId() || '';
+      const customerPhone = storage.getPhone() || '';
+      const d = selectedCommuteDriver;
+      const dId = String(d.driverId || d.id || '');
+      const matching = customerBookings.find(
+        (b: any) => String(b.driverId || b.driver_id || '') === dId
+      );
+
+      const { data } = await http.post<{ success: boolean; message?: string }>('/customer/request-route-cancellation', {
+        bookingId: matching?.id || matching?.bookingId,
+        customerId,
+        customerPhone,
+        driverId: dId,
+        routeId: d.routeId || matching?.routeId,
+        route: d.from && d.to ? `${d.from} ➔ ${d.to}` : undefined,
+        reason,
+        details: details.trim(),
+      });
+
+      if (data?.success) {
+        show('تم إرسال طلب إلغاء الاشتراك للكابتن بنجاح 📤', 'success', 6000);
+        setIsCommuteCancelModalOpen(false);
+      } else {
+        show(data?.message || 'تعذر إرسال طلب الإلغاء', 'error');
+      }
+    } catch (err: any) {
+      show(err?.response?.data?.error || 'فشل إرسال طلب الإلغاء', 'error');
+    } finally {
+      setIsSubmittingCommuteCancel(false);
+    }
+  }
 
   // المدينة المحددة
   const [selectedCity, setSelectedCity] = useState('المدينة الحالية');
@@ -2222,6 +2432,7 @@ export default function CustomerHomePage() {
             {stage === 'pickup' ? (
               <button
                 type="button"
+                id="customer-nav-home-btn"
                 onClick={() => navigate('/hub')}
                 className={`min-h-[48px] min-w-[48px] h-12 w-12 rounded-full backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
                   isDark 
@@ -2276,38 +2487,53 @@ export default function CustomerHomePage() {
             />
           </div>
 
-          {/* الوسط: زر «الخطوط الدائمية» الأحادي الصغير والأنيق بين زر الهوم وزر الحساب */}
-          <div className="pointer-events-auto flex items-center mx-1">
-            <button
-              type="button"
-              onClick={() => {
-                setShowCommuteRoutes(prev => {
-                  const next = !prev;
-                  if (!next) setSelectedCommuteDriver(null);
-                  return next;
-                });
-              }}
-              className={`min-h-[44px] h-11 px-3 sm:px-3.5 rounded-full backdrop-blur-xl border flex items-center gap-1.5 font-cairo font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-lg select-none ${
-                showCommuteRoutes
-                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.45)] ring-2 ring-emerald-500/30'
-                  : isDark
-                  ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-emerald-400/50'
-                  : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-emerald-500 shadow-sm'
-              }`}
-              title={showCommuteRoutes ? 'إخفاء الخطوط الدائمية' : 'إظهار الخطوط الدائمية على الخريطة'}
-              aria-label="الخطوط الدائمية"
-              aria-pressed={showCommuteRoutes}
-            >
-              <span className="text-base leading-none">🚌</span>
-              <span className="leading-tight">الخطوط الدائمية</span>
-              {showCommuteRoutes && (
-                <span className="flex h-2 w-2 relative mr-0.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                </span>
-              )}
-            </button>
-          </div>
+          {/* الوسط: زر «الخطوط الدائمية» القديم أو اللوحة الموحدة الجديدة */}
+          {!isUnifiedHome ? (
+            <div className="pointer-events-auto flex items-center mx-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCommuteRoutes(prev => {
+                    const next = !prev;
+                    if (!next) setSelectedCommuteDriver(null);
+                    return next;
+                  });
+                }}
+                className={`min-h-[44px] h-11 px-3 sm:px-3.5 rounded-full backdrop-blur-xl border flex items-center gap-1.5 font-cairo font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-lg select-none ${
+                  showCommuteRoutes
+                    ? 'bg-emerald-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.45)] ring-2 ring-emerald-500/30'
+                    : isDark
+                    ? 'bg-[#161C28]/95 border-white/15 text-slate-300 hover:text-white hover:border-emerald-400/50'
+                    : 'bg-white/95 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-emerald-500 shadow-sm'
+                }`}
+                title={showCommuteRoutes ? 'إخفاء الخطوط الدائمية' : 'إظهار الخطوط الدائمية على الخريطة'}
+                aria-label="الخطوط الدائمية"
+                aria-pressed={showCommuteRoutes}
+              >
+                <span className="text-base leading-none">🚌</span>
+                <span className="leading-tight">الخطوط الدائمية</span>
+                {showCommuteRoutes && (
+                  <span className="flex h-2 w-2 relative mr-0.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                  </span>
+                )}
+              </button>
+            </div>
+          ) : stage !== 'searching' && !isLiveTrackingDriver ? (
+            <div className="pointer-events-auto flex items-center mx-1">
+              <UnifiedRideTypePanel
+                isOpen={isRideTypePanelOpen}
+                onToggleOpen={() => setIsRideTypePanelOpen(prev => !prev)}
+                selectedType={unifiedRideType}
+                onSelectType={handleSelectUnifiedRideType}
+                genderPreference={genderPreference}
+                onSelectGender={handleSelectGenderPreference}
+                isGenderFilterEnabled={isGenderFilterEnabled}
+                isDark={isDark}
+              />
+            </div>
+          ) : null}
 
           {/* اليسار: ترحيب المستخدم وزر تبديل الوضع النهاري والليلي */}
           <div className="pointer-events-auto flex items-center gap-2">
@@ -2685,9 +2911,14 @@ export default function CustomerHomePage() {
         })()}
 
         {stage !== 'searching' && stage !== 'driver_arriving' && (
-          <div className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] left-4 z-20 flex items-center gap-2">
+          <div className={`pointer-events-auto absolute ${
+            isUnifiedHome && isRideTypePanelOpen
+              ? 'top-[calc(18.5rem+env(safe-area-inset-top,1rem))]'
+              : 'top-[calc(4.75rem+env(safe-area-inset-top,1rem))]'
+          } left-4 z-20 flex items-center gap-2 transition-all duration-200`}>
             <button
               type="button"
+              id="emergency-sos-btn"
               onClick={() => show('خدمة الطوارئ والأمان 🛡️', 'info')}
               className={`w-9 h-9 min-w-[36px] min-h-[36px] rounded-full backdrop-blur-md border shadow-xl flex items-center justify-center cursor-pointer active:scale-95 transition-transform ${
                 isDark ? 'bg-[#161C28]/95 border-white/10 text-amber-400' : 'bg-white/95 border-slate-200 text-amber-600 shadow-md'
@@ -2700,8 +2931,8 @@ export default function CustomerHomePage() {
           </div>
         )}
 
-        {/* أزرار اختيار جنس السائق العائمة في أقصى اليمين (Segmented Control) */}
-        {isGenderFilterEnabled && stage !== 'searching' && stage !== 'driver_arriving' && (
+        {/* أزرار اختيار جنس السائق العائمة في أقصى اليمين (تظهر فقط عند إيقاف الصفحة الموحدة) */}
+        {!isUnifiedHome && isGenderFilterEnabled && stage !== 'searching' && stage !== 'driver_arriving' && (
           <div
             id="floating-gender-filter-container"
             className="pointer-events-auto absolute top-[calc(7.25rem+env(safe-area-inset-top,1rem))] right-4 z-30 inline-flex items-center p-1 rounded-2xl bg-[#0f172a]/95 backdrop-blur-md border border-slate-700/60 shadow-xl"
@@ -2818,8 +3049,53 @@ export default function CustomerHomePage() {
           </button>
         )}
 
-        {/* بطاقة تفاصيل كابتن الخط الدائم المحدد من الخريطة */}
-        {selectedCommuteDriver && (
+        {/* بطاقة تفاصيل كابتن الخط الدائم في الصفحة الموحدة */}
+        {isUnifiedHome && selectedCommuteDriver && (
+          <CommuteBookingCard
+            driver={selectedCommuteDriver}
+            isDark={isDark}
+            customerBookings={customerBookings}
+            isBooking={isBookingSeat}
+            onBookSeat={handleBookCommuteSeat}
+            onRequestCancellation={() => setIsCommuteCancelModalOpen(true)}
+            onClose={() => {
+              setSelectedCommuteDriver(null);
+              setShowCommuteRoute(false);
+              setCommuteRouteCoordinates(null);
+            }}
+            showToast={(msg, type) => show(msg, type || 'info')}
+            isLoadingRoute={isLoadingCommuteRoute}
+            isRouteShown={showCommuteRoute}
+            onToggleRoute={handleToggleCommuteRoute}
+          />
+        )}
+
+        {/* نافذة إلغاء الاشتراك في الخط الدائمي للصفحة الموحدة */}
+        {isUnifiedHome && isCommuteCancelModalOpen && (
+          <CommuteCancelModal
+            isOpen={isCommuteCancelModalOpen}
+            isDark={isDark}
+            driverName={selectedCommuteDriver?.firstName || selectedCommuteDriver?.name || selectedCommuteDriver?.fullName}
+            isSubmitting={isSubmittingCommuteCancel}
+            onClose={() => setIsCommuteCancelModalOpen(false)}
+            onSubmit={handleSubmitCommuteCancel}
+          />
+        )}
+
+        {/* شارة إرشادية عند عدم تحديد كابتن في وضع الخطوط الدائمية */}
+        {isUnifiedHome && unifiedRideType === 'commute' && !selectedCommuteDriver && stage !== 'searching' && !isLiveTrackingDriver && (
+          <div className="pointer-events-auto absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom,0.5rem))] inset-x-4 z-30 flex justify-center animate-fade-in" dir="rtl">
+            <div className={`px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 backdrop-blur-md border ${
+              isDark ? 'bg-[#161C28]/95 border-amber-500/30 text-white shadow-2xl' : 'bg-white/95 border-slate-200 text-slate-800 shadow-lg'
+            }`}>
+              <span className="text-xl">🚌</span>
+              <span className="text-xs font-bold">اختر كابتن الخط الدائمي من الخريطة لعرض تفاصيل المسار وحجز المقعد</span>
+            </div>
+          </div>
+        )}
+
+        {/* بطاقة تفاصيل كابتن الخط الدائم القديمة (تظهر فقط عند إيقاف الصفحة الموحدة) */}
+        {!isUnifiedHome && selectedCommuteDriver && (
           <div className="pointer-events-auto absolute bottom-[calc(14rem+env(safe-area-inset-bottom,1rem))] inset-x-4 sm:inset-x-auto sm:right-6 sm:w-96 z-40 animate-slide-up" dir="rtl">
             <div className={`p-4 rounded-3xl shadow-2xl border backdrop-blur-xl ${
               isDark ? 'bg-[#161C28]/95 border-amber-500/40 text-white' : 'bg-white/95 border-slate-300 text-slate-900 shadow-xl'
@@ -2968,7 +3244,7 @@ export default function CustomerHomePage() {
         )}
 
         {/* 6. البطاقة السفلية الفاخرة في مرحلتي الانطلاق والوصول */}
-        {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
+        {(!isUnifiedHome || unifiedRideType === 'short') && stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
           <div className={`absolute inset-x-0 bottom-0 z-30 rounded-t-2xl backdrop-blur-md px-5 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] mb-[env(safe-area-inset-bottom)] shadow-2xl border-t ${
             isDark ? 'bg-[#161C28]/95 border-amber-500/20 text-white' : 'bg-white/95 border-slate-200 text-slate-900 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]'
           }`}>
@@ -3056,7 +3332,7 @@ export default function CustomerHomePage() {
         )}
 
         {/* 7. بطاقة خيارات فئات الرحلة كنافذة سفلية قابلة للسحب ثلاثية الحالات (minimized, middle, expanded) */}
-        {stage === 'ride_options' && (
+        {(!isUnifiedHome || unifiedRideType === 'short') && stage === 'ride_options' && (
           <div
             role="region"
             aria-label="قائمة فئات الرحلة والتسعير"
@@ -3139,31 +3415,33 @@ export default function CustomerHomePage() {
 
             {/* الحاوية القابلة للتمرير الداخلي عند ضيق الشاشة (Scrollable Body) */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1.5 touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {/* التبويبات العلوية: تكسي و بوكس (RTL: تكسي يمين، بوكس يسار) */}
-              <div className={`flex border-b px-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`} dir="rtl">
-                <button
-                  type="button"
-                  onClick={() => setSelectedServiceTab('taxi')}
-                  className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
-                    selectedServiceTab === 'taxi'
-                      ? isDark ? 'text-amber-400 border-b-2 border-amber-500' : 'text-amber-600 border-b-2 border-amber-500'
-                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  تكسي
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedServiceTab('box')}
-                  className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
-                    selectedServiceTab === 'box'
-                      ? isDark ? 'text-amber-400 border-b-2 border-amber-500' : 'text-amber-600 border-b-2 border-amber-500'
-                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  بوكس
-                </button>
-              </div>
+              {/* التبويبات العلوية: تكسي و بوكس (تظهر فقط عند إيقاف الصفحة الموحدة) */}
+              {!isUnifiedHome && (
+                <div className={`flex border-b px-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`} dir="rtl">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedServiceTab('taxi')}
+                    className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
+                      selectedServiceTab === 'taxi'
+                        ? isDark ? 'text-amber-400 border-b-2 border-amber-500' : 'text-amber-600 border-b-2 border-amber-500'
+                        : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    تكسي
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedServiceTab('box')}
+                    className={`flex-1 min-h-[44px] py-2 text-center text-[15px] font-bold transition relative cursor-pointer ${
+                      selectedServiceTab === 'box'
+                        ? isDark ? 'text-amber-400 border-b-2 border-amber-500' : 'text-amber-600 border-b-2 border-amber-500'
+                        : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    بوكس
+                  </button>
+                </div>
+              )}
 
               {/* شارة الذروة أو الخصم الذكي المفعّل */}
               {dynamicPricingData.surgeBadge && (
