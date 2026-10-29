@@ -2211,17 +2211,23 @@ export default function CustomerHomePage() {
     }
   }, [stage, rideStatus, pickup, dropoff, show, triggerDriverRatingModal, handleNoDriversAvailable]);
 
-  // تتبع حالة الرحلة وبث الأحداث اللحظية عبر SSE مع شبكة أمان للاستطلاع (كل 5 ثوانٍ أثناء البحث حتى لو كان SSE متصلاً)
-  useEffect(() => {
-    if (!rideRequestId || (stage !== 'searching' && stage !== 'driver_arriving')) return;
+  // أحدث نسخة من دوال معالجة الرحلة، تقرؤها القناة والاستطلاع دون أن تكون جزءاً من اعتماديات الـeffect.
+  // لو كانت اعتماديات لأُغلقت القناة وطُلبت تذكرة جديدة مع كل تغيّر في stage أو rideStatus أو routeCoordinates،
+  // وكل إعادة فتح تستهلك من ميزانية 180 طلباً في الدقيقة المخصصة للمستخدم.
+  const rideHandlersRef = useRef({ handleRideStateChange, handleDriverPositionUpdate, handleNoDriversAvailable, show });
+  rideHandlersRef.current = { handleRideStateChange, handleDriverPositionUpdate, handleNoDriversAvailable, show };
+  const rideSseConnectedRef = useRef(false);
+  const isRideTrackingStage = stage === 'searching' || stage === 'driver_arriving';
 
-    let isSseConnected = false;
+  // شبكة أمان للاستطلاع: كل 5 ثوانٍ أثناء البحث حتى لو كان SSE متصلاً، وكل 20 ثانية أثناء وصول السائق
+  useEffect(() => {
+    if (!rideRequestId || !isRideTrackingStage) return;
 
     const checkStatus = async () => {
       if (document.hidden) return;
       // أثناء مرحلة البحث: نفحص كل 5 ثوانٍ إلزامياً كشبكة أمان حتى لو كان SSE متصلاً
       // أثناء مرحلة وصول السائق: نفحص كل 20 ثانية فقط في حال انقطاع SSE
-      if (stage !== 'searching' && isSseConnected) return;
+      if (stage !== 'searching' && rideSseConnectedRef.current) return;
       try {
         const { data } = await http.get<{
           success: boolean;
@@ -2233,30 +2239,35 @@ export default function CustomerHomePage() {
         if (data?.success && reqObj) {
           const st = String(reqObj.status || '').toLowerCase();
           if (['nodriversavailable', 'no_drivers', 'no_driver_found', 'expired', 'driver_declined', 'rejected', 'declined'].includes(st)) {
-            handleNoDriversAvailable();
+            rideHandlersRef.current.handleNoDriversAvailable();
             return;
           }
-          handleRideStateChange(reqObj);
+          rideHandlersRef.current.handleRideStateChange(reqObj);
         }
       } catch (_) {}
     };
 
     void checkStatus();
-    // استطلاع دوري: كل 5 ثوانٍ أثناء البحث، وكل 20 ثانية فقط أثناء وصول السائق
     const pollIntervalMs = stage === 'searching' ? 5000 : 20000;
     const interval = setInterval(checkStatus, pollIntervalMs);
+    return () => clearInterval(interval);
+  }, [rideRequestId, stage, isRideTrackingStage]);
 
-    // اتصال SSE اللحظي لتلقي تحديثات المشوار وموقع السائق فوراً
+  // اتصال SSE اللحظي لتلقي تحديثات المشوار وموقع السائق فوراً.
+  // يُفتح مرة واحدة لكل رحلة ويبقى مفتوحاً عبر مراحل البحث ووصول السائق.
+  useEffect(() => {
+    if (!rideRequestId || !isRideTrackingStage) return;
+
     let es: EventSource | null = null;
     let stream: TicketedStreamHandle | null = null;
     try {
       stream = openTicketedStream({
         buildUrl: (authParam) => rideStreamUrl(rideRequestId, authParam, lastCustomerEventIdRef.current),
         onOpen: () => {
-          isSseConnected = true;
+          rideSseConnectedRef.current = true;
         },
         setup: (src) => {
-      es = src;
+          es = src;
 
           const handleCustomerEventId = (e: MessageEvent, data: any) => {
             const id = e.lastEventId || data?.eventId || data?.id;
@@ -2271,34 +2282,34 @@ export default function CustomerHomePage() {
 
           es.addEventListener('init', (e: MessageEvent) => {
             try {
-              isSseConnected = true;
+              rideSseConnectedRef.current = true;
               const data = JSON.parse(e.data);
               if (!handleCustomerEventId(e, data)) return;
               if (data?.request) {
-                handleRideStateChange(data.request);
+                rideHandlersRef.current.handleRideStateChange(data.request);
               }
             } catch (_) {}
           });
 
           es.addEventListener('no_drivers_available', (e: MessageEvent) => {
             try {
-              isSseConnected = true;
+              rideSseConnectedRef.current = true;
               const data = JSON.parse(e.data);
               if (!handleCustomerEventId(e, data)) return;
-              handleNoDriversAvailable();
+              rideHandlersRef.current.handleNoDriversAvailable();
             } catch (_) {}
           });
 
           es.addEventListener('trip_update', (e: MessageEvent) => {
             try {
-              isSseConnected = true;
+              rideSseConnectedRef.current = true;
               const data = JSON.parse(e.data);
               if (!handleCustomerEventId(e, data)) return;
 
               const evType = data?.event || data?.type;
 
               if (evType === 'no_drivers_available' || data?.status === 'NoDriversAvailable' || data?.status === 'NO_DRIVERS' || data?.status === 'no_drivers') {
-                handleNoDriversAvailable();
+                rideHandlersRef.current.handleNoDriversAvailable();
                 return;
               }
 
@@ -2310,7 +2321,7 @@ export default function CustomerHomePage() {
                   const lngNum = Number(rawLoc.lng ?? rawLoc.lon);
                   if (!isNaN(latNum) && !isNaN(lngNum)) {
                     setLastKnownDriverLocation({ lat: latNum, lng: lngNum });
-                    handleDriverPositionUpdate({ lat: latNum, lng: lngNum });
+                    rideHandlersRef.current.handleDriverPositionUpdate({ lat: latNum, lng: lngNum });
                   }
                 }
               } else if (evType === 'external_nav_ended') {
@@ -2319,23 +2330,23 @@ export default function CustomerHomePage() {
 
               if (evType === 'max_wait_exceeded') {
                 setMaxWaitExceeded(true);
-                show('تم تجاوز الحد الأقصى لوقت الانتظار المسموح به ⚠️', 'warning', 7000);
+                rideHandlersRef.current.show('تم تجاوز الحد الأقصى لوقت الانتظار المسموح به ⚠️', 'warning', 7000);
               }
 
               if (data?.request) {
-                handleRideStateChange(data.request);
+                rideHandlersRef.current.handleRideStateChange(data.request);
               } else if (data?.status) {
-                handleRideStateChange(data);
+                rideHandlersRef.current.handleRideStateChange(data);
               }
 
               if (data?.event === 'driver_location' && data.location) {
-                handleDriverPositionUpdate({ lat: data.location.lat, lng: data.location.lon }, data.location.heading);
+                rideHandlersRef.current.handleDriverPositionUpdate({ lat: data.location.lat, lng: data.location.lon }, data.location.heading);
               }
             } catch (_) {}
           });
 
           es.onerror = () => {
-            isSseConnected = false;
+            rideSseConnectedRef.current = false;
           };
         },
       });
@@ -2344,10 +2355,10 @@ export default function CustomerHomePage() {
     }
 
     return () => {
-      clearInterval(interval);
+      rideSseConnectedRef.current = false;
       stream?.close();
     };
-  }, [rideRequestId, stage, handleRideStateChange, handleDriverPositionUpdate, show, handleNoDriversAvailable]);
+  }, [rideRequestId, isRideTrackingStage]);
 
   // اشتراك لحظي في أحداث الرحلة وموقع السائق عبر SignalR / Realtime
   useEffect(() => {
