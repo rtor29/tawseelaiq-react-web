@@ -10,7 +10,7 @@ import { realtime } from '../lib/realtime';
 import { storage } from '../lib/storage';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
-import { getDirections, applyArabicAndEnhancedLabels } from '../lib/mapbox';
+import { getDirections, applyArabicAndEnhancedLabels, keepMapSized } from '../lib/mapbox';
 import { distanceMeters, minDistanceToPolylineMeters, formatEtaArabic } from '../lib/geo';
 import { Button } from '../components/ui';
 import { coordinatesLabel } from '../lib/format';
@@ -213,7 +213,10 @@ export default function LiveTrackingPage() {
           dragPan={true}
           cooperativeGestures={false}
           style={{ width: '100%', height: '100%' }}
-          onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
+          onLoad={(e) => {
+            applyArabicAndEnhancedLabels(e.target);
+            keepMapSized(e.target);
+          }}
         >
           <NavigationControl position="bottom-left" showCompass={false} />
           <VehicleMarker targetLat={driverPos.lat} targetLng={driverPos.lng} targetHeading={heading} title={driverName} />

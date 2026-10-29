@@ -10,7 +10,7 @@ import { config } from '../lib/config';
 import { openTicketedStream, driverStreamUrl, type TicketedStreamHandle } from '../lib/sseTicket';
 import { RouteLines, PickupPin, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin } from '../components/map/MapPins';
 import { useNavigate } from 'react-router-dom';
-import { applyMapEnhancements } from '../lib/mapbox';
+import { applyMapEnhancements, keepMapSized } from '../lib/mapbox';
 import { playIncomingTripAlert } from '../lib/sound';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
@@ -1836,6 +1836,7 @@ export default function DriverHomePage() {
           cooperativeGestures={false}
           onLoad={(e) => {
             applyMapEnhancements(e.target, isDark);
+            keepMapSized(e.target);
           }}
           style={{ width: '100%', height: '100%' }}
         >

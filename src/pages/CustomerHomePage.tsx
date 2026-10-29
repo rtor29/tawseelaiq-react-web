@@ -14,7 +14,7 @@ import { authStore } from '../lib/auth';
 import { config, SEARCH_V2_ENABLED } from '../lib/config';
 import { realtime } from '../lib/realtime';
 import { openTicketedStream, rideStreamUrl, type TicketedStreamHandle } from '../lib/sseTicket';
-import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, type PlaceResult } from '../lib/mapbox';
+import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, keepMapSized, type PlaceResult } from '../lib/mapbox';
 import {
   calculateBearing,
   distanceMeters,
@@ -2879,6 +2879,7 @@ export default function CustomerHomePage() {
           onClick={handleMapClick}
           onLoad={(e) => {
             applyMapEnhancements(e.target, isDark);
+            keepMapSized(e.target);
             autoLocateUserOnMapReady(e.target);
           }}
         >

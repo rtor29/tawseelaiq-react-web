@@ -10,7 +10,7 @@ import { endpoints, http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { config, IRAQ_DEFAULT_CENTER, DEFAULT_DAY_STYLE } from '../lib/config';
-import { getDirections, reverseGeocode, searchPlaces, applyArabicAndEnhancedLabels, type PlaceResult, type RouteResult } from '../lib/mapbox';
+import { getDirections, reverseGeocode, searchPlaces, applyArabicAndEnhancedLabels, keepMapSized, type PlaceResult, type RouteResult } from '../lib/mapbox';
 import { RouteLines } from '../components/map/MapPins';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import type { LngLat } from '../types';
@@ -574,7 +574,10 @@ export default function CreateRoutePage() {
             initialViewState={{ longitude: startPoint.lng, latitude: startPoint.lat, zoom: 13 }}
             style={{ width: '100%', height: '100%', backgroundColor: isDark ? '#080E1A' : '#E2E8F0' }}
             onClick={handleMapClick}
-            onLoad={(e) => applyArabicAndEnhancedLabels(e.target)}
+            onLoad={(e) => {
+              applyArabicAndEnhancedLabels(e.target);
+              keepMapSized(e.target);
+            }}
           >
             <NavigationControl position="bottom-left" showCompass={false} />
 

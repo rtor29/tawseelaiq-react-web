@@ -810,3 +810,66 @@ export function restoreRoutePlacesOnMap(rawMap: any, _isDark = true): void {
     originalSymbolLayerStyles.clear();
   }
 }
+
+// ---------------------------------------------------------------------------
+// حارس قياس الخريطة
+//
+// mapbox-gl لا يراقب حجم حاويته: لا ResizeObserver فيه إطلاقاً، وإنما يعتمد على
+// حدث resize للنافذة و orientationchange وحدهما. وارتفاع `100dvh` على أندرويد
+// يتغيّر مع ظهور شريط عنوان المتصفح واختفائه بلا أي حدث resize، لأن منفذ العرض
+// التخطيطي (vh) لم يتغيّر أصلاً. فتبقى لوحة الرسم بقياسها الأول وتظهر الخريطة
+// بيضاء إلى أن يُجبرها تغيّرٌ آخر على إعادة الرسم (فتح لوحة الحساب مثلاً).
+// وmaplibre-gl فيه ResizeObserver، ولذلك لا يظهر هذا على staging.
+// ---------------------------------------------------------------------------
+
+type MapSizeWatcherHost = { __tawseelaSizeWatcher?: () => void };
+
+/** يراقب حاوية الخريطة ويعيد قياسها عند أي تغيّر، ويعيد دالة إيقاف */
+export function keepMapSized(rawMap: any): () => void {
+  const map = typeof rawMap?.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map || typeof map.resize !== 'function') return () => {};
+
+  // مع reuseMaps تُعاد الخريطة نفسها بحاوية جديدة، فنفكّ المراقبة القديمة أولاً
+  const host = map as MapSizeWatcherHost;
+  try {
+    host.__tawseelaSizeWatcher?.();
+  } catch (_) {}
+
+  const resize = () => {
+    try {
+      map.resize();
+    } catch (_) {}
+  };
+
+  // القياس الأول قد يسبق استقرار التخطيط، فنعيده في الإطار التالي
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(resize);
+
+  let observer: ResizeObserver | undefined;
+  const container: HTMLElement | undefined = map.getContainer?.();
+  if (container && typeof ResizeObserver !== 'undefined') {
+    observer = new ResizeObserver(resize);
+    observer.observe(container);
+  }
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') resize();
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('pageshow', resize);
+
+  const dispose = () => {
+    try {
+      observer?.disconnect();
+    } catch (_) {}
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('pageshow', resize);
+    if (host.__tawseelaSizeWatcher === dispose) delete host.__tawseelaSizeWatcher;
+  };
+
+  host.__tawseelaSizeWatcher = dispose;
+  try {
+    map.once?.('remove', dispose);
+  } catch (_) {}
+
+  return dispose;
+}

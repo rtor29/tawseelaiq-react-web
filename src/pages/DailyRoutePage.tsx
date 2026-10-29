@@ -15,7 +15,7 @@ import { authStore } from '../lib/auth';
 import { storage } from '../lib/storage';
 import { normalizePhoneLoose } from '../lib/phone';
 import { RouteLines } from '../components/map/MapPins';
-import { applyMapEnhancements, searchPlaces, highlightRoutePlacesOnMap, restoreRoutePlacesOnMap, type PlaceResult } from '../lib/mapbox';
+import { applyMapEnhancements, keepMapSized, searchPlaces, highlightRoutePlacesOnMap, restoreRoutePlacesOnMap, type PlaceResult } from '../lib/mapbox';
 import { sanitizeSearchQuery } from '../lib/sanitize';
 import { realtime } from '../lib/realtime';
 import { useTheme } from '../context/ThemeContext';
@@ -896,6 +896,7 @@ export default function DailyRoutePage() {
           onClick={handleMapClick}
           onLoad={(e) => {
             applyMapEnhancements(e.target, isDark);
+            keepMapSized(e.target);
             autoLocateDailyRouteOnMapReady(e.target);
           }}
           style={{ width: '100%', height: '100%' }}
