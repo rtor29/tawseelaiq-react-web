@@ -10,7 +10,7 @@ import { config } from '../lib/config';
 import { openTicketedStream, driverStreamUrl, type TicketedStreamHandle } from '../lib/sseTicket';
 import { RouteLines, PickupPin, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin } from '../components/map/MapPins';
 import { useNavigate } from 'react-router-dom';
-import { applyMapEnhancements, keepMapSized } from '../lib/mapbox';
+import { applyMapEnhancements, keepMapHealthy } from '../lib/mapbox';
 import { playIncomingTripAlert } from '../lib/sound';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
@@ -336,6 +336,36 @@ export default function DriverHomePage() {
   // الخريطة والموقع
   const mapRef = useRef<MapRef | null>(null);
   const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number }>({ lat: 32.0298, lng: 44.3285 });
+
+  // إعادة بناء الخريطة من الصفر حين يعجز حارس الصحة عن إصلاحها (انظر keepMapHealthy).
+  // تغيير المفتاح يهدم <MapGL> ويبنيه، فتُنشأ خريطة جديدة بسياق WebGL جديد.
+  const [mapInstanceKey, setMapInstanceKey] = useState(0);
+  const healthWatcherRef = useRef<(() => void) | null>(null);
+  const mapRebuildsRef = useRef(0);
+  const mapLoadedRef = useRef(false);
+
+  // سقف محاولتين: لو كانت العلّة في الجهاز أو الشبكة فإعادة البناء بلا حدّ
+  // تصير حلقة تهدم الخريطة كل عشرين ثانية، وهذا أسوأ من بياض ثابت
+  const rebuildMap = useCallback(() => {
+    if (mapRebuildsRef.current >= 2) return;
+    mapRebuildsRef.current += 1;
+    mapLoadedRef.current = false;
+    setMapInstanceKey((key) => key + 1);
+  }, []);
+
+  // إن لم يُطلق onLoad إطلاقاً فلا حارس يعمل أصلاً، وتبقى الخريطة بيضاء بصمت
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (!mapLoadedRef.current) rebuildMap();
+    }, 25000);
+    return () => window.clearTimeout(timer);
+  }, [mapInstanceKey, rebuildMap]);
+
+  useEffect(() => () => {
+    healthWatcherRef.current?.();
+    healthWatcherRef.current = null;
+  }, []);
+
   const [isLocating, setIsLocating] = useState(false);
   const [driverRouteCoordinates, setDriverRouteCoordinates] = useState<[number, number][] | null>(null);
 
@@ -445,7 +475,9 @@ export default function DriverHomePage() {
         dashed: true,
       };
     });
-  }, [pendingRequests, driverLoc.lat, driverLoc.lng]);
+    // mapInstanceKey: بعد إعادة بناء الخريطة تكون الماركرات القديمة ماتت مع
+    // الخريطة السابقة، فنعيد رسمها على الجديدة بدل أن تختفي طلبات معلّقة
+  }, [pendingRequests, driverLoc.lat, driverLoc.lng, mapInstanceKey]);
 
   // تتبع موقع السائق وتوسيط الخريطة
   useEffect(() => {
@@ -1827,16 +1859,18 @@ export default function DriverHomePage() {
       {/* 1. خريطة تفاعلية تغطي كامل الشاشة (Midnight Executive Mapbox Canvas) */}
       <div className="absolute inset-0 w-full h-full z-0 touch-none" style={{ touchAction: 'none' }}>
         <MapGL
+          key={mapInstanceKey}
           ref={mapRef}
-          reuseMaps
           mapboxAccessToken={config.mapboxToken}
           mapStyle={selectedMapStyle || mapStyle}
-          initialViewState={{ longitude: driverLoc.lng, latitude: driverLoc.lat, zoom: 15 }}
+          initialViewState={{ longitude: driverLocRef.current.lng, latitude: driverLocRef.current.lat, zoom: 15 }}
           dragPan={true}
           cooperativeGestures={false}
           onLoad={(e) => {
+            mapLoadedRef.current = true;
             applyMapEnhancements(e.target, isDark);
-            keepMapSized(e.target);
+            healthWatcherRef.current?.();
+            healthWatcherRef.current = keepMapHealthy(e.target, rebuildMap);
           }}
           style={{ width: '100%', height: '100%' }}
         >

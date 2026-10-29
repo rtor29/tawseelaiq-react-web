@@ -873,3 +873,105 @@ export function keepMapSized(rawMap: any): () => void {
 
   return dispose;
 }
+
+// ---------------------------------------------------------------------------
+// حارس صحة الخريطة
+//
+// `keepMapSized` يعالج علّة القياس وحدها. وبقيت الخريطة تبيضّ أحياناً لأسباب
+// أخرى لا تُشخَّص من بعيد: ضياع سياق WebGL بلا استعادة من المتصفح، أو طراز
+// لا يكتمل تحميله، أو بلاطات لا تصل. وكلها تنتهي إلى الشيء نفسه عند الكابتن:
+// مستطيل أبيض لا يُصلحه شيء.
+//
+// فبدل ملاحقة كل سبب، نراقب النتيجة: إن بقيت الخريطة غير سليمة عشرين ثانية
+// متصلة والحاوية ظاهرة، نُبلغ الصفحة لتعيد بناء الخريطة من الصفر. والمراقبة
+// قراءة خصائص كل ثلاث ثوانٍ، فلا تكلّف شيئاً وهي سليمة.
+// ---------------------------------------------------------------------------
+
+const HEALTH_TICK_MS = 3000;
+const UNHEALTHY_LIMIT_MS = 20000;
+const CONTEXT_RESTORE_GRACE_MS = 6000;
+
+/** يراقب الخريطة ويعيد قياسها، ويستدعي onUnrecoverable إن عجز عن إصلاحها */
+export function keepMapHealthy(rawMap: any, onUnrecoverable: () => void): () => void {
+  const map = typeof rawMap?.getMap === 'function' ? rawMap.getMap() : rawMap;
+  if (!map || typeof map.resize !== 'function') return () => {};
+
+  const stopSizing = keepMapSized(map);
+
+  let disposed = false;
+  let fired = false;
+  let lastGoodAt = Date.now();
+  let contextLostAt = 0;
+
+  const giveUp = () => {
+    if (fired || disposed) return;
+    fired = true;
+    try {
+      onUnrecoverable();
+    } catch (_) {}
+  };
+
+  const canvas: HTMLCanvasElement | undefined = map.getCanvas?.();
+
+  const onContextLost = () => {
+    contextLostAt = Date.now();
+  };
+
+  const onContextRestored = () => {
+    contextLostAt = 0;
+    try {
+      map.resize();
+      map.triggerRepaint?.();
+    } catch (_) {}
+  };
+
+  canvas?.addEventListener('webglcontextlost', onContextLost);
+  canvas?.addEventListener('webglcontextrestored', onContextRestored);
+
+  const tick = () => {
+    if (disposed || fired) return;
+    try {
+      const container: HTMLElement | undefined = map.getContainer?.();
+      const liveCanvas: HTMLCanvasElement | undefined = map.getCanvas?.();
+
+      // الحاوية مطوية أو الصفحة مخفية: ليست علّة، ولا نحاسب الخريطة عليها
+      if (!container || container.clientWidth === 0 || container.clientHeight === 0) {
+        lastGoodAt = Date.now();
+        return;
+      }
+
+      // سياق WebGL ضاع ولم يستعده المتصفح: لا تصلحه إعادة القياس
+      if (contextLostAt > 0 && Date.now() - contextLostAt > CONTEXT_RESTORE_GRACE_MS) {
+        giveUp();
+        return;
+      }
+
+      const canvasBlank = !liveCanvas || liveCanvas.width === 0 || liveCanvas.height === 0;
+      const styleReady = typeof map.isStyleLoaded === 'function' ? map.isStyleLoaded() : true;
+      const tilesReady = typeof map.areTilesLoaded === 'function' ? map.areTilesLoaded() : true;
+
+      if (!canvasBlank && styleReady && tilesReady) {
+        lastGoodAt = Date.now();
+        return;
+      }
+
+      // محاولة الإصلاح الرخيصة أولاً، في كل نبضة غير سليمة
+      try {
+        map.resize();
+        map.triggerRepaint?.();
+      } catch (_) {}
+
+      if (Date.now() - lastGoodAt > UNHEALTHY_LIMIT_MS) giveUp();
+    } catch (_) {}
+  };
+
+  const timer = window.setInterval(tick, HEALTH_TICK_MS);
+
+  return () => {
+    disposed = true;
+    window.clearInterval(timer);
+    canvas?.removeEventListener('webglcontextlost', onContextLost);
+    canvas?.removeEventListener('webglcontextrestored', onContextRestored);
+    stopSizing();
+  };
+}
