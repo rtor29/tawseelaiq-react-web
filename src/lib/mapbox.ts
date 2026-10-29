@@ -829,7 +829,7 @@ export function keepMapSized(rawMap: any): () => void {
   const map = typeof rawMap?.getMap === 'function' ? rawMap.getMap() : rawMap;
   if (!map || typeof map.resize !== 'function') return () => {};
 
-  // مع reuseMaps تُعاد الخريطة نفسها بحاوية جديدة، فنفكّ المراقبة القديمة أولاً
+  // لو أُعيد استعمال خريطة بحاوية جديدة، نفكّ المراقبة القديمة قبل الجديدة
   const host = map as MapSizeWatcherHost;
   try {
     host.__tawseelaSizeWatcher?.();

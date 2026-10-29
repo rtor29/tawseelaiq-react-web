@@ -2864,7 +2864,6 @@ export default function CustomerHomePage() {
         )}
         <MapGL
           ref={mapRef}
-          reuseMaps
           mapboxAccessToken={config.mapboxToken}
           mapStyle={mapStyle}
           initialViewState={{

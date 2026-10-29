@@ -887,7 +887,6 @@ export default function DailyRoutePage() {
       <div className="absolute inset-0 w-full h-full z-0 touch-none" style={{ touchAction: 'none' }}>
         <MapGL
           ref={mapRef}
-          reuseMaps
           mapboxAccessToken={config.mapboxToken}
           mapStyle={mapStyle}
           initialViewState={{ longitude: userLoc.lng, latitude: userLoc.lat, zoom: 14 }}
