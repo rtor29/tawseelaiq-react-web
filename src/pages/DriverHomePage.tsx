@@ -7,6 +7,7 @@ import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import mapboxgl from 'mapbox-gl';
 import { config } from '../lib/config';
+import { openTicketedStream, driverStreamUrl, type TicketedStreamHandle } from '../lib/sseTicket';
 import { RouteLines, PickupPin, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin } from '../components/map/MapPins';
 import { useNavigate } from 'react-router-dom';
 import { applyMapEnhancements } from '../lib/mapbox';
@@ -802,6 +803,7 @@ export default function DriverHomePage() {
     const sseConnectedRef = { current: false };
     const lastSseDisconnectTimeRef = { current: 0 };
     let es: EventSource | null = null;
+    let stream: TicketedStreamHandle | null = null;
 
     // إرسال موقع السائق بشكل مخنوق وصارم (محدد بمعدل أقصى طلب واحد كل 3 ثوانٍ لمنع تجاوز حد 30/30s)
     const sendLocation = () => {
@@ -868,170 +870,171 @@ export default function DriverHomePage() {
       if (!currentTargetId || currentTargetId === 'undefined' || currentTargetId === 'null') {
         return;
       }
-      const token = storage.getToken() || localStorage.getItem('token') || '';
-      const lastIdQuery = lastEventIdRef.current ? `&lastEventId=${encodeURIComponent(lastEventIdRef.current)}` : '';
-      const streamUrl = `${config.apiBaseUrl}/events/driver/${encodeURIComponent(currentTargetId)}?token=${encodeURIComponent(token)}${lastIdQuery}`;
-      es = new EventSource(streamUrl);
-
-      es.onopen = () => {
-        sseConnectedRef.current = true;
-      };
-
-      const handleIncomingEventId = (e: MessageEvent, data: any) => {
-        const evId = e.lastEventId || data?.eventId || data?.id;
-        if (evId) {
-          const idStr = String(evId);
-          if (processedEventIdsRef.current.has(idStr)) {
-            return false;
-          }
-          processedEventIdsRef.current.add(idStr);
-          lastEventIdRef.current = idStr;
-        }
-        return true;
-      };
-
-      es.addEventListener('init', (e: MessageEvent) => {
-        try {
+      stream = openTicketedStream({
+        buildUrl: (authParam) => driverStreamUrl(currentTargetId, authParam, lastEventIdRef.current),
+        onOpen: () => {
           sseConnectedRef.current = true;
-          const data = JSON.parse(e.data);
-          if (!handleIncomingEventId(e, data)) return;
+        },
+        setup: (src) => {
+          es = src;
 
-          if (data?.pendingRequests) {
-            updatePendingRequestsSafely(data.pendingRequests);
-          }
-          if (data?.activeRide !== undefined) {
-            if (data.activeRide) {
-              setActiveRide(data.activeRide);
-            } else {
-              setActiveRide((prev: any) => {
-                if (!prev) return null;
-                return isRideActiveStatus(prev.status) ? prev : null;
-              });
-            }
-          }
-        } catch (_) {}
-      });
-
-      es.addEventListener('dispatch', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (!handleIncomingEventId(e, data)) return;
-
-          const evType = data.event || data.type;
-          if (evType === 'ride_cancelled' || evType === 'ride_taken' || evType === 'ride_expired' || evType === 'ride_offer_expired') {
-            const cancelledId = String(data.rideId || data.requestId || data.id || '');
-            if (acceptedRideIdRef.current === cancelledId || (activeRide && String(activeRide.id || activeRide.rideId) === cancelledId)) {
-              return; // المشوار المقبول للكابتن الحالي لا يُلغى أو يومض
-            }
-            if (evType === 'ride_taken' || evType === 'ride_expired' || evType === 'ride_offer_expired') {
-              // تم قبول المشوار أو انتهاء مهلته: إزالة هادئة من البطاقات المعلقة دون رسالة إلغاء مربكة
-              setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== cancelledId));
-              if (pendingMarkersRef.current.has(cancelledId)) {
-                pendingMarkersRef.current.get(cancelledId)?.remove();
-                pendingMarkersRef.current.delete(cancelledId);
+          const handleIncomingEventId = (e: MessageEvent, data: any) => {
+            const evId = e.lastEventId || data?.eventId || data?.id;
+            if (evId) {
+              const idStr = String(evId);
+              if (processedEventIdsRef.current.has(idStr)) {
+                return false;
               }
-              lastIncomingIdRef.current = null;
-              return;
+              processedEventIdsRef.current.add(idStr);
+              lastEventIdRef.current = idStr;
             }
-            handleRideCancelled(cancelledId);
-          } else if (data?.pendingRequests) {
-            updatePendingRequestsSafely(data.pendingRequests);
-          }
-        } catch (err) {
-          console.error('[SSE:dispatch] Error handling dispatch event:', err);
-        }
-      });
+            return true;
+          };
 
-      es.addEventListener('driver_event', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (!handleIncomingEventId(e, data)) return;
+          es.addEventListener('init', (e: MessageEvent) => {
+            try {
+              sseConnectedRef.current = true;
+              const data = JSON.parse(e.data);
+              if (!handleIncomingEventId(e, data)) return;
 
-          // معالجة عرض وسحب المشوار المباشر الموجه للكابتن
-          const innerEv = data?.event || data;
-          const evType = innerEv?.event || innerEv?.type || data?.type;
-
-          // تحديث فوري لإحصائيات الكابتن الحقيقية عبر SSE عند اكتمال رحلة أو تحديث الأرقام
-          if (evType === 'stats_updated' || evType === 'ride_completed') {
-            void fetchDriverStats();
-          }
-          if (evType === 'ride_offer_expired' || evType === 'ride_taken' || evType === 'ride_cancelled') {
-            const expId = String(innerEv?.rideId || innerEv?.requestId || data?.rideId || data?.requestId || '');
-            if (expId) {
-              setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== expId));
-              if (pendingMarkersRef.current.has(expId)) {
-                pendingMarkersRef.current.get(expId)?.remove();
-                pendingMarkersRef.current.delete(expId);
+              if (data?.pendingRequests) {
+                updatePendingRequestsSafely(data.pendingRequests);
               }
-              lastIncomingIdRef.current = null;
-            }
-            return;
-          }
+              if (data?.activeRide !== undefined) {
+                if (data.activeRide) {
+                  setActiveRide(data.activeRide);
+                } else {
+                  setActiveRide((prev: any) => {
+                    if (!prev) return null;
+                    return isRideActiveStatus(prev.status) ? prev : null;
+                  });
+                }
+              }
+            } catch (_) {}
+          });
 
-          // أحداث حجوزات الخط الدائمي اللحظية (تحديث لحظي ومنع ازدواجية)
-          if (evType === 'booking_request') {
-            const rawBk = innerEv?.booking || data?.booking;
-            if (rawBk && (rawBk.id || rawBk.bookingId)) {
-              const bId = rawBk.id || rawBk.bookingId;
-              setPendingSeatRequests((prev) => {
-                if (prev.some((x) => (x.id === bId || x.bookingId === bId))) return prev;
-                return [rawBk, ...prev];
-              });
-              setIsBottomDockExpanded(true);
-              show('📢 وصلك طلب حجز مقعد جديد في الخط الدائم!', 'info');
-              try { playIncomingTripAlert(); } catch (_) {}
-            }
-            return;
-          }
+          es.addEventListener('dispatch', (e: MessageEvent) => {
+            try {
+              const data = JSON.parse(e.data);
+              if (!handleIncomingEventId(e, data)) return;
 
-          if (evType === 'booking_accepted') {
-            const bId = innerEv?.bookingId || data?.bookingId;
-            if (bId) {
-              setPendingSeatRequests((prev) => prev.filter((x) => x.id !== bId && x.bookingId !== bId));
-              void fetchSubscribers();
+              const evType = data.event || data.type;
+              if (evType === 'ride_cancelled' || evType === 'ride_taken' || evType === 'ride_expired' || evType === 'ride_offer_expired') {
+                const cancelledId = String(data.rideId || data.requestId || data.id || '');
+                if (acceptedRideIdRef.current === cancelledId || (activeRide && String(activeRide.id || activeRide.rideId) === cancelledId)) {
+                  return; // المشوار المقبول للكابتن الحالي لا يُلغى أو يومض
+                }
+                if (evType === 'ride_taken' || evType === 'ride_expired' || evType === 'ride_offer_expired') {
+                  // تم قبول المشوار أو انتهاء مهلته: إزالة هادئة من البطاقات المعلقة دون رسالة إلغاء مربكة
+                  setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== cancelledId));
+                  if (pendingMarkersRef.current.has(cancelledId)) {
+                    pendingMarkersRef.current.get(cancelledId)?.remove();
+                    pendingMarkersRef.current.delete(cancelledId);
+                  }
+                  lastIncomingIdRef.current = null;
+                  return;
+                }
+                handleRideCancelled(cancelledId);
+              } else if (data?.pendingRequests) {
+                updatePendingRequestsSafely(data.pendingRequests);
+              }
+            } catch (err) {
+              console.error('[SSE:dispatch] Error handling dispatch event:', err);
             }
-            return;
-          }
+          });
 
-          if (evType === 'booking_declined') {
-            const bId = innerEv?.bookingId || data?.bookingId;
-            if (bId) {
-              setPendingSeatRequests((prev) => prev.filter((x) => x.id !== bId && x.bookingId !== bId));
-              void fetchSubscribers();
+          es.addEventListener('driver_event', (e: MessageEvent) => {
+            try {
+              const data = JSON.parse(e.data);
+              if (!handleIncomingEventId(e, data)) return;
+
+              // معالجة عرض وسحب المشوار المباشر الموجه للكابتن
+              const innerEv = data?.event || data;
+              const evType = innerEv?.event || innerEv?.type || data?.type;
+
+              // تحديث فوري لإحصائيات الكابتن الحقيقية عبر SSE عند اكتمال رحلة أو تحديث الأرقام
+              if (evType === 'stats_updated' || evType === 'ride_completed') {
+                void fetchDriverStats();
+              }
+              if (evType === 'ride_offer_expired' || evType === 'ride_taken' || evType === 'ride_cancelled') {
+                const expId = String(innerEv?.rideId || innerEv?.requestId || data?.rideId || data?.requestId || '');
+                if (expId) {
+                  setPendingRequests((prev) => prev.filter((r) => String(r.id || (r as any).rideId) !== expId));
+                  if (pendingMarkersRef.current.has(expId)) {
+                    pendingMarkersRef.current.get(expId)?.remove();
+                    pendingMarkersRef.current.delete(expId);
+                  }
+                  lastIncomingIdRef.current = null;
+                }
+                return;
+              }
+
+              // أحداث حجوزات الخط الدائمي اللحظية (تحديث لحظي ومنع ازدواجية)
+              if (evType === 'booking_request') {
+                const rawBk = innerEv?.booking || data?.booking;
+                if (rawBk && (rawBk.id || rawBk.bookingId)) {
+                  const bId = rawBk.id || rawBk.bookingId;
+                  setPendingSeatRequests((prev) => {
+                    if (prev.some((x) => (x.id === bId || x.bookingId === bId))) return prev;
+                    return [rawBk, ...prev];
+                  });
+                  setIsBottomDockExpanded(true);
+                  show('📢 وصلك طلب حجز مقعد جديد في الخط الدائم!', 'info');
+                  try { playIncomingTripAlert(); } catch (_) {}
+                }
+                return;
+              }
+
+              if (evType === 'booking_accepted') {
+                const bId = innerEv?.bookingId || data?.bookingId;
+                if (bId) {
+                  setPendingSeatRequests((prev) => prev.filter((x) => x.id !== bId && x.bookingId !== bId));
+                  void fetchSubscribers();
+                }
+                return;
+              }
+
+              if (evType === 'booking_declined') {
+                const bId = innerEv?.bookingId || data?.bookingId;
+                if (bId) {
+                  setPendingSeatRequests((prev) => prev.filter((x) => x.id !== bId && x.bookingId !== bId));
+                  void fetchSubscribers();
+                }
+                return;
+              }
+
+              if (evType === 'new_ride') {
+                const req = innerEv?.request || innerEv?.ride || data?.request || data?.ride;
+                if (req) {
+                  updatePendingRequestsSafely([req]);
+                }
+              }
+
+              if (data?.pendingRequests && Array.isArray(data.pendingRequests)) {
+                updatePendingRequestsSafely(data.pendingRequests);
+              }
+
+              if (data?.activeRide !== undefined) {
+                if (data.activeRide) {
+                  setActiveRide(data.activeRide);
+                } else {
+                  setActiveRide((prev: any) => {
+                    if (!prev) return null;
+                    return isRideActiveStatus(prev.status) ? prev : null;
+                  });
+                }
+              }
+            } catch (err) {
+              console.error('[SSE:driver_event] Error:', err);
             }
-            return;
-          }
+          });
 
-          if (evType === 'new_ride') {
-            const req = innerEv?.request || innerEv?.ride || data?.request || data?.ride;
-            if (req) {
-              updatePendingRequestsSafely([req]);
-            }
-          }
-
-          if (data?.pendingRequests && Array.isArray(data.pendingRequests)) {
-            updatePendingRequestsSafely(data.pendingRequests);
-          }
-
-          if (data?.activeRide !== undefined) {
-            if (data.activeRide) {
-              setActiveRide(data.activeRide);
-            } else {
-              setActiveRide((prev: any) => {
-                if (!prev) return null;
-                return isRideActiveStatus(prev.status) ? prev : null;
-              });
-            }
-          }
-        } catch (err) {
-          console.error('[SSE:driver_event] Error:', err);
-        }
+          es.onerror = () => {
+            sseConnectedRef.current = false;
+            lastSseDisconnectTimeRef.current = Date.now();
+          };
+        },
       });
-
-      es.onerror = () => {
-        sseConnectedRef.current = false;
-        lastSseDisconnectTimeRef.current = Date.now();
-      };
     } catch (sseErr) {
       console.warn('[SSE] EventSource init error, fallback will handle polling:', sseErr);
       sseConnectedRef.current = false;
@@ -1047,9 +1050,7 @@ export default function DriverHomePage() {
     return () => {
       clearInterval(pollInterval);
       clearInterval(locInterval);
-      if (es) {
-        es.close();
-      }
+      stream?.close();
     };
   }, [currentTargetId, workStatus, updatePendingRequestsSafely, handleRideCancelled, isRideActiveStatus]);
 

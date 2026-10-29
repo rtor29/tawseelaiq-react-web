@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { http } from '../lib/api';
-import { config } from '../lib/config';
-import { storage } from '../lib/storage';
+import { openTicketedStream, rideStreamUrl, type TicketedStreamHandle } from '../lib/sseTicket';
 
 export interface ChatMessage {
   id: string;
@@ -81,12 +80,11 @@ export default function ChatModal({
     const interval = setInterval(fetchMessages, 2500);
 
     // Real-time SSE listener for instant message delivery without waiting for polling
-    let es: EventSource | null = null;
+    let stream: TicketedStreamHandle | null = null;
     try {
-      const token = storage.getToken() || localStorage.getItem('token') || '';
-      const streamUrl = `${config.apiBaseUrl}/ride/${encodeURIComponent(requestId)}/stream?token=${encodeURIComponent(token)}`;
-      es = new EventSource(streamUrl);
-
+      stream = openTicketedStream({
+        buildUrl: (authParam) => rideStreamUrl(requestId, authParam),
+        setup: (es) => {
       es.addEventListener('chat_message', (e: MessageEvent) => {
         try {
           const payload = JSON.parse(e.data);
@@ -107,14 +105,14 @@ export default function ChatModal({
           }
         } catch (_) {}
       });
+        },
+      });
     } catch (_) {}
 
     return () => {
       isMounted = false;
       clearInterval(interval);
-      if (es) {
-        try { es.close(); } catch (_) {}
-      }
+      stream?.close();
     };
   }, [isOpen, requestId]);
 

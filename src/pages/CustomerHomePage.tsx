@@ -13,6 +13,7 @@ import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { config, SEARCH_V2_ENABLED } from '../lib/config';
 import { realtime } from '../lib/realtime';
+import { openTicketedStream, rideStreamUrl, type TicketedStreamHandle } from '../lib/sseTicket';
 import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, type PlaceResult } from '../lib/mapbox';
 import {
   calculateBearing,
@@ -2247,104 +2248,104 @@ export default function CustomerHomePage() {
 
     // اتصال SSE اللحظي لتلقي تحديثات المشوار وموقع السائق فوراً
     let es: EventSource | null = null;
+    let stream: TicketedStreamHandle | null = null;
     try {
-      const token = storage.getToken() || localStorage.getItem('token') || '';
-      const lastIdQuery = lastCustomerEventIdRef.current ? `&lastEventId=${encodeURIComponent(lastCustomerEventIdRef.current)}` : '';
-      const streamUrl = `${config.apiBaseUrl}/ride/${encodeURIComponent(rideRequestId)}/stream?token=${encodeURIComponent(token)}${lastIdQuery}`;
-      es = new EventSource(streamUrl);
-
-      es.onopen = () => {
-        isSseConnected = true;
-      };
-
-      const handleCustomerEventId = (e: MessageEvent, data: any) => {
-        const id = e.lastEventId || data?.eventId || data?.id;
-        if (id) {
-          const str = String(id);
-          if (processedCustomerEventIdsRef.current.has(str)) return false;
-          processedCustomerEventIdsRef.current.add(str);
-          lastCustomerEventIdRef.current = str;
-        }
-        return true;
-      };
-
-      es.addEventListener('init', (e: MessageEvent) => {
-        try {
+      stream = openTicketedStream({
+        buildUrl: (authParam) => rideStreamUrl(rideRequestId, authParam, lastCustomerEventIdRef.current),
+        onOpen: () => {
           isSseConnected = true;
-          const data = JSON.parse(e.data);
-          if (!handleCustomerEventId(e, data)) return;
-          if (data?.request) {
-            handleRideStateChange(data.request);
-          }
-        } catch (_) {}
-      });
+        },
+        setup: (src) => {
+      es = src;
 
-      es.addEventListener('no_drivers_available', (e: MessageEvent) => {
-        try {
-          isSseConnected = true;
-          const data = JSON.parse(e.data);
-          if (!handleCustomerEventId(e, data)) return;
-          handleNoDriversAvailable();
-        } catch (_) {}
-      });
-
-      es.addEventListener('trip_update', (e: MessageEvent) => {
-        try {
-          isSseConnected = true;
-          const data = JSON.parse(e.data);
-          if (!handleCustomerEventId(e, data)) return;
-
-          const evType = data?.event || data?.type;
-
-          if (evType === 'no_drivers_available' || data?.status === 'NoDriversAvailable' || data?.status === 'NO_DRIVERS' || data?.status === 'no_drivers') {
-            handleNoDriversAvailable();
-            return;
-          }
-
-          if (evType === 'external_nav_active') {
-            setIsExternalNavActive(true);
-            if (data?.lastKnownLocation) {
-              const rawLoc = data.lastKnownLocation;
-              const latNum = Number(rawLoc.lat);
-              const lngNum = Number(rawLoc.lng ?? rawLoc.lon);
-              if (!isNaN(latNum) && !isNaN(lngNum)) {
-                setLastKnownDriverLocation({ lat: latNum, lng: lngNum });
-                handleDriverPositionUpdate({ lat: latNum, lng: lngNum });
-              }
+          const handleCustomerEventId = (e: MessageEvent, data: any) => {
+            const id = e.lastEventId || data?.eventId || data?.id;
+            if (id) {
+              const str = String(id);
+              if (processedCustomerEventIdsRef.current.has(str)) return false;
+              processedCustomerEventIdsRef.current.add(str);
+              lastCustomerEventIdRef.current = str;
             }
-          } else if (evType === 'external_nav_ended') {
-            setIsExternalNavActive(false);
-          }
+            return true;
+          };
 
-          if (evType === 'max_wait_exceeded') {
-            setMaxWaitExceeded(true);
-            show('تم تجاوز الحد الأقصى لوقت الانتظار المسموح به ⚠️', 'warning', 7000);
-          }
+          es.addEventListener('init', (e: MessageEvent) => {
+            try {
+              isSseConnected = true;
+              const data = JSON.parse(e.data);
+              if (!handleCustomerEventId(e, data)) return;
+              if (data?.request) {
+                handleRideStateChange(data.request);
+              }
+            } catch (_) {}
+          });
 
-          if (data?.request) {
-            handleRideStateChange(data.request);
-          } else if (data?.status) {
-            handleRideStateChange(data);
-          }
+          es.addEventListener('no_drivers_available', (e: MessageEvent) => {
+            try {
+              isSseConnected = true;
+              const data = JSON.parse(e.data);
+              if (!handleCustomerEventId(e, data)) return;
+              handleNoDriversAvailable();
+            } catch (_) {}
+          });
 
-          if (data?.event === 'driver_location' && data.location) {
-            handleDriverPositionUpdate({ lat: data.location.lat, lng: data.location.lon }, data.location.heading);
-          }
-        } catch (_) {}
+          es.addEventListener('trip_update', (e: MessageEvent) => {
+            try {
+              isSseConnected = true;
+              const data = JSON.parse(e.data);
+              if (!handleCustomerEventId(e, data)) return;
+
+              const evType = data?.event || data?.type;
+
+              if (evType === 'no_drivers_available' || data?.status === 'NoDriversAvailable' || data?.status === 'NO_DRIVERS' || data?.status === 'no_drivers') {
+                handleNoDriversAvailable();
+                return;
+              }
+
+              if (evType === 'external_nav_active') {
+                setIsExternalNavActive(true);
+                if (data?.lastKnownLocation) {
+                  const rawLoc = data.lastKnownLocation;
+                  const latNum = Number(rawLoc.lat);
+                  const lngNum = Number(rawLoc.lng ?? rawLoc.lon);
+                  if (!isNaN(latNum) && !isNaN(lngNum)) {
+                    setLastKnownDriverLocation({ lat: latNum, lng: lngNum });
+                    handleDriverPositionUpdate({ lat: latNum, lng: lngNum });
+                  }
+                }
+              } else if (evType === 'external_nav_ended') {
+                setIsExternalNavActive(false);
+              }
+
+              if (evType === 'max_wait_exceeded') {
+                setMaxWaitExceeded(true);
+                show('تم تجاوز الحد الأقصى لوقت الانتظار المسموح به ⚠️', 'warning', 7000);
+              }
+
+              if (data?.request) {
+                handleRideStateChange(data.request);
+              } else if (data?.status) {
+                handleRideStateChange(data);
+              }
+
+              if (data?.event === 'driver_location' && data.location) {
+                handleDriverPositionUpdate({ lat: data.location.lat, lng: data.location.lon }, data.location.heading);
+              }
+            } catch (_) {}
+          });
+
+          es.onerror = () => {
+            isSseConnected = false;
+          };
+        },
       });
-
-      es.onerror = () => {
-        isSseConnected = false;
-      };
     } catch (sseErr) {
       console.warn('[SSE] Ride EventSource init error, falling back:', sseErr);
     }
 
     return () => {
       clearInterval(interval);
-      if (es) {
-        es.close();
-      }
+      stream?.close();
     };
   }, [rideRequestId, stage, handleRideStateChange, handleDriverPositionUpdate, show, handleNoDriversAvailable]);
 
