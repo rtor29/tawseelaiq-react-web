@@ -347,16 +347,45 @@ export default function DriverHomePage() {
   // أندرويد يسحب سياق WebGL كلما خرج الكابتن من المتصفح، فإعادة البناء حدث
   // متكرر وطبيعي ولا يصحّ تحديده بعدد لمدى الحياة. والحدّ هنا بالمعدّل: ثلاث
   // مرات في الدقيقة كافية لكل خروج وعودة، وتوقف الحلقة لو صار الخلل دائماً.
+  // ما يُعرض فوق الخريطة حين تغيب: مؤشّر أثناء إعادة البناء، ثم زر يدوي إن لم تعد.
+  // والزر مطلب من المالك: «لا تدع الكابتن ينتظر شيئاً صامتاً لا يعرف أيعمل أم لا».
+  const [mapOverlay, setMapOverlay] = useState<'none' | 'loading' | 'help'>('none');
+  const helpTimerRef = useRef<number | undefined>(undefined);
+
+  const armHelpTimer = useCallback(() => {
+    window.clearTimeout(helpTimerRef.current);
+    helpTimerRef.current = window.setTimeout(() => {
+      if (!mapLoadedRef.current) setMapOverlay('help');
+    }, 5000);
+  }, []);
+
   const rebuildMap = useCallback(() => {
     if (document.visibilityState !== 'visible') return;
     const now = Date.now();
     const recent = mapRebuildsRef.current.filter((at) => now - at < 60000);
-    if (recent.length >= 3) return;
+    if (recent.length >= 3) {
+      // بلغنا حدّ المعدّل: لا نعيد البناء تلقائياً، بل نسلّم الأمر للكابتن
+      setMapOverlay('help');
+      return;
+    }
     recent.push(now);
     mapRebuildsRef.current = recent;
     mapLoadedRef.current = false;
+    setMapOverlay('loading');
     setMapInstanceKey((key) => key + 1);
-  }, []);
+    armHelpTimer();
+  }, [armHelpTimer]);
+
+  // ضغطة الكابتن أصدق من أي حارس: تتجاوز حدّ المعدّل وتبني فوراً
+  const forceRebuildMap = useCallback(() => {
+    mapRebuildsRef.current = [];
+    mapLoadedRef.current = false;
+    setMapOverlay('loading');
+    setMapInstanceKey((key) => key + 1);
+    armHelpTimer();
+  }, [armHelpTimer]);
+
+  useEffect(() => () => window.clearTimeout(helpTimerRef.current), []);
 
   // إن لم يُطلق onLoad إطلاقاً فلا حارس يعمل أصلاً، وتبقى الخريطة بيضاء بصمت
   useEffect(() => {
@@ -1873,6 +1902,8 @@ export default function DriverHomePage() {
           cooperativeGestures={false}
           onLoad={(e) => {
             mapLoadedRef.current = true;
+            window.clearTimeout(helpTimerRef.current);
+            setMapOverlay('none');
             applyMapEnhancements(e.target, isDark);
             healthWatcherRef.current?.();
             healthWatcherRef.current = keepMapHealthy(e.target, rebuildMap);
@@ -1992,6 +2023,29 @@ export default function DriverHomePage() {
             </Marker>
           )}
         </MapGL>
+
+        {/* غياب الخريطة لا يُترك صامتاً: مؤشّر أثناء إعادة البناء، ثم زر يضغطه الكابتن */}
+        {mapOverlay !== 'none' && (
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-[6] flex justify-center px-6 pointer-events-none">
+            {mapOverlay === 'loading' ? (
+              <div className={`flex items-center gap-2.5 rounded-full px-5 py-3 shadow-lg ${
+                isDark ? 'bg-[#161C28]/95 text-[#DDE2F4]' : 'bg-white/95 text-[#0F172A]'
+              }`}>
+                <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                <span className="text-sm font-bold">جارٍ تحميل الخريطة…</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={forceRebuildMap}
+                className="pointer-events-auto flex items-center gap-2.5 rounded-full bg-[#F59E0B] px-5 py-3 text-sm font-black text-[#0F172A] shadow-xl active:scale-95 transition-transform"
+              >
+                <span className="text-base">🔄</span>
+                <span>الخريطة لم تظهر؟ اضغط هنا</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2. الترويسة العلوية العائمة (Top Floating HUD Header) - مطابقة لـ code_4.html و screen_3.png */}
@@ -2729,6 +2783,15 @@ export default function DriverHomePage() {
               >
                 <span>🛰️ الأقمار الصناعية (Satellite Streets)</span>
                 {selectedMapStyle?.includes('satellite') && <span className="text-[#56e5a9] font-black">✓</span>}
+              </button>
+
+              {/* مخرج يدوي دائم: الحارس قد لا يرى العلّة، والكابتن يراها دائماً */}
+              <button
+                type="button"
+                onClick={() => { setShowLayersModal(false); forceRebuildMap(); }}
+                className="w-full py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-right flex items-center justify-between cursor-pointer"
+              >
+                <span>🔄 إعادة تحميل الخريطة</span>
               </button>
             </div>
           </div>
