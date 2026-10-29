@@ -354,14 +354,18 @@ export function applyArabicAndEnhancedLabels(rawMap: any, _isDark = true) {
 
       for (const layer of style.layers) {
         if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
-          // 1. صيغة استرجاع النص العربي (Text field Formula: coalesce(name_ar, name_en, name))
+          // 1. صيغة استرجاع النص العربي.
+          //    مخطط الحقول يختلف بين المحركين:
+          //    - OpenFreeMap/MapLibre على مخطط OpenMapTiles: name:ar ثم name:nonlatin ثم name
+          //    - Mapbox على مخططه الخاص: name_ar ثم name_en ثم name
           try {
-            map.setLayoutProperty(layer.id, 'text-field', [
-              'coalesce',
-              ['get', 'name_ar'],
-              ['get', 'name_en'],
-              ['get', 'name'],
-            ]);
+            map.setLayoutProperty(
+              layer.id,
+              'text-field',
+              IS_MAPLIBRE
+                ? ['coalesce', ['get', 'name:ar'], ['get', 'name:nonlatin'], ['get', 'name']]
+                : ['coalesce', ['get', 'name_ar'], ['get', 'name_en'], ['get', 'name']],
+            );
           } catch {}
 
           // 2. تعيين خط الخريطة (Font: Arial Unicode MS Regular لماب بوكس فقط؛ بينما MapLibre/OpenFreeMap يعتمد خطوط نمطه الأصلية Noto Sans)

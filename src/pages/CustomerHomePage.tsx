@@ -284,6 +284,8 @@ export default function CustomerHomePage() {
     setTimeout(() => {
       setIsTourActive(false);
       setIsTourExiting(false);
+      // الدليل فتحها ليشرحها، فتعود مطوية بعد انتهائه
+      setIsRideTypePanelOpen(false);
     }, 250);
   }, []);
 
@@ -316,7 +318,8 @@ export default function CustomerHomePage() {
     }
     return 'short';
   });
-  const [isRideTypePanelOpen, setIsRideTypePanelOpen] = useState(true);
+  // مطوية دائماً عند الدخول: لا تنفتح إلا بضغط الراكب عليها، أو مؤقتاً في دليل الاستخدام لأول مرة
+  const [isRideTypePanelOpen, setIsRideTypePanelOpen] = useState(false);
 
   // حالة حجوزات الراكب للخط الدائمي في الصفحة الموحدة
   const [customerBookings, setCustomerBookings] = useState<any[]>([]);
