@@ -221,3 +221,40 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
     </>
   );
 }
+
+// دبوس نتيجة بحث مرقّم (شاشة البحث V2) — الرقم يطابق ترتيب النتيجة في القائمة
+export function NumberedPlacePin({
+  point,
+  index,
+  label,
+  isActive = false,
+  onClick,
+}: {
+  point: LngLat;
+  index: number;
+  label?: string;
+  isActive?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <Marker longitude={point.lng} latitude={point.lat} anchor="bottom" onClick={onClick}>
+      <div className="flex cursor-pointer flex-col items-center select-none" role="button">
+        {label && isActive && (
+          <div className="mb-1 max-w-[9rem] truncate rounded-full bg-[#161C28] px-2.5 py-0.5 text-[11px] font-bold text-amber-300 shadow-lg border border-amber-500/40">
+            {label}
+          </div>
+        )}
+        <div
+          className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-[12px] font-black shadow-xl transition-transform ${
+            isActive
+              ? 'bg-amber-400 border-[#080E1A] text-slate-950 scale-110'
+              : 'bg-[#161C28] border-amber-400/80 text-amber-300 hover:scale-105'
+          }`}
+        >
+          {index}
+        </div>
+        <div className="h-2 w-[2px] bg-amber-400/80" />
+      </div>
+    </Marker>
+  );
+}

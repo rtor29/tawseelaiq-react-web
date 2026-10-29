@@ -11,6 +11,9 @@ interface ImportMetaEnv {
   readonly VITE_DEV_BACKEND_URL: string;
   readonly VITE_GENDER_FILTER?: string;
   readonly VITE_UNIFIED_HOME?: string;
+  readonly VITE_SEARCH_V2?: string;
+  readonly VITE_MAP_ENGINE?: 'mapbox' | 'maplibre';
+  readonly VITE_MAPLIBRE_STYLE?: string;
 }
 
 interface ImportMeta {

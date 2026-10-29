@@ -12,6 +12,9 @@ export const NAJAF_BBOX = IRAQ_BBOX; // للتوافق العكسي
 export const MAP_ENGINE = (import.meta.env.VITE_MAP_ENGINE || 'mapbox') as 'mapbox' | 'maplibre';
 export const IS_MAPLIBRE = MAP_ENGINE === 'maplibre';
 
+// شاشة البحث V2 عبر خدمة الأماكن المفتوحة في الخادم (staging فقط حتى إصدار صريح)
+export const SEARCH_V2_ENABLED = import.meta.env.VITE_SEARCH_V2 === 'true';
+
 // أنماط OpenFreeMap النهارية (مفتوحة ومجانية)
 export const OPENFREEMAP_LIBERTY_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 export const OPENFREEMAP_BRIGHT_STYLE = 'https://tiles.openfreemap.org/styles/bright';

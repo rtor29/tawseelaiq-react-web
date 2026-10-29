@@ -1,7 +1,7 @@
 // خدمة Mapbox — بديل MapboxService.dart (Directions + Geocoding العكسي والبحث)
 // التوكن يُقرأ من متغير البيئة VITE_MAPBOX_TOKEN فقط
 
-import { http, externalGet } from './api';
+import { externalGet } from './api';
 import { config, IS_MAPLIBRE } from './config';
 import type { LngLat } from '../types';
 
@@ -19,6 +19,12 @@ export interface PlaceResult {
   lon: number;
   subName?: string;
   fullName?: string;
+  /** حقول خدمة الأماكن المفتوحة في الخادم (تبقى غير معرّفة لنتائج Mapbox) */
+  id?: string;
+  category?: string;
+  areaName?: string;
+  govName?: string;
+  distanceM?: number;
 }
 
 const DIRECTIONS_URL = 'https://api.mapbox.com/directions/v5/mapbox/driving';
@@ -100,17 +106,26 @@ import {
   setCachedReverseGeocode,
 } from './cache';
 import { sanitizeSearchQuery, normalizeArabicText } from './sanitize';
+import { searchPlacesInGovernorate, PlacesQueryTooShortError } from './placesApi';
 
-// بحث الأماكن الذكي باللغة العربية داخل كل محافظات العراق
-// يدمج بين Mapbox Geocoding و OpenStreetMap Nominatim للأماكن والمحلات المحلية (مثل السوبرماركت والمعالم)
-export async function searchPlaces(query: string, proximity?: LngLat): Promise<PlaceResult[]> {
+// بحث الأماكن الذكي باللغة العربية داخل محافظات العراق
+// المصدر الأول: خدمة الأماكن المفتوحة في الخادم عبر POST (لا يظهر نص البحث ولا موقع الراكب في سجلات Nginx)
+// الاحتياط: Mapbox Geocoding، ولا يُستدعى إلا على خريطة Mapbox لأن شروط Mapbox تمنع عرض نتائجه على خريطة أخرى
+export async function searchPlaces(
+  query: string,
+  proximity?: LngLat,
+  govCode?: string | null,
+): Promise<PlaceResult[]> {
   const q = sanitizeSearchQuery(query).trim();
   if (!q) return [];
 
-  // التحقق من كاش المتصفح أولاً لتقليل استهلاك الـ API وتسريع الاستجابة الفورية
-  const cached = getCachedSearchResults(q, proximity);
-  if (cached && cached.length > 0) {
-    return cached;
+  // كاش المتصفح: يُستعمل فقط عند الكشف التلقائي للمحافظة.
+  // عند تحديد محافظة يدوياً لا يصلح، لأن مفتاحه لا يحمل رمز المحافظة فقد يرجع نتائج محافظة أخرى.
+  if (!govCode) {
+    const cached = getCachedSearchResults(q, proximity);
+    if (cached && cached.length > 0) {
+      return cached;
+    }
   }
 
   // تحديد ثقل البحث الجغرافي (Proximity Bias):
@@ -119,29 +134,33 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
     ? `${proximity.lng},${proximity.lat}`
     : undefined;
 
-  // 0. الاستعلام أولاً من خادم التطبيق المشترك (Redis Cache) لتوفير استدعاءات Mapbox
-  try {
-    const serverRes = await http.get<{
-      success?: boolean;
-      places?: Array<{ id: string; name: string; address?: string; lat: number; lng: number }>;
-      source?: string;
-    }>('/places/search', {
-      params: { q, proximity: proximityParam },
-      timeout: 3500,
-    });
-    if (serverRes.data?.success && Array.isArray(serverRes.data.places) && serverRes.data.places.length > 0) {
-      const places: PlaceResult[] = serverRes.data.places.map((p) => ({
-        name: p.name,
-        subName: p.address || p.name,
-        fullName: p.address || p.name,
-        lat: p.lat,
-        lon: p.lng,
-      }));
-      setCachedSearchResults(q, places, proximity);
-      return places;
+  // 0. خدمة الأماكن المفتوحة في الخادم: POST بجسم {q, lat, lng, gov}
+  //    لا تُستدعى بلا موقع، لأن الخادم يشترط إحداثيات صالحة داخل العراق
+  if (proximity) {
+    try {
+      const serverRes = await searchPlacesInGovernorate(q, proximity, govCode ?? null);
+      if (serverRes.results.length > 0) {
+        const places: PlaceResult[] = serverRes.results.map((p) => ({
+          id: p.id,
+          name: p.name,
+          subName: [p.category, p.area_name].filter(Boolean).join(' · ') || p.gov_name_ar,
+          fullName: [p.name, p.area_name, p.gov_name_ar].filter(Boolean).join('، '),
+          lat: p.lat,
+          lon: p.lng,
+          category: p.category,
+          areaName: p.area_name,
+          govName: p.gov_name_ar,
+          distanceM: p.distance_m,
+        }));
+        if (!govCode) setCachedSearchResults(q, places, proximity);
+        return places;
+      }
+      // الخدمة ردّت بلا نتائج: هذه إجابة صريحة من قاعدة الأماكن، فلا تُستدعى Mapbox بلا داعٍ
+      return [];
+    } catch (err) {
+      if (err instanceof PlacesQueryTooShortError) return [];
+      // الخدمة مطفأة أو متعذرة: السقوط على الاحتياط أدناه
     }
-  } catch (_) {
-    // السقوط الآمن على استدعاء Mapbox المباشر في حال انقطاع الخادم
   }
 
   // 1. محرك Mapbox Geocoding API الصارم
@@ -217,76 +236,20 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
     }
   };
 
-  // 2. محرك OpenStreetMap Nominatim للأماكن والمحلات المحلية الدقيقة بالعراق
-  const fetchNominatim = async (): Promise<PlaceResult[]> => {
-    try {
-      // توجيه معلمات Nominatim مع حصر بالعراق كاملاً عبر countrycodes=iq ودعم اللغة العربية
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-        q
-      )}&format=json&countrycodes=iq&accept-language=ar&limit=8`;
-      const res = await externalGet<
-        Array<{
-          place_id: number;
-          lat: string;
-          lon: string;
-          name?: string;
-          display_name: string;
-          class?: string;
-          type?: string;
-        }>
-      >(nominatimUrl, {
-        headers: {
-          'Accept-Language': 'ar',
-        },
-        timeout: 7000,
-      });
-
-      if (!Array.isArray(res)) return [];
-
-      return res.map((item) => {
-        const rawName = item.name || (item.display_name ? item.display_name.split(',')[0].trim() : q);
-        let subName = '';
-        if (item.display_name) {
-          const parts = item.display_name.split(',').map((s) => s.trim());
-          if (parts.length > 2) {
-            subName = parts.slice(1, 3).join('، ');
-          } else if (parts.length > 1) {
-            subName = parts[1];
-          }
-        }
-        if (!subName) subName = 'العراق';
-
-        return {
-          name: rawName,
-          lat: parseFloat(item.lat),
-          lon: parseFloat(item.lon),
-          subName,
-          fullName: item.display_name || rawName,
-        };
-      });
-    } catch {
-      return [];
-    }
-  };
+  // 1-ب. الاحتياط: Mapbox Geocoding وحده.
+  //      شروط Mapbox تمنع عرض نتائج أماكنه على خريطة غير Mapbox، فلا يُستدعى في وضع MapLibre.
+  if (IS_MAPLIBRE) return [];
 
   try {
-    // تشغيل محركي Mapbox و OpenStreetMap معاً بالتوازي لتحقيق أقصى سرعة ودقة في كل العراق
-    const [mapboxSettled, nominatimSettled] = await Promise.allSettled([fetchMapbox(), fetchNominatim()]);
-    const mapboxResults = mapboxSettled.status === 'fulfilled' ? mapboxSettled.value : [];
-    const nominatimResults = nominatimSettled.status === 'fulfilled' ? nominatimSettled.value : [];
-
+    const mapboxResults = await fetchMapbox();
     const normQ = normalizeArabicText(q);
 
-    // دمج نتائج المصادر
-    const combined = [...nominatimResults, ...mapboxResults];
-
-    // إزالة التكرار مع الحفاظ على الأماكن المحددة داخل العراق
     const seen = new Set<string>();
     const finalResults: PlaceResult[] = [];
 
-    for (const item of combined) {
+    for (const item of mapboxResults) {
       if (!item.name || isNaN(item.lat) || isNaN(item.lon)) continue;
-      // تصفية جغرافية تضمن أن النتائج داخل جمهورية العراق (خطوط عرض 29 إلى 38، خطوط طول 38.5 إلى 49)
+      // تصفية جغرافية تضمن أن النتائج داخل جمهورية العراق
       if (item.lat < 29.0 || item.lat > 38.0 || item.lon < 38.5 || item.lon > 49.0) continue;
 
       const normName = normalizeArabicText(item.name).slice(0, 20);
@@ -297,7 +260,7 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
       }
     }
 
-    // فرز ذكي: الأقرب لموقع المستخدم أولاً (إن توفر proximity) ثم قوة مطابقة الاسم
+    // فرز: الأقرب لموقع الراكب أولاً (إن توفر proximity) ثم قوة مطابقة الاسم
     finalResults.sort((a, b) => {
       if (proximity) {
         const distA = Math.hypot(a.lat - proximity.lat, a.lon - proximity.lng);
@@ -312,12 +275,10 @@ export async function searchPlaces(query: string, proximity?: LngLat): Promise<P
       return bExact - aExact;
     });
 
-    // تخزين النتائج في الكاش إذا وجدت نتائج
     if (finalResults.length > 0) {
       setCachedSearchResults(q, finalResults, proximity);
     }
 
-    // إرجاع مصفوفة النتائج (أو مصفوفة فارغة إذا لم يعثر على شيء لإظهار رسالة عدم التطابق)
     return finalResults;
   } catch {
     return [];

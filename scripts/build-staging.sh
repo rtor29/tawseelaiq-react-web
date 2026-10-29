@@ -35,6 +35,7 @@ rm -rf "${OUT_DIR}"
 export VITE_GENDER_FILTER="true"
 export VITE_UNIFIED_HOME="true"
 export VITE_MAP_ENGINE="maplibre"
+export VITE_SEARCH_V2="true"
 export VITE_MAP_STYLE="https://tiles.openfreemap.org/styles/liberty"
 export VITE_NAVIGATION_STYLE="https://tiles.openfreemap.org/styles/liberty"
 export NODE_ENV="production"
@@ -56,6 +57,12 @@ if ! grep -rq "gender-btn-female" "${OUT_DIR}/assets/"; then
     exit 1
 fi
 echo "✓ تم التحقق: gender-btn-female موجود داخل أصول ${OUT_DIR}."
+
+if ! grep -rq "Overture Maps Foundation" "${OUT_DIR}/assets/"; then
+    echo "❌ خطأ فادح: شاشة البحث V2 أو إشارة مصادر الأماكن غير موجودة في ${OUT_DIR}/assets/!"
+    exit 1
+fi
+echo "✓ تم التحقق: شاشة البحث V2 وإشارة المصادر موجودتان في أصول ${OUT_DIR}."
 
 # 5. النشر الحصري إلى /var/www/tawseela-web-staging
 echo ">>> [3/3] نشر أصول ${OUT_DIR} إلى ${TARGET_DIR}..."

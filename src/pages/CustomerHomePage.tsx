@@ -11,7 +11,7 @@ import { Map as MapGL, Marker, type MapMouseEvent, type MapRef } from 'react-map
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
-import { config } from '../lib/config';
+import { config, SEARCH_V2_ENABLED } from '../lib/config';
 import { realtime } from '../lib/realtime';
 import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, type PlaceResult } from '../lib/mapbox';
 import {
@@ -41,7 +41,9 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import type { LngLat } from '../types';
 import { VehicleMarker } from '../components/map/VehicleMarker';
-import { RouteLines, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin, type RouteLineData } from '../components/map/MapPins';
+import { RouteLines, NearestDriverPin, SurroundingDriverPin, DestinationFlagPin, NumberedPlacePin, type RouteLineData } from '../components/map/MapPins';
+import SearchV2Screen from '../components/SearchV2Screen';
+import type { PlaceSearchResult } from '../lib/placesApi';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { UnifiedRideTypePanel, type UnifiedRideType } from '../components/UnifiedRideTypePanel';
@@ -575,6 +577,9 @@ export default function CustomerHomePage() {
   // حالة البحث النصي للأماكن
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PlaceResult[]>([]);
+  // دبابيس نتائج البحث V2 المرقّمة على نفس الخريطة
+  const [searchV2Pins, setSearchV2Pins] = useState<PlaceSearchResult[]>([]);
+  const [activeV2PinId, setActiveV2PinId] = useState<string | null>(null);
   const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
   const [isListeningMic, setIsListeningMic] = useState(false);
   const searchTimer = useRef<number | null>(null);
@@ -1389,6 +1394,47 @@ export default function CustomerHomePage() {
     setIsSearchOpen(false);
     setSearchQuery('');
     setSearchResults([]);
+  }
+
+  // اختيار نتيجة من شاشة البحث V2
+  function handleSelectV2Place(place: PlaceSearchResult) {
+    setSearchV2Pins([]);
+    setActiveV2PinId(null);
+    handleSelectPlace({
+      name: place.name,
+      lat: place.lat,
+      lng: place.lng,
+      address: [place.category, place.area_name, place.gov_name_ar].filter(Boolean).join('، '),
+    });
+  }
+
+  // «عرض على الخريطة»: دبابيس مرقّمة على نفس الخريطة ثم إغلاق شاشة البحث
+  function handleShowV2ResultsOnMap(results: PlaceSearchResult[]) {
+    if (results.length === 0) return;
+    setSearchV2Pins(results);
+    setActiveV2PinId(null);
+    setIsSearchOpen(false);
+
+    if (results.length === 1) {
+      mapRef.current?.flyTo({ center: [results[0].lng, results[0].lat], zoom: 16, duration: 700 });
+      return;
+    }
+
+    let minLng = results[0].lng, maxLng = results[0].lng;
+    let minLat = results[0].lat, maxLat = results[0].lat;
+    for (const r of results) {
+      if (r.lng < minLng) minLng = r.lng;
+      if (r.lng > maxLng) maxLng = r.lng;
+      if (r.lat < minLat) minLat = r.lat;
+      if (r.lat > maxLat) maxLat = r.lat;
+    }
+    mapRef.current?.fitBounds(
+      [
+        [minLng, minLat],
+        [maxLng, maxLat],
+      ],
+      { padding: 72, duration: 800, maxZoom: 16 },
+    );
   }
 
   // اختيار محافظة من نافذة اختيار المحافظة
@@ -2938,7 +2984,62 @@ export default function CustomerHomePage() {
               </div>
             </Marker>
           )}
+          {/* دبابيس نتائج البحث V2 المرقّمة */}
+          {searchV2Pins.map((place, idx) => (
+            <NumberedPlacePin
+              key={place.id}
+              point={{ lat: place.lat, lng: place.lng }}
+              index={idx + 1}
+              label={place.name}
+              isActive={activeV2PinId === place.id}
+              onClick={() => {
+                setActiveV2PinId(place.id);
+                mapRef.current?.flyTo({ center: [place.lng, place.lat], zoom: 16, duration: 600 });
+              }}
+            />
+          ))}
         </MapGL>
+
+        {/* شريط نتائج البحث V2 المعروضة على الخريطة */}
+        {searchV2Pins.length > 0 && (
+          <div
+            className="pointer-events-auto absolute top-[calc(4.75rem+env(safe-area-inset-top,1rem))] inset-x-3 z-30 flex justify-center animate-fade-in"
+            dir="rtl"
+          >
+            <div
+              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 shadow-xl backdrop-blur-md ${
+                isDark ? 'bg-[#161C28]/95 border-amber-500/40 text-amber-300' : 'bg-white/95 border-amber-400 text-amber-800'
+              }`}
+            >
+              <span className="text-[12px] font-bold">
+                {searchV2Pins.length} نتيجة على الخريطة
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSearchOpen(true);
+                }}
+                className="text-[11.5px] font-bold underline-offset-2 hover:underline cursor-pointer"
+              >
+                رجوع للبحث
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchV2Pins([]);
+                  setActiveV2PinId(null);
+                }}
+                className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-amber-500/20 transition-colors cursor-pointer"
+                aria-label="مسح نتائج البحث من الخريطة"
+              >
+                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 4. دبوس المركز في منتصف الشاشة (دبوس موقعك الحالي الزمردي #56E5A9 مع رادار نابض) */}
         {stage !== 'ride_options' && stage !== 'searching' && stage !== 'driver_arriving' && (
@@ -4514,8 +4615,21 @@ export default function CustomerHomePage() {
         </div>
       )}
 
-      {/* 9. نافذة البحث الفاخرة عن الأماكن */}
-      {isSearchOpen && (
+      {/* 9-أ. شاشة البحث V2 خلف المفتاح VITE_SEARCH_V2 (staging) */}
+      {isSearchOpen && SEARCH_V2_ENABLED && (
+        <SearchV2Screen
+          isDark={isDark}
+          title={stage === 'pickup' ? 'حدد نقطة الانطلاق' : 'حدد وجهة الوصول'}
+          placeholder={stage === 'pickup' ? 'ابحث عن موقع الانطلاق...' : 'ابحث عن وجهة الوصول...'}
+          proximity={stage === 'pickup' ? pickup : dropoff}
+          onClose={() => setIsSearchOpen(false)}
+          onSelect={handleSelectV2Place}
+          onShowOnMap={handleShowV2ResultsOnMap}
+        />
+      )}
+
+      {/* 9-ب. نافذة البحث القائمة (الإنتاج) */}
+      {isSearchOpen && !SEARCH_V2_ENABLED && (
         <div className={`fixed inset-0 md:max-w-md md:mx-auto z-50 flex flex-col ${
           isDark ? 'bg-[#0D131F] text-white' : 'bg-slate-50 text-slate-900'
         }`}>
