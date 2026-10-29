@@ -61,6 +61,8 @@ rm -rf "${OUT_DIR}"
 # 2. تفعيل مفاتيح فلتر الجنس والصفحة الموحدة لبيئة الإنتاج
 export VITE_GENDER_FILTER="true"
 export VITE_UNIFIED_HOME="true"
+# شاشة البحث V2 على خدمة الأماكن المفتوحة. تتطلب PLACES_SEARCH_ENABLED=true وجدول places في قاعدة الإنتاج.
+export VITE_SEARCH_V2="true"
 export NODE_ENV="production"
 
 # 3. فحص الأنواع وبناء الحزم إلى مجلد dist المستقل
