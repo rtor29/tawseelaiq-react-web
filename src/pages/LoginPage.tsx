@@ -18,6 +18,16 @@ export default function LoginPage() {
   const { show } = useToast();
   const session = useSession();
 
+  // سبب العودة إلى شاشة الدخول: رفض الخادم توكن الجلسة المخزّنة (انتهاء الصلاحية أو تدوير السر)
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('tawseela_session_expired') === '1') {
+        sessionStorage.removeItem('tawseela_session_expired');
+        show('انتهت جلسة الدخول، سجّل الدخول من جديد', 'warning', 6000);
+      }
+    } catch (_) {}
+  }, []);
+
   // Role switching: 'passenger' or 'driver'
   const [role, setRole] = useState<'passenger' | 'driver'>('passenger');
 
