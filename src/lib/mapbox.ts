@@ -891,6 +891,16 @@ const HEALTH_TICK_MS = 3000;
 const UNHEALTHY_LIMIT_MS = 20000;
 const CONTEXT_RESTORE_GRACE_MS = 6000;
 
+/** هل فقدت الخريطة سياق WebGL فعلاً؟ سؤال مباشر للمتصفح، لا استنتاج */
+function isGlContextLost(map: any): boolean {
+  try {
+    const gl = map?.painter?.context?.gl;
+    return !!gl && typeof gl.isContextLost === 'function' && gl.isContextLost();
+  } catch (_) {
+    return false;
+  }
+}
+
 /** يراقب الخريطة ويعيد قياسها، ويستدعي onUnrecoverable إن عجز عن إصلاحها */
 export function keepMapHealthy(rawMap: any, onUnrecoverable: () => void): () => void {
   const map = typeof rawMap?.getMap === 'function' ? rawMap.getMap() : rawMap;
@@ -940,7 +950,13 @@ export function keepMapHealthy(rawMap: any, onUnrecoverable: () => void): () => 
         return;
       }
 
-      // سياق WebGL ضاع ولم يستعده المتصفح: لا تصلحه إعادة القياس
+      // سياق WebGL ضاع فعلاً: لا تصلحه إعادة قياس ولا انتظار، ولا معنى لمهلة
+      if (isGlContextLost(map)) {
+        giveUp();
+        return;
+      }
+
+      // ضاع وأُبلغنا بالحدث ولم يستعده المتصفح خلال المهلة
       if (contextLostAt > 0 && Date.now() - contextLostAt > CONTEXT_RESTORE_GRACE_MS) {
         giveUp();
         return;
@@ -967,9 +983,24 @@ export function keepMapHealthy(rawMap: any, onUnrecoverable: () => void): () => 
 
   const timer = window.setInterval(tick, HEALTH_TICK_MS);
 
+  // العودة من الخلفية هي اللحظة التي يسحب فيها أندرويد السياق، فلا ننتظر النبضة
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible') return;
+    window.setTimeout(() => {
+      if (disposed || fired) return;
+      if (isGlContextLost(map)) {
+        giveUp();
+        return;
+      }
+      tick();
+    }, 400);
+  };
+  document.addEventListener('visibilitychange', onVisible);
+
   return () => {
     disposed = true;
     window.clearInterval(timer);
+    document.removeEventListener('visibilitychange', onVisible);
     canvas?.removeEventListener('webglcontextlost', onContextLost);
     canvas?.removeEventListener('webglcontextrestored', onContextRestored);
     stopSizing();

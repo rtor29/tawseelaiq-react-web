@@ -341,14 +341,19 @@ export default function DriverHomePage() {
   // تغيير المفتاح يهدم <MapGL> ويبنيه، فتُنشأ خريطة جديدة بسياق WebGL جديد.
   const [mapInstanceKey, setMapInstanceKey] = useState(0);
   const healthWatcherRef = useRef<(() => void) | null>(null);
-  const mapRebuildsRef = useRef(0);
+  const mapRebuildsRef = useRef<number[]>([]);
   const mapLoadedRef = useRef(false);
 
-  // سقف محاولتين: لو كانت العلّة في الجهاز أو الشبكة فإعادة البناء بلا حدّ
-  // تصير حلقة تهدم الخريطة كل عشرين ثانية، وهذا أسوأ من بياض ثابت
+  // أندرويد يسحب سياق WebGL كلما خرج الكابتن من المتصفح، فإعادة البناء حدث
+  // متكرر وطبيعي ولا يصحّ تحديده بعدد لمدى الحياة. والحدّ هنا بالمعدّل: ثلاث
+  // مرات في الدقيقة كافية لكل خروج وعودة، وتوقف الحلقة لو صار الخلل دائماً.
   const rebuildMap = useCallback(() => {
-    if (mapRebuildsRef.current >= 2) return;
-    mapRebuildsRef.current += 1;
+    if (document.visibilityState !== 'visible') return;
+    const now = Date.now();
+    const recent = mapRebuildsRef.current.filter((at) => now - at < 60000);
+    if (recent.length >= 3) return;
+    recent.push(now);
+    mapRebuildsRef.current = recent;
     mapLoadedRef.current = false;
     setMapInstanceKey((key) => key + 1);
   }, []);
