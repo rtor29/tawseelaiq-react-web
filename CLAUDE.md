@@ -16,6 +16,10 @@
 - يتم فقط بالسكربتين، ولا rsync/cp يدوي:
   - staging: `npm run build-staging`، ويبني `dist-staging/` ثم ينشر إلى `/var/www/tawseela-web-staging`.
   - الإنتاج: `npm run build-production`، ويبني `dist/` ثم ينشر إلى `/var/www/tawseela-web`.
+- **أين يُبنى:** السكربت يتفرّع بنفسه. على الخادم (Linux والمجلد الهدف موجود) ينشر محلياً، وخارجه يرسل الملفات بـssh. فالنسخة التي على الخادم هي الطريق المعتمد، وينفّذها Antigravity:
+  - `bash scripts/build-staging.sh --pull`
+  - الخيار `--pull` يسحب آخر `origin/main` قبل البناء: يتوقف إن كانت الشجرة غير نظيفة، ثم `git fetch`، ثم `git merge --ff-only` (بلا `reset --hard` وبلا force)، ثم `npm ci`. ويطبع `COMMIT_BEING_BUILT=<sha>` للتحقق.
+  - **استثناء صريح من قاعدة git:** الـgit والـrsync داخل هذين السكربتين مسموحان، تماماً كـ`git pull` داخل `deploy-staging.sh` في الخادم. الممنوع هو أمر git أو rsync **يدوي** بيد Antigravity.
   - كلاهما يشغّل `tsc -b` ويفحص وجود `gender-btn-female`. سكربت الإنتاج يفحص أيضاً `unified-panel-open-card`.
 - **المفاتيح**:
 

@@ -28,6 +28,33 @@ echo "  المجلد المستقل: ${OUT_DIR}"
 echo "  الهدف المنشور: ${TARGET_DIR}"
 echo "======================================================"
 
+# ------------------------------------------------------------------------------
+# سحب آخر نسخة من GitHub عند تمرير --pull (للبناء على الخادم بيد Antigravity)
+# بلا reset --hard وبلا force: يتوقف إن كانت الشجرة غير نظيفة أو تعذّر التقديم السريع
+# ------------------------------------------------------------------------------
+if [ "${1:-}" = "--pull" ]; then
+    echo ">>> [0/3] سحب آخر نسخة من origin/main..."
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        echo "❌ خطأ فادح: شجرة العمل غير نظيفة. تم إلغاء البناء."
+        git status --porcelain --untracked-files=no
+        exit 1
+    fi
+    if ! git fetch origin main; then
+        echo "❌ خطأ فادح: فشل سحب التحديثات من GitHub. تم إلغاء البناء."
+        exit 1
+    fi
+    if ! git merge --ff-only origin/main; then
+        echo "❌ خطأ فادح: تعذّر التقديم السريع إلى origin/main. تم إلغاء البناء."
+        exit 1
+    fi
+    if ! npm ci --no-audit --no-fund; then
+        echo "❌ خطأ فادح: فشل تثبيت الحزم. تم إلغاء البناء."
+        exit 1
+    fi
+fi
+
+echo "COMMIT_BEING_BUILT=$(git rev-parse --short HEAD)"
+
 # 1. تنظيف مجلد البناء المستقل
 rm -rf "${OUT_DIR}"
 
