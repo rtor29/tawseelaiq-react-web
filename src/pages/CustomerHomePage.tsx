@@ -489,6 +489,40 @@ export default function CustomerHomePage() {
     }
   }
 
+  // إلغاء طلب حجز معلّق لم يردّ عليه الكابتن بعد: إلغاء مباشر لا طلب ينتظر موافقته
+  async function handleCancelPendingBooking(bookingId: string) {
+    if (!bookingId || isBookingSeat) return;
+    setIsBookingSeat(true);
+    try {
+      const { data } = await http.post<{ success: boolean; message?: string; error?: string }>(
+        `/bookings/${encodeURIComponent(bookingId)}/cancel`,
+        {},
+      );
+      if (data?.success) {
+        show('تم إلغاء طلب الحجز ✅', 'success', 5000);
+        setCustomerBookings((prev) =>
+          prev.filter((b: any) => String(b.id || b.bookingId || '') !== String(bookingId)),
+        );
+      } else {
+        show(data?.error || 'تعذر إلغاء طلب الحجز', 'error');
+      }
+    } catch (err: unknown) {
+      const res = (err as { response?: { status?: number; data?: { error?: string } } })?.response;
+      // 409 يعني أن الكابتن ردّ للتو، فنعيد تحميل الحجوزات لتظهر الحالة الصحيحة
+      if (res?.status === 409) {
+        // الكابتن ردّ للتو: نزيل الطلب من القائمة المحلية ويعيد الاستطلاع الدوري تحميل حالته الصحيحة
+        show(res.data?.error || 'تغيّرت حالة الطلب، يرجى الانتظار لحظة', 'warning', 6000);
+        setCustomerBookings((prev) =>
+          prev.filter((b: any) => String(b.id || b.bookingId || '') !== String(bookingId)),
+        );
+      } else {
+        show(res?.data?.error || 'فشل إلغاء طلب الحجز', 'error');
+      }
+    } finally {
+      setIsBookingSeat(false);
+    }
+  }
+
   async function handleSubmitCommuteCancel(reason: string, details: string) {
     if (!selectedCommuteDriver) return;
     setIsSubmittingCommuteCancel(true);
@@ -3271,6 +3305,7 @@ export default function CustomerHomePage() {
             isBooking={isBookingSeat}
             onBookSeat={handleBookCommuteSeat}
             onRequestCancellation={() => setIsCommuteCancelModalOpen(true)}
+            onCancelPendingBooking={handleCancelPendingBooking}
             onClose={() => {
               setSelectedCommuteDriver(null);
               setShowCommuteRoute(false);
