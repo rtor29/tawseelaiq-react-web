@@ -349,15 +349,23 @@ export default function DriverHomePage() {
   // مرات في الدقيقة كافية لكل خروج وعودة، وتوقف الحلقة لو صار الخلل دائماً.
   // ما يُعرض فوق الخريطة حين تغيب: مؤشّر أثناء إعادة البناء، ثم زر يدوي إن لم تعد.
   // والزر مطلب من المالك: «لا تدع الكابتن ينتظر شيئاً صامتاً لا يعرف أيعمل أم لا».
-  const [mapOverlay, setMapOverlay] = useState<'none' | 'loading' | 'help'>('none');
+  // يبدأ بـloading لا none: حزمة Mapbox وحدها نحو ميغابايتين، وعلى شبكة بطيئة
+  // تمرّ ثوانٍ قبل أول رسم. وشاشة بيضاء صامتة تبدو عطلاً وهي تحميل عادي.
+  const [mapOverlay, setMapOverlay] = useState<'none' | 'loading' | 'help'>('loading');
   const helpTimerRef = useRef<number | undefined>(undefined);
 
-  const armHelpTimer = useCallback(() => {
+  // الفتحة الأولى تستحق صبراً أطول من إعادة بناء بعد عطل: تلك تُعيد استعمال
+  // حزمة محمّلة أصلاً، وهذه قد تكون ما زالت تنزّلها
+  const armHelpTimer = useCallback((delayMs: number) => {
     window.clearTimeout(helpTimerRef.current);
     helpTimerRef.current = window.setTimeout(() => {
       if (!mapLoadedRef.current) setMapOverlay('help');
-    }, 5000);
+    }, delayMs);
   }, []);
+
+  useEffect(() => {
+    armHelpTimer(15000);
+  }, [armHelpTimer]);
 
   const rebuildMap = useCallback(() => {
     if (document.visibilityState !== 'visible') return;
@@ -373,7 +381,7 @@ export default function DriverHomePage() {
     mapLoadedRef.current = false;
     setMapOverlay('loading');
     setMapInstanceKey((key) => key + 1);
-    armHelpTimer();
+    armHelpTimer(5000);
   }, [armHelpTimer]);
 
   // ضغطة الكابتن أصدق من أي حارس: تتجاوز حدّ المعدّل وتبني فوراً
@@ -382,7 +390,7 @@ export default function DriverHomePage() {
     mapLoadedRef.current = false;
     setMapOverlay('loading');
     setMapInstanceKey((key) => key + 1);
-    armHelpTimer();
+    armHelpTimer(5000);
   }, [armHelpTimer]);
 
   useEffect(() => () => window.clearTimeout(helpTimerRef.current), []);
