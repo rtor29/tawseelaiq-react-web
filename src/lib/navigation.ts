@@ -269,3 +269,170 @@ export async function requestRoute(
     durationS: Math.round(data.trip.summary.time || 0),
   };
 }
+
+// ---------------------------------------------------------------------------
+// رياضيات التتبّع على المسار
+//
+// كل ما يحتاجه المتتبّع: أين أنا على الخط، وكم بقي للمناورة، وإلى أين أتّجه.
+// دوال صرف بلا حالة، كي تُختبر وحدها بلا خريطة ولا متصفح.
+// ---------------------------------------------------------------------------
+
+const EARTH_RADIUS_M = 6371000;
+const toRad = (deg: number) => (deg * Math.PI) / 180;
+const toDeg = (rad: number) => (rad * 180) / Math.PI;
+
+/** المسافة بين نقطتين بالأمتار */
+export function haversineM(a: LatLng, b: LatLng): number {
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** الاتجاه من نقطة إلى أخرى بالدرجات، صفر شمالاً */
+export function bearingBetween(a: LatLng, b: LatLng): number {
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+/**
+ * المسافة التراكمية عند كل نقطة من المسار.
+ * تُحسب مرة عند استلام المسار، فكل سؤال بعدها عن الموضع يصير بحثاً لا حساباً.
+ */
+export function cumulativeDistances(coordinates: [number, number][]): number[] {
+  const out = new Array(coordinates.length).fill(0);
+  for (let i = 1; i < coordinates.length; i++) {
+    const prev = { lat: coordinates[i - 1][1], lng: coordinates[i - 1][0] };
+    const cur = { lat: coordinates[i][1], lng: coordinates[i][0] };
+    out[i] = out[i - 1] + haversineM(prev, cur);
+  }
+  return out;
+}
+
+export interface RoutePosition {
+  point: LatLng;
+  /** رقم النقطة التي قبل الموضع مباشرة */
+  index: number;
+  /** الاتجاه الذي يسير فيه الخط عند هذا الموضع */
+  bearing: number;
+}
+
+/**
+ * الموضع على المسار بعد قطع مسافة معيّنة من بدايته.
+ * يُقحم بين النقطتين المحيطتين، فالسهم يتحرّك بانسياب لا يقفز من نقطة إلى نقطة.
+ */
+export function positionAtDistance(
+  coordinates: [number, number][],
+  cumulative: number[],
+  distanceM: number,
+): RoutePosition {
+  const last = coordinates.length - 1;
+  if (coordinates.length === 0) {
+    return { point: { lat: 0, lng: 0 }, index: 0, bearing: 0 };
+  }
+  if (coordinates.length === 1 || distanceM <= 0) {
+    return {
+      point: { lat: coordinates[0][1], lng: coordinates[0][0] },
+      index: 0,
+      bearing: coordinates.length > 1
+        ? bearingBetween(
+            { lat: coordinates[0][1], lng: coordinates[0][0] },
+            { lat: coordinates[1][1], lng: coordinates[1][0] },
+          )
+        : 0,
+    };
+  }
+
+  const total = cumulative[last];
+  if (distanceM >= total) {
+    return {
+      point: { lat: coordinates[last][1], lng: coordinates[last][0] },
+      index: last,
+      bearing: bearingBetween(
+        { lat: coordinates[last - 1][1], lng: coordinates[last - 1][0] },
+        { lat: coordinates[last][1], lng: coordinates[last][0] },
+      ),
+    };
+  }
+
+  // بحث ثنائي: المسافات التراكمية مرتّبة تصاعدياً دائماً
+  let lo = 0;
+  let hi = last;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (cumulative[mid] <= distanceM) lo = mid;
+    else hi = mid - 1;
+  }
+
+  const a = { lat: coordinates[lo][1], lng: coordinates[lo][0] };
+  const b = { lat: coordinates[lo + 1][1], lng: coordinates[lo + 1][0] };
+  const segment = cumulative[lo + 1] - cumulative[lo];
+  const ratio = segment > 0 ? (distanceM - cumulative[lo]) / segment : 0;
+
+  return {
+    point: {
+      lat: a.lat + (b.lat - a.lat) * ratio,
+      lng: a.lng + (b.lng - a.lng) * ratio,
+    },
+    index: lo,
+    bearing: bearingBetween(a, b),
+  };
+}
+
+/**
+ * ألصِق موقعاً حقيقياً بأقرب نقطة على المسار، وأعِد المسافة المقطوعة عندها.
+ * مستشعر الهاتف يتأرجح أمتاراً، فبلا هذا يبدو السهم على الرصيف أو في البيت
+ * المجاور، وتُحسب المسافة الباقية خطأً.
+ */
+export function snapToRoute(
+  coordinates: [number, number][],
+  cumulative: number[],
+  position: LatLng,
+): { distanceAlongM: number; offRouteM: number } {
+  let bestDistance = Infinity;
+  let bestAlong = 0;
+
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const a = { lat: coordinates[i][1], lng: coordinates[i][0] };
+    const b = { lat: coordinates[i + 1][1], lng: coordinates[i + 1][0] };
+
+    // إسقاط مستوٍ: على أطوال مقطع واحد يكفي ويُجنّبنا مثلثات كروية لكل نقطة
+    const latScale = Math.cos(toRad(position.lat));
+    const ax = (b.lng - a.lng) * latScale;
+    const ay = b.lat - a.lat;
+    const px = (position.lng - a.lng) * latScale;
+    const py = position.lat - a.lat;
+    const lenSq = ax * ax + ay * ay;
+    const t = lenSq > 0 ? Math.max(0, Math.min(1, (px * ax + py * ay) / lenSq)) : 0;
+
+    const proj = { lat: a.lat + ay * t, lng: a.lng + (b.lng - a.lng) * t };
+    const d = haversineM(position, proj);
+    if (d < bestDistance) {
+      bestDistance = d;
+      bestAlong = cumulative[i] + (cumulative[i + 1] - cumulative[i]) * t;
+    }
+  }
+
+  return { distanceAlongM: bestAlong, offRouteM: bestDistance };
+}
+
+/** رقم المناورة القادمة بعد موضعنا الحالي على المسار */
+export function nextManeuverIndex(
+  maneuvers: NavManeuver[],
+  cumulative: number[],
+  distanceAlongM: number,
+): number {
+  for (let i = 0; i < maneuvers.length; i++) {
+    const at = cumulative[maneuvers[i].shapeIndex] ?? 0;
+    // هامش عشرة أمتار: المناورة تُعدّ منتهية بمجرد تجاوزها لا قبله بلحظة
+    if (at > distanceAlongM + 10) return i;
+  }
+  return maneuvers.length - 1;
+}
