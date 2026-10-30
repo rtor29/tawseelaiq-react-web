@@ -53,6 +53,9 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
   const [isFollowing, setIsFollowing] = useState(true);
   const [offRouteM, setOffRouteM] = useState(0);
 
+  // إصبع المستخدم على الشاشة الآن: لا نحرّك الكاميرا تحته
+  const isGesturingRef = useRef(false);
+
   const cumulative = useMemo(
     () => (route ? cumulativeDistances(route.coordinates) : []),
     [route],
@@ -193,15 +196,17 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
   // الكاميرا تتبع السهم وتدور معه
   // ---------------------------------------------------------------------
   useEffect(() => {
-    if (!isFollowing || !live) return;
+    if (!isFollowing || !live || isGesturingRef.current) return;
     const map = mapRef.current?.getMap?.();
     if (!map) return;
     try {
       map.easeTo({
         center: [live.position.point.lng, live.position.point.lat],
         bearing: live.position.bearing,
-        pitch: 60,
-        zoom: 17.5,
+        // التقريب والميل يبقيان كما ضبطهما السائق: الملاحقة تحرّك المركز
+        // والاتجاه فقط. وفرض قيمة ثابتة هنا كان يُلغي تكبيره عند كل إطار.
+        pitch: map.getPitch(),
+        zoom: map.getZoom(),
         duration: 600,
         essential: true,
       });
@@ -246,7 +251,16 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
           pitch: 60,
         }}
         style={{ width: '100%', height: '100%' }}
+        // السحب وحده يوقف الملاحقة، فهو يقول «أريد النظر إلى مكان آخر».
+        // أما التكبير والتدوير والإمالة فتبقى الملاحقة معها، لأن السائق يريد
+        // أن يقترب أو يبتعد وهو ماضٍ في طريقه لا أن يتوقف عن المتابعة.
         onDragStart={() => setIsFollowing(false)}
+        onZoomStart={(e) => { if (e.originalEvent) isGesturingRef.current = true; }}
+        onZoomEnd={(e) => { if (e.originalEvent) isGesturingRef.current = false; }}
+        onRotateStart={(e) => { if (e.originalEvent) isGesturingRef.current = true; }}
+        onRotateEnd={(e) => { if (e.originalEvent) isGesturingRef.current = false; }}
+        onPitchStart={(e) => { if (e.originalEvent) isGesturingRef.current = true; }}
+        onPitchEnd={(e) => { if (e.originalEvent) isGesturingRef.current = false; }}
       >
         <RouteLines lines={routeLines} />
 
