@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Map as MapGL, Marker, type MapRef } from 'react-map-gl';
 import { RouteLines } from './map/MapPins';
 import { config } from '../lib/config';
+import { searchPlacesInGovernorate, type PlaceSearchResult } from '../lib/placesApi';
 import { useTheme } from '../context/ThemeContext';
 import {
   requestRoute,
@@ -38,6 +39,21 @@ const VOICE_THRESHOLDS_M = [800, 400, 150, 30];
 /** سرعة المحاكاة: 60 كم/س تقريباً، وهي سرعة مدينة معقولة للعرض */
 const SIM_SPEED_MPS = 16.7;
 
+/**
+ * الفلاتر: كل واحد كلمة يفهمها بحث الأماكن فيحوّلها إلى فئة في قاعدة البيانات.
+ * فلا حاجة إلى مسار جديد في الخادم، والكلمة نفسها يكتبها المستخدم في البحث.
+ */
+const PLACE_FILTERS = [
+  { icon: '⛽', label: 'بنزين', query: 'بنزين' },
+  { icon: '🍽️', label: 'مطاعم', query: 'مطعم' },
+  { icon: '💊', label: 'صيدليات', query: 'صيدلية' },
+  { icon: '🏦', label: 'بنوك', query: 'مصرف' },
+  { icon: '🔧', label: 'تصليح', query: 'تصليح' },
+  { icon: '🏥', label: 'مستشفيات', query: 'مستشفى' },
+  { icon: '🏪', label: 'أسواق', query: 'سوق' },
+  { icon: '🔌', label: 'شحن', query: 'شحن كهربائي' },
+];
+
 /** أبعد من هذا عن الخط نعدّه خروجاً عن المسار */
 const OFF_ROUTE_LIMIT_M = 50;
 
@@ -55,6 +71,10 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
 
   // إصبع المستخدم على الشاشة الآن: لا نحرّك الكاميرا تحته
   const isGesturingRef = useRef(false);
+
+  // فلاتر الأماكن: الكلمة تُرسل إلى بحث الأماكن، والخادم يحوّلها إلى فئة
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [filterPlaces, setFilterPlaces] = useState<PlaceSearchResult[]>([]);
 
   const cumulative = useMemo(
     () => (route ? cumulativeDistances(route.coordinates) : []),
@@ -258,6 +278,20 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
     } catch (_) {}
   }, [live, isFollowing]);
 
+  useEffect(() => {
+    if (!activeFilter || !live) {
+      setFilterPlaces([]);
+      return;
+    }
+    const controller = new AbortController();
+    searchPlacesInGovernorate(activeFilter, live.position.point, null, controller.signal)
+      .then((res) => setFilterPlaces(res.results || []))
+      .catch(() => setFilterPlaces([]));
+    return () => controller.abort();
+    // الموقع متعمَّد خارج التبعيات: الفلتر يُجلب مرة عند اختياره، لا مع كل متر
+    // يقطعه السائق، وإلا صار طلباً كل جزء من الثانية.
+  }, [activeFilter]);
+
   const routeLines = useMemo(
     () =>
       route
@@ -319,6 +353,17 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
             </div>
           </Marker>
         )}
+
+        {filterPlaces.map((place) => (
+          <Marker key={place.id} longitude={place.lng} latitude={place.lat} anchor="bottom">
+            <div className="flex flex-col items-center pointer-events-none">
+              <div className="px-2 py-0.5 rounded-md bg-slate-900/85 text-white text-[10px] font-bold max-w-[7rem] truncate">
+                {place.name}
+              </div>
+              <span className="text-lg leading-none">📍</span>
+            </div>
+          </Marker>
+        ))}
 
         <Marker longitude={destination.lng} latitude={destination.lat} anchor="bottom">
           <div className="flex flex-col items-center">
@@ -390,6 +435,37 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
           </button>
         )}
       </div>
+
+      {/* فلاتر الأماكن: شريط أفقي فوق شريط الوصول */}
+      <div className="absolute bottom-28 inset-x-0 px-3 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2 w-max pb-1">
+          {PLACE_FILTERS.map((f) => {
+            const isOn = activeFilter === f.query;
+            return (
+              <button
+                key={f.query}
+                type="button"
+                onClick={() => setActiveFilter(isOn ? null : f.query)}
+                className={`shrink-0 px-3 py-2 rounded-full text-xs font-bold shadow-lg whitespace-nowrap ${
+                  isOn ? 'bg-amber-500 text-slate-950' : panelBg
+                }`}
+              >
+                {f.icon} {f.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {activeFilter && (
+        <div className="absolute bottom-[8.5rem] inset-x-0 flex justify-center px-3 pointer-events-none">
+          <div className={`rounded-full px-3 py-1 text-[11px] font-bold shadow-lg ${panelBg}`}>
+            {filterPlaces.length > 0
+              ? `${filterPlaces.length} نتيجة قريبة`
+              : 'لا نتائج قريبة'}
+          </div>
+        </div>
+      )}
 
       {/* شريط الوصول */}
       <div className="absolute bottom-0 inset-x-0 p-3 pb-safe">
