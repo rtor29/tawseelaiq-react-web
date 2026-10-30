@@ -112,20 +112,65 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
   // ---------------------------------------------------------------------
   const spokenRef = useRef<string>('');
 
+  // صوت عربي مُختار بالاسم، لا بالاعتماد على lang وحده.
+  //
+  // المتصفح يحمّل قائمة الأصوات بتكاسل: أول استدعاء بعد فتح الصفحة يجدها فارغة،
+  // ثم يُطلق `voiceschanged`. فمن يقرأها مرة واحدة عند التحميل يجدها خالية دائماً.
+  // ولا يكفي ضبط lang='ar': كثير من الأجهزة تنطق النص بصوت إنجليزي فيخرج مشوّهاً،
+  // فنبحث عن صوت لغته تبدأ بـar ونمرّره صراحة.
+  const arabicVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const [hasArabicVoice, setHasArabicVoice] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      setHasArabicVoice(false);
+      return;
+    }
+
+    const pickVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+      const arabic = voices.find((v) => v.lang?.toLowerCase().startsWith('ar'));
+      arabicVoiceRef.current = arabic || null;
+      setHasArabicVoice(Boolean(arabic));
+    };
+
+    pickVoice();
+    window.speechSynthesis.addEventListener('voiceschanged', pickVoice);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', pickVoice);
+  }, []);
+
   const speak = useCallback(
     (text: string) => {
       if (isMuted || typeof window === 'undefined' || !window.speechSynthesis) return;
       try {
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ar';
-        utterance.rate = 1.0;
+        if (arabicVoiceRef.current) utterance.voice = arabicVoiceRef.current;
+        utterance.lang = arabicVoiceRef.current?.lang || 'ar-SA';
+        // أبطأ قليلاً من الافتراضي: التعليمة تُسمع مرة واحدة والسائق منشغل بالطريق
+        utterance.rate = 0.95;
         window.speechSynthesis.speak(utterance);
       } catch (_) {
-        // غياب الأصوات العربية في الجهاز لا يوقف الملاحة
+        // جهاز بلا أصوات لا يوقف الملاحة
       }
     },
     [isMuted],
   );
+
+  /**
+   * أندرويد لا يسمح بالنطق إلا بعد لمسة من المستخدم. فنُطلق جملة صامتة عند أول
+   * ضغطة على زر، فيُفتح الباب، وتُسمع التعليمة الأولى في وقتها لا بعد فوات المنعطف.
+   */
+  const primedRef = useRef(false);
+  const primeVoice = useCallback(() => {
+    if (primedRef.current || typeof window === 'undefined' || !window.speechSynthesis) return;
+    primedRef.current = true;
+    try {
+      const warmup = new SpeechSynthesisUtterance(' ');
+      warmup.volume = 0;
+      window.speechSynthesis.speak(warmup);
+    } catch (_) {}
+  }, []);
 
   useEffect(() => {
     if (!live || !live.maneuver || live.arrived) return;
@@ -323,12 +368,17 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
       <div className="absolute top-28 left-3 flex flex-col gap-2">
         <button
           type="button"
-          onClick={() => setIsMuted((m) => !m)}
+          onClick={() => { primeVoice(); setIsMuted((m) => !m); }}
           aria-label={isMuted ? 'تشغيل الصوت' : 'كتم الصوت'}
           className={`w-11 h-11 rounded-full shadow-lg flex items-center justify-center text-lg ${panelBg}`}
         >
-          {isMuted ? '🔇' : '🔊'}
+          {isMuted ? '🔇' : hasArabicVoice === false ? '🔈' : '🔊'}
         </button>
+        {hasArabicVoice === false && !isMuted && (
+          <div className={`max-w-[9rem] rounded-xl px-2.5 py-1.5 text-[10px] font-bold shadow-lg ${panelBg}`}>
+            لا يوجد صوت عربي في هذا الجهاز، والتعليمات تظهر مكتوبة
+          </div>
+        )}
         {!isFollowing && (
           <button
             type="button"
@@ -363,7 +413,7 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
 
           <button
             type="button"
-            onClick={() => setIsSimulating((s) => !s)}
+            onClick={() => { primeVoice(); setIsSimulating((s) => !s); }}
             disabled={!route}
             className="mt-2.5 w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black disabled:opacity-40"
           >
