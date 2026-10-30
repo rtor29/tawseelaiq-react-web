@@ -61,9 +61,13 @@ export function NavigationView({ origin, destination: initialDestination, destin
   // الوجهة تصير حالة داخلية: البحث يغيّرها ويُعاد حساب المسار عليها
   const [destination, setDestination] = useState<LatLng>(initialDestination);
   const [destinationName, setDestinationName] = useState(initialName || 'الوجهة');
+  const [startPoint, setStartPoint] = useState<LatLng>(origin);
+  const [startName, setStartName] = useState('موقعي الحالي');
 
   // البحث عن وجهة من داخل الملاحة
   const [searchOpen, setSearchOpen] = useState(false);
+  // أي حقل يُعدَّل الآن: الانطلاق أم الوصول
+  const [searchTarget, setSearchTarget] = useState<'start' | 'destination'>('destination');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PlaceSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -80,6 +84,37 @@ export function NavigationView({ origin, destination: initialDestination, destin
 
   // إصبع المستخدم على الشاشة الآن: لا نحرّك الكاميرا تحته
   const isGesturingRef = useRef(false);
+
+  /**
+   * اتجاه الجهاز من حسّاس البوصلة.
+   * اتجاه المسار يقول إلى أين يمضي الخط، لا إلى أين يشير الهاتف. فالسائق الواقف
+   * عند إشارة ويلتفت يمنة ويسرة يبقى سهمه ثابتاً، وهو ما يبدو معطّلاً. والبوصلة
+   * تعطي الاتجاه الحقيقي، فنفضّلها حين تتوفّر ونرجع إلى اتجاه المسار حين تغيب.
+   */
+  const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onOrientation = (e: DeviceOrientationEvent) => {
+      // iOS يعطي الاتجاه جاهزاً، وأندرويد يعطي alpha وهي زاوية معكوسة عن الشمال
+      const webkit = (e as DeviceOrientationEvent & { webkitCompassHeading?: number })
+        .webkitCompassHeading;
+      const heading = typeof webkit === 'number' && !isNaN(webkit)
+        ? webkit
+        : typeof e.alpha === 'number'
+          ? (360 - e.alpha) % 360
+          : null;
+      if (heading !== null) setDeviceHeading(heading);
+    };
+
+    // absolute أدق لأنها منسوبة إلى الشمال المغناطيسي لا إلى وضع البدء
+    const eventName = 'ondeviceorientationabsolute' in window
+      ? 'deviceorientationabsolute'
+      : 'deviceorientation';
+    window.addEventListener(eventName, onOrientation as EventListener);
+    return () => window.removeEventListener(eventName, onOrientation as EventListener);
+  }, []);
 
   // فلاتر الأماكن: الكلمة تُرسل إلى بحث الأماكن، والخادم يحوّلها إلى فئة
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -105,7 +140,7 @@ export function NavigationView({ origin, destination: initialDestination, destin
     setIsSimulating(false);
     stopSpeaking();
 
-    requestRoute(origin, destination, controller.signal)
+    requestRoute(startPoint, destination, controller.signal)
       .then(setRoute)
       .catch((err: unknown) => {
         if ((err as { name?: string })?.name === 'AbortError') return;
@@ -113,7 +148,7 @@ export function NavigationView({ origin, destination: initialDestination, destin
       });
 
     return () => controller.abort();
-  }, [origin.lat, origin.lng, destination.lat, destination.lng]);
+  }, [startPoint.lat, startPoint.lng, destination.lat, destination.lng]);
 
   // ---------------------------------------------------------------------
   // الموضع الحالي والمناورة القادمة
@@ -417,7 +452,13 @@ export function NavigationView({ origin, destination: initialDestination, destin
               width="34"
               height="34"
               viewBox="0 0 34 34"
-              style={{ transform: `rotate(${live.position.bearing}deg)`, display: 'block' }}
+              style={{
+                transform: `rotate(${
+                  !isSimulating && deviceHeading !== null ? deviceHeading : live.position.bearing
+                }deg)`,
+                display: 'block',
+                transition: 'transform 200ms linear',
+              }}
             >
               <path
                 d="M17 3 L28 29 L17 23 L6 29 Z"
@@ -510,7 +551,7 @@ export function NavigationView({ origin, destination: initialDestination, destin
         )}
         <button
           type="button"
-          onClick={() => setSearchOpen(true)}
+          onClick={() => { setSearchTarget('destination'); setSearchOpen(true); }}
           aria-label="البحث عن وجهة"
           className={`w-11 h-11 rounded-full shadow-lg flex items-center justify-center text-lg ${panelBg}`}
         >
@@ -544,7 +585,7 @@ export function NavigationView({ origin, destination: initialDestination, destin
               autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="إلى أين تريد الذهاب؟"
+              placeholder={searchTarget === 'start' ? 'من أين تنطلق؟' : 'إلى أين تريد الذهاب؟'}
               className={`flex-1 min-h-[44px] px-3.5 rounded-xl text-sm font-bold outline-none border ${
                 isDark
                   ? 'bg-[#161C28] border-white/10 text-[#DDE2F4] placeholder-slate-500'
@@ -563,8 +604,13 @@ export function NavigationView({ origin, destination: initialDestination, destin
                 key={r.id}
                 type="button"
                 onClick={() => {
-                  setDestination({ lat: r.lat, lng: r.lng });
-                  setDestinationName(r.name);
+                  if (searchTarget === 'start') {
+                    setStartPoint({ lat: r.lat, lng: r.lng });
+                    setStartName(r.name);
+                  } else {
+                    setDestination({ lat: r.lat, lng: r.lng });
+                    setDestinationName(r.name);
+                  }
                   setSearchOpen(false);
                   setSearchQuery('');
                   setIsFollowing(true);
@@ -590,7 +636,7 @@ export function NavigationView({ origin, destination: initialDestination, destin
       )}
 
       {/* فلاتر الأماكن: شريط أفقي فوق شريط الوصول */}
-      <div className="absolute bottom-28 inset-x-0 px-3 overflow-x-auto no-scrollbar">
+      <div className="absolute bottom-[11.5rem] inset-x-0 z-[8] px-3 overflow-x-auto no-scrollbar">
         <div className="flex gap-2 w-max pb-1">
           {PLACE_FILTERS.map((f) => {
             const isOn = activeFilter === f.query;
@@ -611,7 +657,7 @@ export function NavigationView({ origin, destination: initialDestination, destin
       </div>
 
       {activeFilter && (
-        <div className="absolute bottom-[8.5rem] inset-x-0 flex justify-center px-3 pointer-events-none">
+        <div className="absolute bottom-[15rem] inset-x-0 z-[8] flex justify-center px-3 pointer-events-none">
           <div className={`rounded-full px-3 py-1 text-[11px] font-bold shadow-lg ${panelBg}`}>
             {filterPlaces.length > 0
               ? `${filterPlaces.length} نتيجة قريبة`
@@ -623,14 +669,24 @@ export function NavigationView({ origin, destination: initialDestination, destin
       {/* شريط الوصول */}
       <div className="absolute bottom-0 inset-x-0 p-3 pb-safe">
         <div className={`rounded-2xl px-4 py-3 shadow-xl ${panelBg}`}>
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className="w-full text-right text-[11px] font-bold opacity-70 truncate mb-1.5 flex items-center gap-1.5"
-          >
-            <span className="truncate">إلى: {destinationName}</span>
-            <span className="shrink-0 opacity-60">✎ تغيير</span>
-          </button>
+          <div className="mb-2 space-y-1">
+            <button
+              type="button"
+              onClick={() => { setSearchTarget('start'); setSearchOpen(true); }}
+              className="w-full text-right text-[11px] font-bold opacity-70 truncate flex items-center gap-1.5"
+            >
+              <span className="text-emerald-500 shrink-0">●</span>
+              <span className="truncate">{startName}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchTarget('destination'); setSearchOpen(true); }}
+              className="w-full text-right text-[11px] font-bold opacity-70 truncate flex items-center gap-1.5"
+            >
+              <span className="text-red-500 shrink-0">◆</span>
+              <span className="truncate">{destinationName}</span>
+            </button>
+          </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-baseline gap-3">
               <span className="text-lg font-black">{live ? formatDuration(live.remainingS) : '—'}</span>
