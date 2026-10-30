@@ -436,3 +436,26 @@ export function nextManeuverIndex(
   }
   return maneuvers.length - 1;
 }
+
+/** رمز المناورة المعروض في شريط التعليمات */
+export function maneuverIcon(type: number): string {
+  if (DESTINATION_TYPES.has(type)) return '⚑';
+  if (type === ROUNDABOUT_ENTER || type === ROUNDABOUT_EXIT) return '⟳';
+  switch (type) {
+    case 9: return '↗';
+    case 10:
+    case 11: return '↱';
+    case 12:
+    case 13: return '↩';
+    case 14:
+    case 15: return '↰';
+    case 16: return '↖';
+    case 18:
+    case 20:
+    case 23: return '⤴';
+    case 19:
+    case 21:
+    case 24: return '⤵';
+    default: return '↑';
+  }
+}
