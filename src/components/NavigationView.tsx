@@ -57,7 +57,16 @@ const PLACE_FILTERS = [
 /** أبعد من هذا عن الخط نعدّه خروجاً عن المسار */
 const OFF_ROUTE_LIMIT_M = 50;
 
-export function NavigationView({ origin, destination, destinationName, onExit }: NavigationViewProps) {
+export function NavigationView({ origin, destination: initialDestination, destinationName: initialName, onExit }: NavigationViewProps) {
+  // الوجهة تصير حالة داخلية: البحث يغيّرها ويُعاد حساب المسار عليها
+  const [destination, setDestination] = useState<LatLng>(initialDestination);
+  const [destinationName, setDestinationName] = useState(initialName || 'الوجهة');
+
+  // البحث عن وجهة من داخل الملاحة
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PlaceSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const { isDark, mapStyle } = useTheme();
   const mapRef = useRef<MapRef | null>(null);
 
@@ -292,6 +301,27 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
     // يقطعه السائق، وإلا صار طلباً كل جزء من الثانية.
   }, [activeFilter]);
 
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!searchOpen || q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const controller = new AbortController();
+    // 350ms تمنع طلباً مع كل حرف، وهي القاعدة نفسها في شاشة البحث
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      searchPlacesInGovernorate(q, live?.position.point || origin, null, controller.signal)
+        .then((res) => setSearchResults(res.results || []))
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery, searchOpen]);
+
   const routeLines = useMemo(
     () =>
       route
@@ -356,7 +386,15 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
 
         {filterPlaces.map((place) => (
           <Marker key={place.id} longitude={place.lng} latitude={place.lat} anchor="bottom">
-            <div className="flex flex-col items-center pointer-events-none">
+            <div
+              className="flex flex-col items-center cursor-pointer"
+              onClick={() => {
+                setDestination({ lat: place.lat, lng: place.lng });
+                setDestinationName(place.name);
+                setActiveFilter(null);
+                setIsFollowing(true);
+              }}
+            >
               <div className="px-2 py-0.5 rounded-md bg-slate-900/85 text-white text-[10px] font-bold max-w-[7rem] truncate">
                 {place.name}
               </div>
@@ -424,6 +462,14 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
             لا يوجد صوت عربي في هذا الجهاز، والتعليمات تظهر مكتوبة
           </div>
         )}
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label="البحث عن وجهة"
+          className={`w-11 h-11 rounded-full shadow-lg flex items-center justify-center text-lg ${panelBg}`}
+        >
+          🔎
+        </button>
         {!isFollowing && (
           <button
             type="button"
@@ -435,6 +481,67 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
           </button>
         )}
       </div>
+
+      {/* البحث عن وجهة: يغطي الشاشة ويغلق باختيار نتيجة أو بالرجوع */}
+      {searchOpen && (
+        <div className={`absolute inset-0 z-[5] ${isDark ? 'bg-[#080E1A]' : 'bg-white'} flex flex-col`}>
+          <div className="p-3 pt-safe flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
+              aria-label="رجوع"
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${panelBg}`}
+            >
+              ✕
+            </button>
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="إلى أين تريد الذهاب؟"
+              className={`flex-1 min-h-[44px] px-3.5 rounded-xl text-sm font-bold outline-none border ${
+                isDark
+                  ? 'bg-[#161C28] border-white/10 text-[#DDE2F4] placeholder-slate-500'
+                  : 'bg-slate-100 border-slate-200 text-[#0F172A] placeholder-slate-400'
+              }`}
+            />
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3 pb-4">
+            {searching && <p className="text-xs font-bold opacity-60 py-3">جارٍ البحث…</p>}
+            {!searching && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+              <p className="text-xs font-bold opacity-60 py-3">لا نتائج</p>
+            )}
+            {searchResults.map((r, i) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => {
+                  setDestination({ lat: r.lat, lng: r.lng });
+                  setDestinationName(r.name);
+                  setSearchOpen(false);
+                  setSearchQuery('');
+                  setIsFollowing(true);
+                }}
+                className={`w-full text-right py-3 px-2 border-b flex items-center gap-3 ${
+                  isDark ? 'border-white/5' : 'border-slate-100'
+                }`}
+              >
+                <span className="text-xs font-black opacity-40 w-5 shrink-0">{i + 1}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-bold truncate">{r.name}</span>
+                  <span className="block text-[11px] opacity-60 truncate">
+                    {r.category}{r.area_name ? ` · ${r.area_name}` : ''}
+                  </span>
+                </span>
+                <span className="text-[11px] font-bold opacity-70 shrink-0">
+                  {formatDistance(r.distance_m)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* فلاتر الأماكن: شريط أفقي فوق شريط الوصول */}
       <div className="absolute bottom-28 inset-x-0 px-3 overflow-x-auto no-scrollbar">
@@ -470,6 +577,9 @@ export function NavigationView({ origin, destination, destinationName, onExit }:
       {/* شريط الوصول */}
       <div className="absolute bottom-0 inset-x-0 p-3 pb-safe">
         <div className={`rounded-2xl px-4 py-3 shadow-xl ${panelBg}`}>
+          <div className="text-[11px] font-bold opacity-70 truncate mb-1.5">
+            إلى: {destinationName}
+          </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-baseline gap-3">
               <span className="text-lg font-black">{live ? formatDuration(live.remainingS) : '—'}</span>
