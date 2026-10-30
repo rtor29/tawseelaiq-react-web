@@ -61,9 +61,11 @@ if [ "${1:-}" = "--pull" ]; then
         echo "❌ خطأ فادح: تعذّر التقديم السريع إلى origin/${STAGING_BRANCH}. تم إلغاء البناء."
         exit 1
     fi
-    if ! npm ci --no-audit --no-fund; then
-        echo "❌ خطأ فادح: فشل تثبيت الحزم. تم إلغاء البناء."
-        exit 1
+    if [ -z "${TAWSEELA_BUILD_REEXEC:-}" ]; then
+        if ! npm ci --no-audit --no-fund; then
+            echo "❌ خطأ فادح: فشل تثبيت الحزم. تم إلغاء البناء."
+            exit 1
+        fi
     fi
 
     # bash يقرأ السكربت وهو يُنفَّذ، والسحب غيّر هذا الملف نفسه للتوّ. فما بقي من
@@ -72,7 +74,9 @@ if [ "${1:-}" = "--pull" ]; then
     if [ -z "${TAWSEELA_BUILD_REEXEC:-}" ]; then
         echo ">>> أُعيد التشغيل بالنسخة المسحوبة من السكربت..."
         export TAWSEELA_BUILD_REEXEC=1
-        exec bash "$0"
+        # الرايات تُمرَّر كما هي: بدونها تتخطّى التمريرة الثانية كتلة --pull كلها،
+        # ومعها تبديل الفرع، فيُبنى الفرع الخطأ ويبدو كل شيء ناجحاً.
+        exec bash "$0" "$@"
     fi
 fi
 
