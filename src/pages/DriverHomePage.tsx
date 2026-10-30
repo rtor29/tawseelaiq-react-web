@@ -1516,7 +1516,7 @@ export default function DriverHomePage() {
   }
 
   // إرسال تنبيه تفعيل الملاحة الخارجية في الخلفية فوراً دون انتظار
-  function notifyExternalNavStart(app: 'Google Maps' | 'Waze') {
+  function notifyExternalNavStart(app: 'Google Maps') {
     if (!activeRide) return;
     try {
       localStorage.setItem('tawseela_preferred_nav_app', app);
@@ -1529,7 +1529,7 @@ export default function DriverHomePage() {
     http.post('/ride/external-nav/start', {
       requestId: activeRide.id,
       driverId: currentId,
-      app: app === 'Waze' ? 'Waze' : 'Google Maps',
+      app,
     }, {
       headers: { 'Idempotency-Key': `extnav-start-${activeRide.id}-${Date.now()}` }
     }).catch((err) => {
@@ -2966,7 +2966,7 @@ export default function DriverHomePage() {
         </div>
       )}
 
-      {/* نافذة اختيار تطبيق الملاحة المنبثقة (Google Maps / Waze / نسخ الإحداثيات) */}
+      {/* نافذة الملاحة: خرائط جوجل أو المتابعة داخل التطبيق (أُلغي Waze بطلب المالك 2026-10-30) */}
       {isNavModalOpen && navCoordinates && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl bg-[#161C28] border border-white/10 p-5 shadow-2xl text-center space-y-3.5" dir="rtl" role="dialog" aria-modal="true" aria-label="اختيار تطبيق الملاحة">
@@ -2992,25 +2992,10 @@ export default function DriverHomePage() {
                 rel="noopener noreferrer"
                 onClick={() => notifyExternalNavStart('Google Maps')}
                 aria-label="افتح في خرائط جوجل"
-                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer text-center"
+                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-300 font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer text-center"
               >
                 <span className="text-lg">🗺️</span>
                 <span>افتح في Google Maps</span>
-              </a>
-
-              {/* تطبيق ويز (Waze) كرابط أصلي مباشر <a> يفتح فوراً دون اعتراض المتصفح */}
-              <a
-                href={(!isNaN(navCoordinates.lat) && !isNaN(navCoordinates.lng) && navCoordinates.lat !== 0)
-                  ? `https://waze.com/ul?ll=${navCoordinates.lat},${navCoordinates.lng}&navigate=yes`
-                  : '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => notifyExternalNavStart('Waze')}
-                aria-label="افتح في تطبيق ويز"
-                className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-300 font-bold text-sm flex items-center justify-center gap-2.5 transition active:scale-[0.98] cursor-pointer text-center"
-              >
-                <span className="text-lg">🚙</span>
-                <span>افتح في Waze</span>
               </a>
 
               <button
