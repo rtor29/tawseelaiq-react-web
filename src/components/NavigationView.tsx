@@ -99,6 +99,12 @@ export function NavigationView({ origin, destination: initialDestination, destin
     setRoute(null);
     setDistanceAlong(0);
 
+    spokenRef.current = '';
+    arrivedSpokenRef.current = false;
+    firstVoiceSkipRef.current = true;
+    setIsSimulating(false);
+    stopSpeaking();
+
     requestRoute(origin, destination, controller.signal)
       .then(setRoute)
       .catch((err: unknown) => {
@@ -140,6 +146,23 @@ export function NavigationView({ origin, destination: initialDestination, destin
   // الصوت
   // ---------------------------------------------------------------------
   const spokenRef = useRef<string>('');
+  const arrivedSpokenRef = useRef(false);
+  // أول تنبيه بعد فتح الشاشة أو تبديل الوجهة لا يُنطق: المسافة تكون أصلاً تحت
+  // العتبة، فيتكلّم فور الفتح بلا سبب. ننطق عند **عبور** العتبة لا عند وجودنا دونها.
+  const firstVoiceSkipRef = useRef(true);
+
+  const stopSpeaking = useCallback(() => {
+    try {
+      window.speechSynthesis?.cancel();
+    } catch (_) {}
+  }, []);
+
+  // الجمل المنطوقة تبقى في طابور المتصفح بعد إغلاق الشاشة، فتتكلم فوق صفحة أخرى
+  useEffect(() => () => {
+    try {
+      window.speechSynthesis?.cancel();
+    } catch (_) {}
+  }, []);
 
   // صوت عربي مُختار بالاسم، لا بالاعتماد على lang وحده.
   //
@@ -212,8 +235,22 @@ export function NavigationView({ origin, destination: initialDestination, destin
     if (spokenRef.current === key) return;
     spokenRef.current = key;
 
+    if (firstVoiceSkipRef.current) {
+      firstVoiceSkipRef.current = false;
+      return;
+    }
+
     speak(voiceText(live.maneuver.text, threshold <= 30 ? null : live.distanceToManeuverM));
   }, [live, speak]);
+
+  // الوصول يُنهي كل شيء: تتوقف المحاكاة ويُقال «وصلت» مرة واحدة
+  useEffect(() => {
+    if (!live?.arrived || arrivedSpokenRef.current) return;
+    arrivedSpokenRef.current = true;
+    setIsSimulating(false);
+    stopSpeaking();
+    speak('وصلت إلى وجهتك');
+  }, [live?.arrived, speak, stopSpeaking]);
 
   // ---------------------------------------------------------------------
   // المحاكاة: تقدّم على المسار بسرعة ثابتة
@@ -375,12 +412,21 @@ export function NavigationView({ origin, destination: initialDestination, destin
 
         {live && (
           <Marker longitude={live.position.point.lng} latitude={live.position.point.lat} anchor="center">
-            <div
-              className="w-11 h-11 rounded-full bg-amber-500 border-[3px] border-white shadow-xl flex items-center justify-center"
-              style={{ transform: `rotate(${live.position.bearing}deg)` }}
+            {/* سهم وحده بلا دائرة: الدائرة كانت تخفي اتجاهه وتزحم الشارع تحته */}
+            <svg
+              width="34"
+              height="34"
+              viewBox="0 0 34 34"
+              style={{ transform: `rotate(${live.position.bearing}deg)`, display: 'block' }}
             >
-              <span className="text-slate-950 text-xl font-black leading-none">▲</span>
-            </div>
+              <path
+                d="M17 3 L28 29 L17 23 L6 29 Z"
+                fill="#2563EB"
+                stroke="#FFFFFF"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+            </svg>
           </Marker>
         )}
 
@@ -577,9 +623,14 @@ export function NavigationView({ origin, destination: initialDestination, destin
       {/* شريط الوصول */}
       <div className="absolute bottom-0 inset-x-0 p-3 pb-safe">
         <div className={`rounded-2xl px-4 py-3 shadow-xl ${panelBg}`}>
-          <div className="text-[11px] font-bold opacity-70 truncate mb-1.5">
-            إلى: {destinationName}
-          </div>
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="w-full text-right text-[11px] font-bold opacity-70 truncate mb-1.5 flex items-center gap-1.5"
+          >
+            <span className="truncate">إلى: {destinationName}</span>
+            <span className="shrink-0 opacity-60">✎ تغيير</span>
+          </button>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-baseline gap-3">
               <span className="text-lg font-black">{live ? formatDuration(live.remainingS) : '—'}</span>
@@ -590,7 +641,7 @@ export function NavigationView({ origin, destination: initialDestination, destin
             </div>
             <button
               type="button"
-              onClick={onExit}
+              onClick={() => { stopSpeaking(); onExit(); }}
               className="px-4 py-2 rounded-xl bg-red-500/90 text-white text-xs font-black"
             >
               إنهاء
