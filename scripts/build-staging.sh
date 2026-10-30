@@ -32,19 +32,33 @@ echo "======================================================"
 # سحب آخر نسخة من GitHub عند تمرير --pull (للبناء على الخادم بيد Antigravity)
 # بلا reset --hard وبلا force: يتوقف إن كانت الشجرة غير نظيفة أو تعذّر التقديم السريع
 # ------------------------------------------------------------------------------
+# الفرع الذي تبني منه staging. الإنتاج يبني من main دائماً، وstaging قد يبني من
+# فرع ميزة كي تُجرَّب وحدها بلا أن تدخل أي نشرة إنتاج. مثال:
+#   STAGING_BRANCH=nav-demo bash scripts/build-staging.sh --pull
+STAGING_BRANCH="${STAGING_BRANCH:-main}"
+
 if [ "${1:-}" = "--pull" ]; then
-    echo ">>> [0/3] سحب آخر نسخة من origin/main..."
+    echo ">>> [0/3] سحب آخر نسخة من origin/${STAGING_BRANCH}..."
     if ! git diff --quiet || ! git diff --cached --quiet; then
         echo "❌ خطأ فادح: شجرة العمل غير نظيفة. تم إلغاء البناء."
         git status --porcelain --untracked-files=no
         exit 1
     fi
-    if ! git fetch origin main; then
+    if ! git fetch origin "${STAGING_BRANCH}"; then
         echo "❌ خطأ فادح: فشل سحب التحديثات من GitHub. تم إلغاء البناء."
         exit 1
     fi
-    if ! git merge --ff-only origin/main; then
-        echo "❌ خطأ فادح: تعذّر التقديم السريع إلى origin/main. تم إلغاء البناء."
+    # الانتقال إلى الفرع المطلوب إن لم نكن عليه، بلا reset ولا force
+    CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+    if [ "$CURRENT_BRANCH" != "${STAGING_BRANCH}" ]; then
+        if git show-ref --verify --quiet "refs/heads/${STAGING_BRANCH}"; then
+            git checkout "${STAGING_BRANCH}" || { echo "❌ تعذّر الانتقال إلى ${STAGING_BRANCH}."; exit 1; }
+        else
+            git checkout -b "${STAGING_BRANCH}" "origin/${STAGING_BRANCH}" || { echo "❌ تعذّر إنشاء ${STAGING_BRANCH}."; exit 1; }
+        fi
+    fi
+    if ! git merge --ff-only "origin/${STAGING_BRANCH}"; then
+        echo "❌ خطأ فادح: تعذّر التقديم السريع إلى origin/${STAGING_BRANCH}. تم إلغاء البناء."
         exit 1
     fi
     if ! npm ci --no-audit --no-fund; then
@@ -63,6 +77,7 @@ if [ "${1:-}" = "--pull" ]; then
 fi
 
 echo "COMMIT_BEING_BUILT=$(git rev-parse --short HEAD)"
+echo "BUILD_BRANCH=$(git rev-parse --abbrev-ref HEAD)"
 
 # 1. تنظيف مجلد البناء المستقل
 rm -rf "${OUT_DIR}"
