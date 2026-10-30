@@ -51,6 +51,15 @@ if [ "${1:-}" = "--pull" ]; then
         echo "❌ خطأ فادح: فشل تثبيت الحزم. تم إلغاء البناء."
         exit 1
     fi
+
+    # bash يقرأ السكربت وهو يُنفَّذ، والسحب غيّر هذا الملف نفسه للتوّ. فما بقي من
+    # أسطر يُقرأ من النسخة القديمة: كود جديد بمفاتيح قديمة، وهو خطأ صامت لا يظهر
+    # في أي فحص. فنعيد تشغيل النسخة الجديدة، مرة واحدة بحارس، وبلا --pull.
+    if [ -z "${TAWSEELA_BUILD_REEXEC:-}" ]; then
+        echo ">>> أُعيد التشغيل بالنسخة المسحوبة من السكربت..."
+        export TAWSEELA_BUILD_REEXEC=1
+        exec bash "$0"
+    fi
 fi
 
 echo "COMMIT_BEING_BUILT=$(git rev-parse --short HEAD)"
@@ -64,6 +73,9 @@ export VITE_UNIFIED_HOME="true"
 # شاشة البحث V2 على خدمة الأماكن المفتوحة. تتطلب PLACES_SEARCH_ENABLED=true وجدول places في قاعدة الإنتاج.
 export VITE_SEARCH_V2="true"
 export NODE_ENV="production"
+
+# تُطبع لتظهر في تقرير النشر: مفاتيح البناء الفعلية، لا المتوقعة
+echo "BUILD_FLAGS: MAP_ENGINE=${VITE_MAP_ENGINE:-mapbox} SEARCH_V2=${VITE_SEARCH_V2:-unset} NAV_DEMO=${VITE_NAV_DEMO:-unset}"
 
 # 3. فحص الأنواع وبناء الحزم إلى مجلد dist المستقل
 echo ">>> [1/3] فحص الأنواع وبناء حزم الإنتاج..."
