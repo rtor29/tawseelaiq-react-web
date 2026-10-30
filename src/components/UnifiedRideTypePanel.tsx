@@ -15,6 +15,13 @@ export interface UnifiedRideTypePanelProps {
   className?: string;
   isTourActive?: boolean;
   tourStep?: 1 | 2 | null;
+  /**
+   * الملاحة ليست نوع مشوار بل إجراء: لا تُحجز ولا تُسعّر ولا تُغيّر عنوان الصفحة.
+   * فتُعرض بين الخيارين لأن مكانها هناك، وتبقى خارج `selectedType` كي لا يمسّ
+   * ظهورها منطق الحجز ولا الكباتن القريبين ولا الجولة التعريفية.
+   */
+  showNavigationOption?: boolean;
+  onOpenNavigation?: () => void;
 }
 
 export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
@@ -29,6 +36,8 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
   className = '',
   isTourActive = false,
   tourStep = null,
+  showNavigationOption = false,
+  onOpenNavigation,
 }) => {
   const touchStartYRef = useRef<number | null>(null);
 
@@ -183,6 +192,28 @@ export const UnifiedRideTypePanel: React.FC<UnifiedRideTypePanelProps> = ({
                 <span className="text-[11px] font-black px-1.5 py-0.5 rounded bg-slate-950/15">محدد</span>
               )}
             </button>
+
+            {/* خيار 3: الملاحة */}
+            {showNavigationOption && (
+              <button
+                type="button"
+                id="ride-type-nav-btn"
+                onClick={onOpenNavigation}
+                className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl flex items-center justify-between transition-all duration-150 cursor-pointer ${
+                  isDark
+                    ? 'bg-white/5 text-slate-300 hover:bg-white/10'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">🧭</span>
+                  <span className="text-xs font-bold">ملاحة</span>
+                </div>
+                <span className="text-[11px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500">
+                  تجريبي
+                </span>
+              </button>
+            )}
           </div>
 
           {/* فاصل وصف فلتر الجنس (إن كان مفعّلاً) */}

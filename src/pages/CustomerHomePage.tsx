@@ -11,7 +11,7 @@ import { Map as MapGL, Marker, type MapMouseEvent, type MapRef } from 'react-map
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { http } from '../lib/api';
 import { authStore } from '../lib/auth';
-import { config, SEARCH_V2_ENABLED } from '../lib/config';
+import { config, SEARCH_V2_ENABLED, NAV_DEMO_ENABLED } from '../lib/config';
 import { realtime } from '../lib/realtime';
 import { openTicketedStream, rideStreamUrl, type TicketedStreamHandle } from '../lib/sseTicket';
 import { searchPlaces, reverseGeocode, getDirections, applyMapEnhancements, keepMapSized, type PlaceResult } from '../lib/mapbox';
@@ -48,6 +48,7 @@ import type { PlaceSearchResult } from '../lib/placesApi';
 import { Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { UnifiedRideTypePanel, type UnifiedRideType } from '../components/UnifiedRideTypePanel';
+import { NavigationView } from '../components/NavigationView';
 import { UnifiedOnboardingTour } from '../components/UnifiedOnboardingTour';
 import { CommuteBookingCard } from '../components/commute/CommuteBookingCard';
 import { CommuteCancelModal } from '../components/commute/CommuteCancelModal';
@@ -197,6 +198,7 @@ export default function CustomerHomePage() {
   // إحداثيات وأسماء النقطتين
   const [pickup, setPickup] = useState<LngLat>(DEFAULT_PICKUP);
   const [pickupName, setPickupName] = useState(DEFAULT_PICKUP_NAME);
+  const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [dropoff, setDropoff] = useState<LngLat>(DEFAULT_DROPOFF);
   const [dropoffName, setDropoffName] = useState(DEFAULT_DROPOFF_NAME);
 
@@ -2713,6 +2715,8 @@ export default function CustomerHomePage() {
                 }}
                 selectedType={unifiedRideType}
                 onSelectType={handleSelectUnifiedRideType}
+                showNavigationOption={NAV_DEMO_ENABLED}
+                onOpenNavigation={() => setIsNavigationOpen(true)}
                 genderPreference={genderPreference}
                 onSelectGender={handleSelectGenderPreference}
                 isGenderFilterEnabled={isGenderFilterEnabled}
@@ -4675,6 +4679,16 @@ export default function CustomerHomePage() {
           onClose={() => setIsSearchOpen(false)}
           onSelect={handleSelectV2Place}
           onShowOnMap={handleShowV2ResultsOnMap}
+        />
+      )}
+
+      {/* شاشة الملاحة التجريبية: staging فقط، فوق كل شيء وتغلق بزر «إنهاء» */}
+      {isNavigationOpen && NAV_DEMO_ENABLED && (
+        <NavigationView
+          origin={{ lat: pickup.lat, lng: pickup.lng }}
+          destination={{ lat: dropoff.lat, lng: dropoff.lng }}
+          destinationName={dropoffName}
+          onExit={() => setIsNavigationOpen(false)}
         />
       )}
 

@@ -12,6 +12,10 @@ export const NAJAF_BBOX = IRAQ_BBOX; // للتوافق العكسي
 export const MAP_ENGINE = (import.meta.env.VITE_MAP_ENGINE || 'mapbox') as 'mapbox' | 'maplibre';
 export const IS_MAPLIBRE = MAP_ENGINE === 'maplibre';
 
+// شاشة الملاحة: عرض فقط على staging. الإنتاج لا يراها، ولا تُفعَّل فيه إلا
+// بقرار صريح، لأن شروط Mapbox تمنع تطبيقات المركبات بلا رخصة منفصلة.
+export const NAV_DEMO_ENABLED = import.meta.env.VITE_NAV_DEMO === 'true';
+
 // شاشة البحث V2 عبر خدمة الأماكن المفتوحة في الخادم (staging فقط حتى إصدار صريح)
 export const SEARCH_V2_ENABLED = import.meta.env.VITE_SEARCH_V2 === 'true';
 
