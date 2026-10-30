@@ -68,6 +68,8 @@ export function NavigationView({ origin, destination: initialDestination, destin
   const [searchOpen, setSearchOpen] = useState(false);
   // أي حقل يُعدَّل الآن: الانطلاق أم الوصول
   const [searchTarget, setSearchTarget] = useState<'start' | 'destination'>('destination');
+  // وضع «حدد على الخريطة»: الضغطة التالية على الخريطة تثبّت النقطة المقصودة
+  const [pickOnMap, setPickOnMap] = useState<'start' | 'destination' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PlaceSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -435,6 +437,18 @@ export function NavigationView({ origin, destination: initialDestination, destin
         // السحب وحده يوقف الملاحقة، فهو يقول «أريد النظر إلى مكان آخر».
         // أما التكبير والتدوير والإمالة فتبقى الملاحقة معها، لأن السائق يريد
         // أن يقترب أو يبتعد وهو ماضٍ في طريقه لا أن يتوقف عن المتابعة.
+        onClick={(e) => {
+          if (!pickOnMap) return;
+          const point = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+          if (pickOnMap === 'start') {
+            setStartPoint(point);
+            setStartName('نقطة على الخريطة');
+          } else {
+            setDestination(point);
+            setDestinationName('نقطة على الخريطة');
+          }
+          setPickOnMap(null);
+        }}
         onDragStart={() => setIsFollowing(false)}
         onZoomStart={(e) => { if (e.originalEvent) isGesturingRef.current = true; }}
         onZoomEnd={(e) => { if (e.originalEvent) isGesturingRef.current = false; }}
@@ -490,8 +504,35 @@ export function NavigationView({ origin, destination: initialDestination, destin
           </Marker>
         ))}
 
-        <Marker longitude={destination.lng} latitude={destination.lat} anchor="bottom">
-          <div className="flex flex-col items-center">
+        <Marker
+          longitude={startPoint.lng}
+          latitude={startPoint.lat}
+          anchor="bottom"
+          draggable
+          onDragEnd={(e) => {
+            setStartPoint({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+            setStartName('نقطة على الخريطة');
+          }}
+        >
+          <div className="flex flex-col items-center cursor-grab active:cursor-grabbing">
+            <div className="px-2.5 py-1 rounded-lg bg-emerald-600/95 text-white text-[11px] font-bold shadow-lg">
+              {startName}
+            </div>
+            <span className="text-2xl leading-none">●</span>
+          </div>
+        </Marker>
+
+        <Marker
+          longitude={destination.lng}
+          latitude={destination.lat}
+          anchor="bottom"
+          draggable
+          onDragEnd={(e) => {
+            setDestination({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+            setDestinationName('نقطة على الخريطة');
+          }}
+        >
+          <div className="flex flex-col items-center cursor-grab active:cursor-grabbing">
             <div className="px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-[11px] font-bold shadow-lg">
               {destinationName || 'الوجهة'}
             </div>
@@ -569,6 +610,15 @@ export function NavigationView({ origin, destination: initialDestination, destin
         )}
       </div>
 
+      {pickOnMap && (
+        <div className="absolute top-24 inset-x-0 z-[9] flex justify-center px-4">
+          <div className="flex items-center gap-2 rounded-full bg-amber-500 text-slate-950 px-4 py-2.5 text-xs font-black shadow-xl">
+            <span>اضغط على الخريطة لتحديد {pickOnMap === 'start' ? 'نقطة الانطلاق' : 'الوجهة'}</span>
+            <button type="button" onClick={() => setPickOnMap(null)} aria-label="إلغاء">✕</button>
+          </div>
+        </div>
+      )}
+
       {/* البحث عن وجهة: يغطي الشاشة ويغلق باختيار نتيجة أو بالرجوع */}
       {searchOpen && (
         <div className={`absolute inset-0 z-[5] ${isDark ? 'bg-[#080E1A]' : 'bg-white'} flex flex-col`}>
@@ -592,6 +642,35 @@ export function NavigationView({ origin, destination: initialDestination, destin
                   : 'bg-slate-100 border-slate-200 text-[#0F172A] placeholder-slate-400'
               }`}
             />
+          </div>
+
+          <div className="px-3 pb-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setPickOnMap(searchTarget);
+                setSearchOpen(false);
+                setSearchQuery('');
+                setIsFollowing(false);
+              }}
+              className="flex-1 min-h-[42px] rounded-xl bg-amber-500 text-slate-950 text-xs font-black"
+            >
+              📍 حدد على الخريطة
+            </button>
+            {searchTarget === 'start' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStartPoint(origin);
+                  setStartName('موقعي الحالي');
+                  setSearchOpen(false);
+                  setSearchQuery('');
+                }}
+                className={`flex-1 min-h-[42px] rounded-xl text-xs font-black ${panelBg}`}
+              >
+                ⌖ موقعي الحالي
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 pb-4">
