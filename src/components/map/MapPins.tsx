@@ -162,6 +162,11 @@ export function RouteLines({ lines }: { lines: RouteLineData[] }) {
             key={line.id}
             id={`line-${line.id}`}
             type="geojson"
+            // المحرك يبسّط هندسة أي مصدر geojson بخوارزمية دوغلاس-بوكر، و`tolerance`
+            // الافتراضي 0.375 لا صفر. فكل مسار نرسمه اليوم يصل الشاشة مبسّطاً، وتُقَصّ
+            // زواياه كلما قرّبنا — وهو ما يظهر كخطّ يقطع الرصيف بدل أن يتبع الشارع.
+            // الصفر يعني: ارسم الإحداثيات كما جاءت من محرك المسار بلا حذف نقطة.
+            tolerance={0}
             data={{
               type: 'Feature',
               properties: {},
